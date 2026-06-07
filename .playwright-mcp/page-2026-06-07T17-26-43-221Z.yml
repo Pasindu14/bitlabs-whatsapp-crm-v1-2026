@@ -1,0 +1,106 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - main [ref=e3]:
+    - generic [ref=e5]:
+      - button "Toggle Sidebar" [ref=e6]:
+        - img
+        - generic [ref=e7]: Toggle Sidebar
+      - navigation "breadcrumb" [ref=e8]:
+        - list [ref=e9]:
+          - listitem [ref=e10]:
+            - link "Superadmin" [ref=e11] [cursor=pointer]:
+              - /url: /superadmin
+          - listitem [ref=e12]:
+            - img [ref=e13]
+          - listitem [ref=e15]:
+            - link "Users" [disabled] [ref=e16]
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - heading "Users" [level=1] [ref=e19]
+        - paragraph [ref=e20]: Create and manage Company Admin and Agent users for tenant companies.
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - textbox "Search users..." [ref=e24]
+            - button "Search" [ref=e25]:
+              - img
+              - generic [ref=e26]: Search
+          - generic [ref=e27]:
+            - button "Add User" [ref=e28]:
+              - img
+              - text: Add User
+            - button "Toggle columns" [ref=e29]:
+              - img
+              - text: View
+            - button "Open table settings" [ref=e30]:
+              - img
+              - generic [ref=e31]: Open table settings
+        - generic "Data table" [ref=e32]:
+          - table [ref=e34]:
+            - rowgroup [ref=e35]:
+              - row "User Company Role Active Last Login Created Actions" [ref=e36]:
+                - columnheader "User" [ref=e37]:
+                  - button "User" [ref=e39]:
+                    - generic [ref=e40]: User
+                    - img
+                  - generic [ref=e42]:
+                    - separator [ref=e43]
+                    - img [ref=e44]
+                - columnheader "Company" [ref=e51]:
+                  - button "Company" [ref=e53]:
+                    - generic [ref=e54]: Company
+                    - img
+                  - generic [ref=e56]:
+                    - separator [ref=e57]
+                    - img [ref=e58]
+                - columnheader "Role" [ref=e65]:
+                  - text: Role
+                  - generic [ref=e67]:
+                    - separator [ref=e68]
+                    - img [ref=e69]
+                - columnheader "Active" [ref=e76]:
+                  - text: Active
+                  - generic [ref=e78]:
+                    - separator [ref=e79]
+                    - img [ref=e80]
+                - columnheader "Last Login" [ref=e87]:
+                  - text: Last Login
+                  - generic [ref=e89]:
+                    - separator [ref=e90]
+                    - img [ref=e91]
+                - columnheader "Created" [ref=e98]:
+                  - button "Created" [ref=e100]:
+                    - generic [ref=e101]: Created
+                    - img
+                  - generic [ref=e103]:
+                    - separator [ref=e104]
+                    - img [ref=e105]
+                - columnheader "Actions" [ref=e112]:
+                  - text: Actions
+                  - generic [ref=e114]:
+                    - separator [ref=e115]
+                    - img [ref=e116]
+            - rowgroup [ref=e123]:
+              - row "Loading" [ref=e124]:
+                - cell "Loading" [ref=e125]:
+                  - status "Loading" [ref=e127]
+        - generic [ref=e129]:
+          - generic [ref=e130]: 0 row(s) .
+          - generic [ref=e131]:
+            - generic [ref=e132]:
+              - paragraph [ref=e133]: Rows per page
+              - combobox [ref=e134] [cursor=pointer]:
+                - img
+              - combobox [ref=e135]
+            - generic [ref=e136]: Page 1 of 1
+            - generic [ref=e137]:
+              - button "Go to first page" [disabled]:
+                - img
+              - button "Go to previous page" [disabled]:
+                - img
+              - button "Go to next page" [disabled]:
+                - img
+              - button "Go to last page" [disabled]:
+                - img
+  - button "Open Next.js Dev Tools" [ref=e143] [cursor=pointer]:
+    - img [ref=e144]

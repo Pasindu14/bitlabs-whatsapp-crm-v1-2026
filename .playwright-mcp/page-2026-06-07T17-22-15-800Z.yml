@@ -1,0 +1,307 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e70] [cursor=pointer]:
+    - img [ref=e71]
+  - alert [ref=e74]
+  - generic [ref=e75]:
+    - generic [ref=e78]:
+      - list [ref=e80]:
+        - listitem [ref=e81]:
+          - link "Bitlabs Enterprise" [ref=e82] [cursor=pointer]:
+            - /url: /home
+            - img [ref=e84]
+            - generic [ref=e86]:
+              - generic [ref=e87]: Bitlabs
+              - generic [ref=e88]: Enterprise
+      - generic [ref=e90]:
+        - generic [ref=e91]: Administration
+        - list [ref=e92]:
+          - listitem [ref=e93]:
+            - button "Platform" [expanded] [ref=e94]:
+              - img [ref=e95]
+              - generic [ref=e99]: Platform
+              - img [ref=e100]
+            - list [ref=e103]:
+              - listitem [ref=e104]:
+                - link "Companies" [ref=e105] [cursor=pointer]:
+                  - /url: /superadmin/companies
+                  - generic [ref=e106]: Companies
+              - listitem [ref=e107]:
+                - link "WABA Connections" [ref=e108] [cursor=pointer]:
+                  - /url: /superadmin/waba-connections
+                  - generic [ref=e109]: WABA Connections
+              - listitem [ref=e110]:
+                - link "Plans" [ref=e111] [cursor=pointer]:
+                  - /url: /superadmin/plans
+                  - generic [ref=e112]: Plans
+              - listitem [ref=e113]:
+                - link "Subscriptions" [ref=e114] [cursor=pointer]:
+                  - /url: /superadmin/subscriptions
+                  - generic [ref=e115]: Subscriptions
+              - listitem [ref=e116]:
+                - link "Users" [ref=e117] [cursor=pointer]:
+                  - /url: /superadmin/users
+                  - generic [ref=e118]: Users
+      - list [ref=e120]:
+        - listitem [ref=e121]:
+          - button "P Platform Super Admin superadmin@btilabs.com" [ref=e122]:
+            - generic [ref=e124]: P
+            - generic [ref=e125]:
+              - generic [ref=e126]: Platform Super Admin
+              - generic [ref=e127]: superadmin@btilabs.com
+            - img [ref=e128]
+      - button "Toggle Sidebar" [ref=e131]
+    - main [ref=e132]:
+      - generic [ref=e134]:
+        - button "Toggle Sidebar" [ref=e135]:
+          - img
+          - generic [ref=e136]: Toggle Sidebar
+        - navigation "breadcrumb" [ref=e137]:
+          - list [ref=e138]:
+            - listitem [ref=e139]:
+              - link "Superadmin" [ref=e140] [cursor=pointer]:
+                - /url: /superadmin
+            - listitem [ref=e141]:
+              - img [ref=e142]
+            - listitem [ref=e144]:
+              - link "Companies" [disabled] [ref=e145]
+      - generic [ref=e146]:
+        - generic [ref=e147]:
+          - heading "Company Management" [level=1] [ref=e148]
+          - paragraph [ref=e149]: Create and manage tenant companies on the platform.
+        - generic [ref=e150]:
+          - generic [ref=e151]:
+            - generic [ref=e152]:
+              - textbox "Search companies..." [ref=e153]
+              - button "Search" [ref=e154]:
+                - img
+                - generic [ref=e155]: Search
+            - generic [ref=e156]:
+              - button "Add Company" [ref=e157]:
+                - img
+                - text: Add Company
+              - button "Toggle columns" [ref=e158]:
+                - img
+                - text: View
+              - button "Open table settings" [ref=e159]:
+                - img
+                - generic [ref=e160]: Open table settings
+          - generic "Data table" [ref=e161]:
+            - table [ref=e163]:
+              - rowgroup [ref=e164]:
+                - row "Company Email Phone Status Created Actions" [ref=e165]:
+                  - columnheader "Company" [ref=e166]:
+                    - button "Company" [ref=e168]:
+                      - generic [ref=e169]: Company
+                      - img
+                    - generic [ref=e171]:
+                      - separator [ref=e172]
+                      - img [ref=e173]
+                  - columnheader "Email" [ref=e180]:
+                    - button "Email" [ref=e182]:
+                      - generic [ref=e183]: Email
+                      - img
+                    - generic [ref=e185]:
+                      - separator [ref=e186]
+                      - img [ref=e187]
+                  - columnheader "Phone" [ref=e194]:
+                    - text: Phone
+                    - generic [ref=e196]:
+                      - separator [ref=e197]
+                      - img [ref=e198]
+                  - columnheader "Status" [ref=e205]:
+                    - text: Status
+                    - generic [ref=e207]:
+                      - separator [ref=e208]
+                      - img [ref=e209]
+                  - columnheader "Created" [ref=e216]:
+                    - button "Created" [ref=e218]:
+                      - generic [ref=e219]: Created
+                      - img
+                    - generic [ref=e221]:
+                      - separator [ref=e222]
+                      - img [ref=e223]
+                  - columnheader "Actions" [ref=e230]:
+                    - text: Actions
+                    - generic [ref=e232]:
+                      - separator [ref=e233]
+                      - img [ref=e234]
+              - rowgroup [ref=e241]:
+                - row "SmokeTest Co 1780851854 — — — Active Jun 7, 2026 Open actions" [ref=e242]:
+                  - cell "SmokeTest Co 1780851854 —" [ref=e243]:
+                    - generic [ref=e244]:
+                      - img [ref=e246]
+                      - generic [ref=e250]:
+                        - generic [ref=e251]: SmokeTest Co 1780851854
+                        - generic [ref=e252]: —
+                  - cell "—" [ref=e253]
+                  - cell "—" [ref=e254]
+                  - cell "Active" [ref=e255]:
+                    - generic [ref=e256]: Active
+                  - cell "Jun 7, 2026" [ref=e257]
+                  - cell "Open actions" [ref=e258]:
+                    - button "Open actions" [ref=e259]:
+                      - img
+                      - generic [ref=e260]: Open actions
+                - row "SmokeTest Co 1780851827 — — — Active Jun 7, 2026 Open actions" [ref=e261]:
+                  - cell "SmokeTest Co 1780851827 —" [ref=e262]:
+                    - generic [ref=e263]:
+                      - img [ref=e265]
+                      - generic [ref=e269]:
+                        - generic [ref=e270]: SmokeTest Co 1780851827
+                        - generic [ref=e271]: —
+                  - cell "—" [ref=e272]
+                  - cell "—" [ref=e273]
+                  - cell "Active" [ref=e274]:
+                    - generic [ref=e275]: Active
+                  - cell "Jun 7, 2026" [ref=e276]
+                  - cell "Open actions" [ref=e277]:
+                    - button "Open actions" [ref=e278]:
+                      - img
+                      - generic [ref=e279]: Open actions
+                - row "E2E Upd Co mq3kn1v8 — — — Active Jun 7, 2026 Open actions" [ref=e280]:
+                  - cell "E2E Upd Co mq3kn1v8 —" [ref=e281]:
+                    - generic [ref=e282]:
+                      - img [ref=e284]
+                      - generic [ref=e288]:
+                        - generic [ref=e289]: E2E Upd Co mq3kn1v8
+                        - generic [ref=e290]: —
+                  - cell "—" [ref=e291]
+                  - cell "—" [ref=e292]
+                  - cell "Active" [ref=e293]:
+                    - generic [ref=e294]: Active
+                  - cell "Jun 7, 2026" [ref=e295]
+                  - cell "Open actions" [ref=e296]:
+                    - button "Open actions" [ref=e297]:
+                      - img
+                      - generic [ref=e298]: Open actions
+                - row "E2E Sts Co smq3kmndh — — — Active Jun 7, 2026 Open actions" [ref=e299]:
+                  - cell "E2E Sts Co smq3kmndh —" [ref=e300]:
+                    - generic [ref=e301]:
+                      - img [ref=e303]
+                      - generic [ref=e307]:
+                        - generic [ref=e308]: E2E Sts Co smq3kmndh
+                        - generic [ref=e309]: —
+                  - cell "—" [ref=e310]
+                  - cell "—" [ref=e311]
+                  - cell "Active" [ref=e312]:
+                    - generic [ref=e313]: Active
+                  - cell "Jun 7, 2026" [ref=e314]
+                  - cell "Open actions" [ref=e315]:
+                    - button "Open actions" [ref=e316]:
+                      - img
+                      - generic [ref=e317]: Open actions
+                - row "E2E Pwd Co pmq3kmdm3 — — — Active Jun 7, 2026 Open actions" [ref=e318]:
+                  - cell "E2E Pwd Co pmq3kmdm3 —" [ref=e319]:
+                    - generic [ref=e320]:
+                      - img [ref=e322]
+                      - generic [ref=e326]:
+                        - generic [ref=e327]: E2E Pwd Co pmq3kmdm3
+                        - generic [ref=e328]: —
+                  - cell "—" [ref=e329]
+                  - cell "—" [ref=e330]
+                  - cell "Active" [ref=e331]:
+                    - generic [ref=e332]: Active
+                  - cell "Jun 7, 2026" [ref=e333]
+                  - cell "Open actions" [ref=e334]:
+                    - button "Open actions" [ref=e335]:
+                      - img
+                      - generic [ref=e336]: Open actions
+                - row "E2E User Co mq3klo6v — — — Active Jun 7, 2026 Open actions" [ref=e337]:
+                  - cell "E2E User Co mq3klo6v —" [ref=e338]:
+                    - generic [ref=e339]:
+                      - img [ref=e341]
+                      - generic [ref=e345]:
+                        - generic [ref=e346]: E2E User Co mq3klo6v
+                        - generic [ref=e347]: —
+                  - cell "—" [ref=e348]
+                  - cell "—" [ref=e349]
+                  - cell "Active" [ref=e350]:
+                    - generic [ref=e351]: Active
+                  - cell "Jun 7, 2026" [ref=e352]
+                  - cell "Open actions" [ref=e353]:
+                    - button "Open actions" [ref=e354]:
+                      - img
+                      - generic [ref=e355]: Open actions
+                - row "E2E User Co mq3k2yf3 — — — Active Jun 7, 2026 Open actions" [ref=e356]:
+                  - cell "E2E User Co mq3k2yf3 —" [ref=e357]:
+                    - generic [ref=e358]:
+                      - img [ref=e360]
+                      - generic [ref=e364]:
+                        - generic [ref=e365]: E2E User Co mq3k2yf3
+                        - generic [ref=e366]: —
+                  - cell "—" [ref=e367]
+                  - cell "—" [ref=e368]
+                  - cell "Active" [ref=e369]:
+                    - generic [ref=e370]: Active
+                  - cell "Jun 7, 2026" [ref=e371]
+                  - cell "Open actions" [ref=e372]:
+                    - button "Open actions" [ref=e373]:
+                      - img
+                      - generic [ref=e374]: Open actions
+                - row "E2E WC Edit Co mq3jndun — — — Active Jun 7, 2026 Open actions" [ref=e375]:
+                  - cell "E2E WC Edit Co mq3jndun —" [ref=e376]:
+                    - generic [ref=e377]:
+                      - img [ref=e379]
+                      - generic [ref=e383]:
+                        - generic [ref=e384]: E2E WC Edit Co mq3jndun
+                        - generic [ref=e385]: —
+                  - cell "—" [ref=e386]
+                  - cell "—" [ref=e387]
+                  - cell "Active" [ref=e388]:
+                    - generic [ref=e389]: Active
+                  - cell "Jun 7, 2026" [ref=e390]
+                  - cell "Open actions" [ref=e391]:
+                    - button "Open actions" [ref=e392]:
+                      - img
+                      - generic [ref=e393]: Open actions
+                - row "E2E WC Sts Co smq3jn0pi — — — Active Jun 7, 2026 Open actions" [ref=e394]:
+                  - cell "E2E WC Sts Co smq3jn0pi —" [ref=e395]:
+                    - generic [ref=e396]:
+                      - img [ref=e398]
+                      - generic [ref=e402]:
+                        - generic [ref=e403]: E2E WC Sts Co smq3jn0pi
+                        - generic [ref=e404]: —
+                  - cell "—" [ref=e405]
+                  - cell "—" [ref=e406]
+                  - cell "Active" [ref=e407]:
+                    - generic [ref=e408]: Active
+                  - cell "Jun 7, 2026" [ref=e409]
+                  - cell "Open actions" [ref=e410]:
+                    - button "Open actions" [ref=e411]:
+                      - img
+                      - generic [ref=e412]: Open actions
+                - row "E2E WC Co mq3jmefe — — — Active Jun 7, 2026 Open actions" [ref=e413]:
+                  - cell "E2E WC Co mq3jmefe —" [ref=e414]:
+                    - generic [ref=e415]:
+                      - img [ref=e417]
+                      - generic [ref=e421]:
+                        - generic [ref=e422]: E2E WC Co mq3jmefe
+                        - generic [ref=e423]: —
+                  - cell "—" [ref=e424]
+                  - cell "—" [ref=e425]
+                  - cell "Active" [ref=e426]:
+                    - generic [ref=e427]: Active
+                  - cell "Jun 7, 2026" [ref=e428]
+                  - cell "Open actions" [ref=e429]:
+                    - button "Open actions" [ref=e430]:
+                      - img
+                      - generic [ref=e431]: Open actions
+          - generic [ref=e432]:
+            - generic [ref=e433]: 23 row(s) .
+            - generic [ref=e434]:
+              - generic [ref=e435]:
+                - paragraph [ref=e436]: Rows per page
+                - combobox [ref=e437] [cursor=pointer]:
+                  - generic: "10"
+                  - img
+              - generic [ref=e438]: Page 1 of 3
+              - generic [ref=e439]:
+                - button "Go to first page" [disabled]:
+                  - img
+                - button "Go to previous page" [disabled]:
+                  - img
+                - button "Go to next page" [ref=e440] [cursor=pointer]:
+                  - img
+                - button "Go to last page" [ref=e441] [cursor=pointer]:
+                  - img

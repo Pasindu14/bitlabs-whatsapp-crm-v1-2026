@@ -1,0 +1,134 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e74] [cursor=pointer]:
+    - img [ref=e75]
+  - alert [ref=e78]
+  - generic [ref=e79]:
+    - generic [ref=e82]:
+      - list [ref=e84]:
+        - listitem [ref=e85]:
+          - link "Bitlabs Enterprise" [ref=e86] [cursor=pointer]:
+            - /url: /home
+            - img [ref=e88]
+            - generic [ref=e90]:
+              - generic [ref=e91]: Bitlabs
+              - generic [ref=e92]: Enterprise
+      - generic [ref=e94]:
+        - generic [ref=e95]: Administration
+        - list [ref=e96]:
+          - listitem [ref=e97]:
+            - button "Overview" [expanded] [ref=e98]:
+              - img [ref=e99]
+              - generic [ref=e104]: Overview
+              - img [ref=e105]
+            - list [ref=e108]:
+              - listitem [ref=e109]:
+                - link "Dashboard" [ref=e110] [cursor=pointer]:
+                  - /url: /dashboard
+                  - generic [ref=e111]: Dashboard
+          - listitem [ref=e112]:
+            - button "Messaging" [ref=e113]:
+              - img [ref=e114]
+              - generic [ref=e116]: Messaging
+              - img [ref=e117]
+          - listitem [ref=e119]:
+            - button "Company Settings" [ref=e120]:
+              - img [ref=e121]
+              - generic [ref=e126]: Company Settings
+              - img [ref=e127]
+      - list [ref=e130]:
+        - listitem [ref=e131]:
+          - button "S Smoke Admin admin1780851854@smoke.test" [ref=e132]:
+            - generic [ref=e134]: S
+            - generic [ref=e135]:
+              - generic [ref=e136]: Smoke Admin
+              - generic [ref=e137]: admin1780851854@smoke.test
+            - img [ref=e138]
+      - button "Toggle Sidebar" [ref=e141]
+    - main [ref=e142]:
+      - generic [ref=e144]:
+        - button "Toggle Sidebar" [ref=e145]:
+          - img
+          - generic [ref=e146]: Toggle Sidebar
+        - navigation "breadcrumb" [ref=e147]:
+          - list [ref=e148]:
+            - listitem [ref=e149]:
+              - link "Dashboard" [disabled] [ref=e150]
+      - generic [ref=e151]:
+        - generic [ref=e153]:
+          - generic [ref=e154]:
+            - generic [ref=e155]: Dashboard
+            - heading "Good evening, Smoke" [level=1] [ref=e157]
+            - paragraph [ref=e158]: Manage your messaging, contacts, and team — all from one place.
+            - generic [ref=e159]:
+              - generic [ref=e160]: Company Admin
+              - generic [ref=e161]: Sunday, June 7
+          - generic [ref=e162]:
+            - generic [ref=e165]: SA
+            - generic [ref=e166]:
+              - paragraph [ref=e167]: Smoke Admin
+              - paragraph [ref=e168]: admin1780851854@smoke.test
+        - generic [ref=e169]:
+          - generic [ref=e171]:
+            - generic [ref=e173]:
+              - img [ref=e174]
+              - paragraph [ref=e176]: Current Plan
+            - generic [ref=e177]:
+              - img [ref=e179]
+              - paragraph [ref=e182]: No active plan
+              - paragraph [ref=e183]: Contact your platform administrator to get set up.
+          - generic [ref=e184]:
+            - paragraph [ref=e185]: Account
+            - generic [ref=e186]:
+              - generic [ref=e187]:
+                - img [ref=e189]
+                - generic [ref=e192]:
+                  - generic [ref=e193]: Email
+                  - generic [ref=e194]: admin1780851854@smoke.test
+              - generic [ref=e195]:
+                - img [ref=e197]
+                - generic [ref=e199]:
+                  - generic [ref=e200]: Role
+                  - generic [ref=e202]: Company Admin
+              - generic [ref=e203]:
+                - img [ref=e205]
+                - generic [ref=e209]:
+                  - generic [ref=e210]: Workspace
+                  - generic [ref=e211]: e5666277-ee89-4c77-b794-c681e84373fb
+        - generic [ref=e212]:
+          - generic [ref=e213]:
+            - heading "Quick access" [level=2] [ref=e214]
+            - paragraph [ref=e215]: Pick up where you left off.
+          - generic [ref=e216]:
+            - link "Messages Send and review WhatsApp messages." [ref=e217] [cursor=pointer]:
+              - /url: /messages
+              - generic [ref=e218]:
+                - img [ref=e220]
+                - img [ref=e223]
+              - generic [ref=e226]:
+                - heading "Messages" [level=3] [ref=e227]
+                - paragraph [ref=e228]: Send and review WhatsApp messages.
+            - link "Contacts Manage the people you message." [ref=e229] [cursor=pointer]:
+              - /url: /contacts
+              - generic [ref=e230]:
+                - img [ref=e232]
+                - img [ref=e236]
+              - generic [ref=e239]:
+                - heading "Contacts" [level=3] [ref=e240]
+                - paragraph [ref=e241]: Manage the people you message.
+            - link "Contact Lists Group contacts for campaigns." [ref=e242] [cursor=pointer]:
+              - /url: /contact-lists
+              - generic [ref=e243]:
+                - img [ref=e245]
+                - img [ref=e248]
+              - generic [ref=e251]:
+                - heading "Contact Lists" [level=3] [ref=e252]
+                - paragraph [ref=e253]: Group contacts for campaigns.
+            - link "Team Invite users and set permissions." [ref=e254] [cursor=pointer]:
+              - /url: /team
+              - generic [ref=e255]:
+                - img [ref=e257]
+                - img [ref=e262]
+              - generic [ref=e265]:
+                - heading "Team" [level=3] [ref=e266]
+                - paragraph [ref=e267]: Invite users and set permissions.
