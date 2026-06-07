@@ -1,0 +1,47 @@
+# ---- .NET ----
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+*_i.c
+*.dbmdl
+
+# Rider / Resharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+build/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# ---- Env & secrets ----
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+# Dev settings hold real secrets (DB password, Meta app secret) — never commit.
+appsettings.Development.json
+!appsettings.Development.example.json
+
+# ---- Logs ----
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
