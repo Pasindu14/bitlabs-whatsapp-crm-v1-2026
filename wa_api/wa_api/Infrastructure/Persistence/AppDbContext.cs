@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Audit;
 using wa_api.Features.Auth;
 using wa_api.Features.Companies;
+using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Infrastructure.Persistence;
 
@@ -14,6 +15,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     // ── Feature tables ─────────────────────────────────────────────────────
     public DbSet<User> Users => Set<User>();
     public DbSet<Company> Companies => Set<Company>();
+    public DbSet<WabaConnection> WabaConnections => Set<WabaConnection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -54,6 +56,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.Slug).IsUnique();         // unique when set (nulls allowed)
             e.Property(x => x.Email).HasMaxLength(256);
             e.Property(x => x.Phone).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<WabaConnection>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.PhoneNumberId).IsRequired().HasMaxLength(64);
+            e.HasIndex(x => x.PhoneNumberId).IsUnique();   // one connection per Meta phone-number id
+            e.Property(x => x.WabaId).IsRequired().HasMaxLength(64);
+            e.Property(x => x.DisplayPhoneNumber).HasMaxLength(32);
+            e.Property(x => x.EncryptedAccessToken).IsRequired().HasMaxLength(2048);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne(x => x.Company)
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

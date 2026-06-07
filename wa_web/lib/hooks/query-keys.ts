@@ -45,6 +45,15 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.companies.details(), id] as const,
   },
 
+  // WABA connections (SuperAdmin)
+  wabaConnections: {
+    all: ['waba-connections'] as const,
+    lists: () => [...queryKeys.wabaConnections.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.wabaConnections.lists(), filters] as const,
+    details: () => [...queryKeys.wabaConnections.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.wabaConnections.details(), id] as const,
+  },
+
   // Stats/Analytics
   stats: {
     all: ['stats'] as const,
