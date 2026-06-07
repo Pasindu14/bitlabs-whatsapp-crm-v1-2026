@@ -16,5 +16,7 @@ public record WabaConnectionResponse(
     WabaConnectionStatus Status,
     bool HasAccessToken,
     bool IsActive,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    DateTime? LastHealthCheckAt,
+    string? HealthCheckErrorMessage
 );

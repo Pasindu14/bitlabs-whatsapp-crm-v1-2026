@@ -43,7 +43,8 @@ public class WabaConnectionService(AppDbContext db) : IWabaConnectionService
             .Take(pageSize)
             .Select(w => new WabaConnectionResponse(
                 w.Id, w.CompanyId, w.Company.Name, w.PhoneNumberId, w.WabaId,
-                w.DisplayPhoneNumber, w.Status, w.EncryptedAccessToken != "", w.IsActive, w.CreatedAt))
+                w.DisplayPhoneNumber, w.Status, w.EncryptedAccessToken != "", w.IsActive, w.CreatedAt,
+                w.LastHealthCheckAt, w.HealthCheckErrorMessage))
             .ToListAsync(ct);
 
         return (items, total);
@@ -146,5 +147,6 @@ public class WabaConnectionService(AppDbContext db) : IWabaConnectionService
         => new(
             w.Id, w.CompanyId, companyName ?? w.Company?.Name,
             w.PhoneNumberId, w.WabaId, w.DisplayPhoneNumber, w.Status,
-            !string.IsNullOrEmpty(w.EncryptedAccessToken), w.IsActive, w.CreatedAt);
+            !string.IsNullOrEmpty(w.EncryptedAccessToken), w.IsActive, w.CreatedAt,
+            w.LastHealthCheckAt, w.HealthCheckErrorMessage);
 }

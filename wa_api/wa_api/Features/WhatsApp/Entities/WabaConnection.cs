@@ -38,6 +38,12 @@ public class WabaConnection : BaseEntity, ITenantEntity
     /// <summary>Connection status as reported / set by the platform.</summary>
     public WabaConnectionStatus Status { get; set; } = WabaConnectionStatus.Connected;
 
+    /// <summary>UTC timestamp of the last Hangfire health-check poll against Meta's API.</summary>
+    public DateTime? LastHealthCheckAt { get; set; }
+
+    /// <summary>Last error message returned by Meta's API during a health check. Null when healthy.</summary>
+    public string? HealthCheckErrorMessage { get; set; }
+
     /// <summary>Owning company navigation.</summary>
     public Company Company { get; set; } = null!;
 }

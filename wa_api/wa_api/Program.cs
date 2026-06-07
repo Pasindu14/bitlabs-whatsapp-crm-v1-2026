@@ -79,6 +79,14 @@ try
 
     // ── Background jobs (Hangfire) ─────────────────────────────────────────
     builder.Services.AddPlatformHangfire(builder.Configuration);
+    builder.Services.AddTransient<WabaHealthCheckJob>();
+
+    // Named HttpClient for Meta Graph API calls (base address set here; auth header per-request).
+    builder.Services.AddHttpClient("MetaGraph", c =>
+    {
+        c.BaseAddress = new Uri("https://graph.facebook.com/");
+        c.Timeout = TimeSpan.FromSeconds(15);
+    });
 
     // ── Authentication & Authorization (JWT bearer) ───────────────────────
     builder.Services.AddPlatformAuthentication(builder.Configuration);
@@ -187,6 +195,7 @@ try
         Authorization = [new HangfireDashboardAuthorizationFilter(app.Environment)]
     });
     RecurringJob.AddOrUpdate<HeartbeatJob>("heartbeat", j => j.Run(), Cron.Hourly);
+    RecurringJob.AddOrUpdate<WabaHealthCheckJob>("waba-health-check", j => j.RunAsync(), Cron.MinuteInterval(15));
 
     app.Run();
 }
