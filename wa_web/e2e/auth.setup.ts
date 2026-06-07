@@ -21,7 +21,8 @@ setup('authenticate as superadmin', async ({ page }) => {
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
 
-  await page.waitForURL('**/dashboard', { timeout: 15_000 })
+  // SuperAdmin is redirected from /dashboard → /superadmin/companies by middleware
+  await page.waitForURL(/\/(dashboard|superadmin)/, { timeout: 15_000 })
 
   await page.context().storageState({ path: authFile })
 })

@@ -36,6 +36,15 @@ export const queryKeys = {
     profile: () => [...queryKeys.users.all, 'profile'] as const,
   },
 
+  // Team (CompanyAdmin — users within the caller's own company)
+  team: {
+    all: ['team'] as const,
+    lists: () => [...queryKeys.team.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.team.lists(), filters] as const,
+    details: () => [...queryKeys.team.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.team.details(), id] as const,
+  },
+
   // Companies (SuperAdmin)
   companies: {
     all: ['companies'] as const,
