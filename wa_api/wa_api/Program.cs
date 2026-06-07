@@ -78,6 +78,7 @@ try
     // ── Feature services ───────────────────────────────────────────────────
     builder.Services.AddScoped<wa_api.Features.Companies.ICompanyService, wa_api.Features.Companies.CompanyService>();
     builder.Services.AddScoped<wa_api.Features.WhatsApp.IWabaConnectionService, wa_api.Features.WhatsApp.WabaConnectionService>();
+    builder.Services.AddScoped<wa_api.Features.Users.IUserService, wa_api.Features.Users.UserService>();
 
     // ── Observability ──────────────────────────────────────────────────────
     builder.Services.AddPlatformHealthChecks(builder.Configuration);

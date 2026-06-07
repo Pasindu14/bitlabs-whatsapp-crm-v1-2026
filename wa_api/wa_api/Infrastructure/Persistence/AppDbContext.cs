@@ -45,6 +45,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.FullName).IsRequired().HasMaxLength(200);
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(50).IsRequired();
             e.HasIndex(x => x.CompanyId);               // null for SuperAdmin; set for tenant users
+            e.HasOne(x => x.Company)                    // optional FK — SuperAdmin's CompanyId is null
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Company>(e =>

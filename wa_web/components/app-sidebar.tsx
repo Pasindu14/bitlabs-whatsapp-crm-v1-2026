@@ -54,6 +54,7 @@ const navConfig: NavGroup[] = [
     items: [
       { title: "Companies", url: "/superadmin/companies" },
       { title: "WABA Connections", url: "/superadmin/waba-connections" },
+      { title: "Users", url: "/superadmin/users" },
     ],
   },
   // ── Company workspace (CompanyAdmin / Agent) ───────────────────

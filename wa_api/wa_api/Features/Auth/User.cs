@@ -1,4 +1,5 @@
 using wa_api.Common.Entities;
+using wa_api.Features.Companies;
 
 namespace wa_api.Features.Auth;
 
@@ -27,5 +28,6 @@ public class User : BaseEntity
 
     public DateTime? LastLoginAt { get; set; }
 
-    // Navigation to Company is added in Phase 1.1 when the Company entity exists.
+    /// <summary>Owning tenant. Null for SuperAdmin; set for every tenant-scoped role.</summary>
+    public Company? Company { get; set; }
 }

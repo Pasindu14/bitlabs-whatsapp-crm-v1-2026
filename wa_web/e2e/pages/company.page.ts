@@ -81,11 +81,11 @@ export class CompanyPage {
   // ─── Dialog interactions ──────────────────────────────────────────────────
   async openCreateDialog() {
     await this.addButton.click()
-    await expect(this.page.locator('[role="dialog"]')).toBeVisible({ timeout: 5_000 })
+    await expect(this.page.locator('[role="dialog"]:not([data-nextjs-dialog])')).toBeVisible({ timeout: 5_000 })
   }
 
   async fillCompanyForm(data: Partial<CompanyFormData>) {
-    const dialog = this.page.locator('[role="dialog"]')
+    const dialog = this.page.locator('[role="dialog"]:not([data-nextjs-dialog])')
     if (data.name !== undefined) {
       await dialog.getByLabel('Name', { exact: true }).clear()
       await dialog.getByLabel('Name', { exact: true }).fill(data.name)
@@ -105,11 +105,11 @@ export class CompanyPage {
   }
 
   async submitCreateForm() {
-    await this.page.locator('[role="dialog"]').getByRole('button', { name: 'Create Company' }).click()
+    await this.page.locator('[role="dialog"]:not([data-nextjs-dialog])').getByRole('button', { name: 'Create Company' }).click()
   }
 
   async submitEditForm() {
-    await this.page.locator('[role="dialog"]').getByRole('button', { name: 'Update Company' }).click()
+    await this.page.locator('[role="dialog"]:not([data-nextjs-dialog])').getByRole('button', { name: 'Update Company' }).click()
   }
 
   async confirmAlertAction(buttonName: string) {
@@ -139,10 +139,10 @@ export class CompanyPage {
   }
 
   async expectDialogClosed() {
-    await expect(this.page.locator('[role="dialog"]')).not.toBeAttached({ timeout: 15_000 })
+    await expect(this.page.locator('[role="dialog"]:not([data-nextjs-dialog])')).not.toBeAttached({ timeout: 15_000 })
   }
 
   async expectDialogOpen() {
-    await expect(this.page.locator('[role="dialog"]')).toBeVisible({ timeout: 5_000 })
+    await expect(this.page.locator('[role="dialog"]:not([data-nextjs-dialog])')).toBeVisible({ timeout: 5_000 })
   }
 }
