@@ -1,0 +1,764 @@
+- generic [ref=e3]:
+  - generic [ref=e6]:
+    - img [ref=e8]
+    - generic [ref=e44]:
+      - generic [ref=e45]: Select a definition
+      - combobox "Select a definition" [ref=e46]:
+        - option "WhatsApp API v1" [selected]
+  - generic [ref=e47]:
+    - generic:
+      - img
+    - generic [ref=e48]:
+      - generic [ref=e53]:
+        - heading "wa_api 1.0 OAS 3.0" [level=2] [ref=e54]:
+          - text: wa_api
+          - generic [ref=e55]:
+            - generic [ref=e57]: "1.0"
+            - generic [ref=e59]: OAS 3.0
+        - link "/swagger/v1/swagger.json" [ref=e60] [cursor=pointer]:
+          - /url: /swagger/v1/swagger.json
+          - generic [ref=e61]: /swagger/v1/swagger.json
+      - button "Authorize" [ref=e65] [cursor=pointer]:
+        - generic [ref=e66]: Authorize
+        - img [ref=e67]
+      - generic [ref=e71]:
+        - generic [ref=e73]:
+          - heading "Auth Collapse operation" [level=3] [ref=e74] [cursor=pointer]:
+            - generic [ref=e75]: Auth
+            - button "Collapse operation" [expanded] [ref=e76]:
+              - img [ref=e77]
+          - generic [ref=e80]:
+            - generic [ref=e83] [cursor=pointer]:
+              - button "POST /api/v1/auth/login" [ref=e84]:
+                - generic [ref=e85]: POST
+                - generic [ref=e89]:
+                  - text: /api
+                  - text: /v1
+                  - text: /auth
+                  - text: /login
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e92]:
+                - img [ref=e93]
+              - button "post /api/v1/auth/login" [ref=e95]:
+                - img [ref=e96]
+            - generic [ref=e100] [cursor=pointer]:
+              - button "GET /api/v1/auth/me" [ref=e101]:
+                - generic [ref=e102]: GET
+                - generic [ref=e106]:
+                  - text: /api
+                  - text: /v1
+                  - text: /auth
+                  - text: /me
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e109]:
+                - img [ref=e110]
+              - button "get /api/v1/auth/me" [ref=e112]:
+                - img [ref=e113]
+            - generic [ref=e117] [cursor=pointer]:
+              - button "POST /api/v1/auth/logout" [ref=e118]:
+                - generic [ref=e119]: POST
+                - generic [ref=e123]:
+                  - text: /api
+                  - text: /v1
+                  - text: /auth
+                  - text: /logout
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e126]:
+                - img [ref=e127]
+              - button "post /api/v1/auth/logout" [ref=e129]:
+                - img [ref=e130]
+        - generic [ref=e133]:
+          - heading "Companies Collapse operation" [level=3] [ref=e134] [cursor=pointer]:
+            - generic [ref=e135]: Companies
+            - button "Collapse operation" [expanded] [ref=e136]:
+              - img [ref=e137]
+          - generic [ref=e140]:
+            - generic [ref=e143] [cursor=pointer]:
+              - button "GET /api/v1/companies" [ref=e144]:
+                - generic [ref=e145]: GET
+                - generic [ref=e149]:
+                  - text: /api
+                  - text: /v1
+                  - text: /companies
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e152]:
+                - img [ref=e153]
+              - button "get /api/v1/companies" [ref=e155]:
+                - img [ref=e156]
+            - generic [ref=e160] [cursor=pointer]:
+              - button "POST /api/v1/companies" [ref=e161]:
+                - generic [ref=e162]: POST
+                - generic [ref=e166]:
+                  - text: /api
+                  - text: /v1
+                  - text: /companies
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e169]:
+                - img [ref=e170]
+              - button "post /api/v1/companies" [ref=e172]:
+                - img [ref=e173]
+            - generic [ref=e177] [cursor=pointer]:
+              - 'button "GET /api/v1/companies/{id}" [ref=e178]':
+                - generic [ref=e179]: GET
+                - generic [ref=e183]:
+                  - text: /api
+                  - text: /v1
+                  - text: /companies
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e186]:
+                - img [ref=e187]
+              - 'button "get /api/v1/companies/{id}" [ref=e189]':
+                - img [ref=e190]
+            - generic [ref=e194] [cursor=pointer]:
+              - 'button "PUT /api/v1/companies/{id}" [ref=e195]':
+                - generic [ref=e196]: PUT
+                - generic [ref=e200]:
+                  - text: /api
+                  - text: /v1
+                  - text: /companies
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e203]:
+                - img [ref=e204]
+              - 'button "put /api/v1/companies/{id}" [ref=e206]':
+                - img [ref=e207]
+            - generic [ref=e211] [cursor=pointer]:
+              - 'button "POST /api/v1/companies/{id}/activate" [ref=e212]':
+                - generic [ref=e213]: POST
+                - generic [ref=e217]:
+                  - text: /api
+                  - text: /v1
+                  - text: /companies
+                  - text: "/{id}"
+                  - text: /activate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e220]:
+                - img [ref=e221]
+              - 'button "post /api/v1/companies/{id}/activate" [ref=e223]':
+                - img [ref=e224]
+            - generic [ref=e228] [cursor=pointer]:
+              - 'button "POST /api/v1/companies/{id}/deactivate" [ref=e229]':
+                - generic [ref=e230]: POST
+                - generic [ref=e234]:
+                  - text: /api
+                  - text: /v1
+                  - text: /companies
+                  - text: "/{id}"
+                  - text: /deactivate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e237]:
+                - img [ref=e238]
+              - 'button "post /api/v1/companies/{id}/deactivate" [ref=e240]':
+                - img [ref=e241]
+        - generic [ref=e244]:
+          - heading "CompanyUsers Collapse operation" [level=3] [ref=e245] [cursor=pointer]:
+            - generic [ref=e246]: CompanyUsers
+            - button "Collapse operation" [expanded] [ref=e247]:
+              - img [ref=e248]
+          - generic [ref=e251]:
+            - generic [ref=e254] [cursor=pointer]:
+              - button "GET /api/v1/team-users" [ref=e255]:
+                - generic [ref=e256]: GET
+                - generic [ref=e260]:
+                  - text: /api
+                  - text: /v1
+                  - text: /team-users
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e263]:
+                - img [ref=e264]
+              - button "get /api/v1/team-users" [ref=e266]:
+                - img [ref=e267]
+            - generic [ref=e271] [cursor=pointer]:
+              - button "POST /api/v1/team-users" [ref=e272]:
+                - generic [ref=e273]: POST
+                - generic [ref=e277]:
+                  - text: /api
+                  - text: /v1
+                  - text: /team-users
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e280]:
+                - img [ref=e281]
+              - button "post /api/v1/team-users" [ref=e283]:
+                - img [ref=e284]
+            - generic [ref=e288] [cursor=pointer]:
+              - 'button "GET /api/v1/team-users/{id}" [ref=e289]':
+                - generic [ref=e290]: GET
+                - generic [ref=e294]:
+                  - text: /api
+                  - text: /v1
+                  - text: /team-users
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e297]:
+                - img [ref=e298]
+              - 'button "get /api/v1/team-users/{id}" [ref=e300]':
+                - img [ref=e301]
+            - generic [ref=e305] [cursor=pointer]:
+              - 'button "PUT /api/v1/team-users/{id}" [ref=e306]':
+                - generic [ref=e307]: PUT
+                - generic [ref=e311]:
+                  - text: /api
+                  - text: /v1
+                  - text: /team-users
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e314]:
+                - img [ref=e315]
+              - 'button "put /api/v1/team-users/{id}" [ref=e317]':
+                - img [ref=e318]
+            - generic [ref=e322] [cursor=pointer]:
+              - 'button "POST /api/v1/team-users/{id}/reset-password" [ref=e323]':
+                - generic [ref=e324]: POST
+                - generic [ref=e328]:
+                  - text: /api
+                  - text: /v1
+                  - text: /team-users
+                  - text: "/{id}"
+                  - text: /reset-password
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e331]:
+                - img [ref=e332]
+              - 'button "post /api/v1/team-users/{id}/reset-password" [ref=e334]':
+                - img [ref=e335]
+            - generic [ref=e339] [cursor=pointer]:
+              - 'button "POST /api/v1/team-users/{id}/activate" [ref=e340]':
+                - generic [ref=e341]: POST
+                - generic [ref=e345]:
+                  - text: /api
+                  - text: /v1
+                  - text: /team-users
+                  - text: "/{id}"
+                  - text: /activate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e348]:
+                - img [ref=e349]
+              - 'button "post /api/v1/team-users/{id}/activate" [ref=e351]':
+                - img [ref=e352]
+            - generic [ref=e356] [cursor=pointer]:
+              - 'button "POST /api/v1/team-users/{id}/deactivate" [ref=e357]':
+                - generic [ref=e358]: POST
+                - generic [ref=e362]:
+                  - text: /api
+                  - text: /v1
+                  - text: /team-users
+                  - text: "/{id}"
+                  - text: /deactivate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e365]:
+                - img [ref=e366]
+              - 'button "post /api/v1/team-users/{id}/deactivate" [ref=e368]':
+                - img [ref=e369]
+        - generic [ref=e372]:
+          - heading "ContactLists Collapse operation" [level=3] [ref=e373] [cursor=pointer]:
+            - generic [ref=e374]: ContactLists
+            - button "Collapse operation" [expanded] [ref=e375]:
+              - img [ref=e376]
+          - generic [ref=e379]:
+            - generic [ref=e382] [cursor=pointer]:
+              - button "GET /api/v1/contact-lists" [ref=e383]:
+                - generic [ref=e384]: GET
+                - generic [ref=e388]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e391]:
+                - img [ref=e392]
+              - button "get /api/v1/contact-lists" [ref=e394]:
+                - img [ref=e395]
+            - generic [ref=e399] [cursor=pointer]:
+              - button "POST /api/v1/contact-lists" [ref=e400]:
+                - generic [ref=e401]: POST
+                - generic [ref=e405]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e408]:
+                - img [ref=e409]
+              - button "post /api/v1/contact-lists" [ref=e411]:
+                - img [ref=e412]
+            - generic [ref=e416] [cursor=pointer]:
+              - 'button "GET /api/v1/contact-lists/{id}" [ref=e417]':
+                - generic [ref=e418]: GET
+                - generic [ref=e422]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e425]:
+                - img [ref=e426]
+              - 'button "get /api/v1/contact-lists/{id}" [ref=e428]':
+                - img [ref=e429]
+            - generic [ref=e433] [cursor=pointer]:
+              - 'button "PUT /api/v1/contact-lists/{id}" [ref=e434]':
+                - generic [ref=e435]: PUT
+                - generic [ref=e439]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e442]:
+                - img [ref=e443]
+              - 'button "put /api/v1/contact-lists/{id}" [ref=e445]':
+                - img [ref=e446]
+            - generic [ref=e450] [cursor=pointer]:
+              - 'button "POST /api/v1/contact-lists/{id}/activate" [ref=e451]':
+                - generic [ref=e452]: POST
+                - generic [ref=e456]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+                  - text: "/{id}"
+                  - text: /activate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e459]:
+                - img [ref=e460]
+              - 'button "post /api/v1/contact-lists/{id}/activate" [ref=e462]':
+                - img [ref=e463]
+            - generic [ref=e467] [cursor=pointer]:
+              - 'button "POST /api/v1/contact-lists/{id}/deactivate" [ref=e468]':
+                - generic [ref=e469]: POST
+                - generic [ref=e473]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+                  - text: "/{id}"
+                  - text: /deactivate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e476]:
+                - img [ref=e477]
+              - 'button "post /api/v1/contact-lists/{id}/deactivate" [ref=e479]':
+                - img [ref=e480]
+            - generic [ref=e484] [cursor=pointer]:
+              - 'button "POST /api/v1/contact-lists/{id}/contacts" [ref=e485]':
+                - generic [ref=e486]: POST
+                - generic [ref=e490]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+                  - text: "/{id}"
+                  - text: /contacts
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e493]:
+                - img [ref=e494]
+              - 'button "post /api/v1/contact-lists/{id}/contacts" [ref=e496]':
+                - img [ref=e497]
+            - generic [ref=e501] [cursor=pointer]:
+              - 'button "DELETE /api/v1/contact-lists/{id}/contacts/{contactId}" [ref=e502]':
+                - generic [ref=e503]: DELETE
+                - generic [ref=e507]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+                  - text: "/{id}"
+                  - text: /contacts
+                  - text: "/{contactId}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e510]:
+                - img [ref=e511]
+              - 'button "delete /api/v1/contact-lists/{id}/contacts/{contactId}" [ref=e513]':
+                - img [ref=e514]
+            - generic [ref=e518] [cursor=pointer]:
+              - 'button "POST /api/v1/contact-lists/{id}/import" [ref=e519]':
+                - generic [ref=e520]: POST
+                - generic [ref=e524]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contact-lists
+                  - text: "/{id}"
+                  - text: /import
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e527]:
+                - img [ref=e528]
+              - 'button "post /api/v1/contact-lists/{id}/import" [ref=e530]':
+                - img [ref=e531]
+        - generic [ref=e534]:
+          - heading "Contacts Collapse operation" [level=3] [ref=e535] [cursor=pointer]:
+            - generic [ref=e536]: Contacts
+            - button "Collapse operation" [expanded] [ref=e537]:
+              - img [ref=e538]
+          - generic [ref=e541]:
+            - generic [ref=e544] [cursor=pointer]:
+              - button "GET /api/v1/contacts" [ref=e545]:
+                - generic [ref=e546]: GET
+                - generic [ref=e550]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contacts
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e553]:
+                - img [ref=e554]
+              - button "get /api/v1/contacts" [ref=e556]:
+                - img [ref=e557]
+            - generic [ref=e561] [cursor=pointer]:
+              - button "POST /api/v1/contacts" [ref=e562]:
+                - generic [ref=e563]: POST
+                - generic [ref=e567]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contacts
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e570]:
+                - img [ref=e571]
+              - button "post /api/v1/contacts" [ref=e573]:
+                - img [ref=e574]
+            - generic [ref=e578] [cursor=pointer]:
+              - 'button "GET /api/v1/contacts/{id}" [ref=e579]':
+                - generic [ref=e580]: GET
+                - generic [ref=e584]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contacts
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e587]:
+                - img [ref=e588]
+              - 'button "get /api/v1/contacts/{id}" [ref=e590]':
+                - img [ref=e591]
+            - generic [ref=e595] [cursor=pointer]:
+              - 'button "PUT /api/v1/contacts/{id}" [ref=e596]':
+                - generic [ref=e597]: PUT
+                - generic [ref=e601]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contacts
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e604]:
+                - img [ref=e605]
+              - 'button "put /api/v1/contacts/{id}" [ref=e607]':
+                - img [ref=e608]
+            - generic [ref=e612] [cursor=pointer]:
+              - 'button "POST /api/v1/contacts/{id}/activate" [ref=e613]':
+                - generic [ref=e614]: POST
+                - generic [ref=e618]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contacts
+                  - text: "/{id}"
+                  - text: /activate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e621]:
+                - img [ref=e622]
+              - 'button "post /api/v1/contacts/{id}/activate" [ref=e624]':
+                - img [ref=e625]
+            - generic [ref=e629] [cursor=pointer]:
+              - 'button "POST /api/v1/contacts/{id}/deactivate" [ref=e630]':
+                - generic [ref=e631]: POST
+                - generic [ref=e635]:
+                  - text: /api
+                  - text: /v1
+                  - text: /contacts
+                  - text: "/{id}"
+                  - text: /deactivate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e638]:
+                - img [ref=e639]
+              - 'button "post /api/v1/contacts/{id}/deactivate" [ref=e641]':
+                - img [ref=e642]
+        - generic [ref=e645]:
+          - heading "Messages Collapse operation" [level=3] [ref=e646] [cursor=pointer]:
+            - generic [ref=e647]: Messages
+            - button "Collapse operation" [expanded] [ref=e648]:
+              - img [ref=e649]
+          - generic [ref=e652]:
+            - generic [ref=e655] [cursor=pointer]:
+              - button "GET /api/v1/messages" [ref=e656]:
+                - generic [ref=e657]: GET
+                - generic [ref=e661]:
+                  - text: /api
+                  - text: /v1
+                  - text: /messages
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e664]:
+                - img [ref=e665]
+              - button "get /api/v1/messages" [ref=e667]:
+                - img [ref=e668]
+            - generic [ref=e672] [cursor=pointer]:
+              - button "POST /api/v1/messages" [ref=e673]:
+                - generic [ref=e674]: POST
+                - generic [ref=e678]:
+                  - text: /api
+                  - text: /v1
+                  - text: /messages
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e681]:
+                - img [ref=e682]
+              - button "post /api/v1/messages" [ref=e684]:
+                - img [ref=e685]
+        - generic [ref=e688]:
+          - heading "MyWabaConnections Collapse operation" [level=3] [ref=e689] [cursor=pointer]:
+            - generic [ref=e690]: MyWabaConnections
+            - button "Collapse operation" [expanded] [ref=e691]:
+              - img [ref=e692]
+          - generic [ref=e698] [cursor=pointer]:
+            - button "GET /api/v1/my-waba-connections" [ref=e699]:
+              - generic [ref=e700]: GET
+              - generic [ref=e704]:
+                - text: /api
+                - text: /v1
+                - text: /my-waba-connections
+            - generic "Copy to clipboard"
+            - button "authorization button unlocked" [ref=e707]:
+              - img [ref=e708]
+            - button "get /api/v1/my-waba-connections" [ref=e710]:
+              - img [ref=e711]
+        - generic [ref=e714]:
+          - heading "Ping Collapse operation" [level=3] [ref=e715] [cursor=pointer]:
+            - generic [ref=e716]: Ping
+            - button "Collapse operation" [expanded] [ref=e717]:
+              - img [ref=e718]
+          - generic [ref=e721]:
+            - generic [ref=e724] [cursor=pointer]:
+              - button "GET /api/v1/ping" [ref=e725]:
+                - generic [ref=e726]: GET
+                - generic [ref=e730]:
+                  - text: /api
+                  - text: /v1
+                  - text: /ping
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e733]:
+                - img [ref=e734]
+              - button "get /api/v1/ping" [ref=e736]:
+                - img [ref=e737]
+            - generic [ref=e741] [cursor=pointer]:
+              - button "GET /api/v1/ping/boom" [ref=e742]:
+                - generic [ref=e743]: GET
+                - generic [ref=e747]:
+                  - text: /api
+                  - text: /v1
+                  - text: /ping
+                  - text: /boom
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e750]:
+                - img [ref=e751]
+              - button "get /api/v1/ping/boom" [ref=e753]:
+                - img [ref=e754]
+        - generic [ref=e757]:
+          - heading "Users Collapse operation" [level=3] [ref=e758] [cursor=pointer]:
+            - generic [ref=e759]: Users
+            - button "Collapse operation" [expanded] [ref=e760]:
+              - img [ref=e761]
+          - generic [ref=e764]:
+            - generic [ref=e767] [cursor=pointer]:
+              - button "GET /api/v1/users" [ref=e768]:
+                - generic [ref=e769]: GET
+                - generic [ref=e773]:
+                  - text: /api
+                  - text: /v1
+                  - text: /users
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e776]:
+                - img [ref=e777]
+              - button "get /api/v1/users" [ref=e779]:
+                - img [ref=e780]
+            - generic [ref=e784] [cursor=pointer]:
+              - button "POST /api/v1/users" [ref=e785]:
+                - generic [ref=e786]: POST
+                - generic [ref=e790]:
+                  - text: /api
+                  - text: /v1
+                  - text: /users
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e793]:
+                - img [ref=e794]
+              - button "post /api/v1/users" [ref=e796]:
+                - img [ref=e797]
+            - generic [ref=e801] [cursor=pointer]:
+              - 'button "GET /api/v1/users/{id}" [ref=e802]':
+                - generic [ref=e803]: GET
+                - generic [ref=e807]:
+                  - text: /api
+                  - text: /v1
+                  - text: /users
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e810]:
+                - img [ref=e811]
+              - 'button "get /api/v1/users/{id}" [ref=e813]':
+                - img [ref=e814]
+            - generic [ref=e818] [cursor=pointer]:
+              - 'button "PUT /api/v1/users/{id}" [ref=e819]':
+                - generic [ref=e820]: PUT
+                - generic [ref=e824]:
+                  - text: /api
+                  - text: /v1
+                  - text: /users
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e827]:
+                - img [ref=e828]
+              - 'button "put /api/v1/users/{id}" [ref=e830]':
+                - img [ref=e831]
+            - generic [ref=e835] [cursor=pointer]:
+              - 'button "POST /api/v1/users/{id}/reset-password" [ref=e836]':
+                - generic [ref=e837]: POST
+                - generic [ref=e841]:
+                  - text: /api
+                  - text: /v1
+                  - text: /users
+                  - text: "/{id}"
+                  - text: /reset-password
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e844]:
+                - img [ref=e845]
+              - 'button "post /api/v1/users/{id}/reset-password" [ref=e847]':
+                - img [ref=e848]
+            - generic [ref=e852] [cursor=pointer]:
+              - 'button "POST /api/v1/users/{id}/activate" [ref=e853]':
+                - generic [ref=e854]: POST
+                - generic [ref=e858]:
+                  - text: /api
+                  - text: /v1
+                  - text: /users
+                  - text: "/{id}"
+                  - text: /activate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e861]:
+                - img [ref=e862]
+              - 'button "post /api/v1/users/{id}/activate" [ref=e864]':
+                - img [ref=e865]
+            - generic [ref=e869] [cursor=pointer]:
+              - 'button "POST /api/v1/users/{id}/deactivate" [ref=e870]':
+                - generic [ref=e871]: POST
+                - generic [ref=e875]:
+                  - text: /api
+                  - text: /v1
+                  - text: /users
+                  - text: "/{id}"
+                  - text: /deactivate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e878]:
+                - img [ref=e879]
+              - 'button "post /api/v1/users/{id}/deactivate" [ref=e881]':
+                - img [ref=e882]
+        - generic [ref=e885]:
+          - heading "WabaConnections Collapse operation" [level=3] [ref=e886] [cursor=pointer]:
+            - generic [ref=e887]: WabaConnections
+            - button "Collapse operation" [expanded] [ref=e888]:
+              - img [ref=e889]
+          - generic [ref=e892]:
+            - generic [ref=e895] [cursor=pointer]:
+              - button "GET /api/v1/waba-connections" [ref=e896]:
+                - generic [ref=e897]: GET
+                - generic [ref=e901]:
+                  - text: /api
+                  - text: /v1
+                  - text: /waba-connections
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e904]:
+                - img [ref=e905]
+              - button "get /api/v1/waba-connections" [ref=e907]:
+                - img [ref=e908]
+            - generic [ref=e912] [cursor=pointer]:
+              - button "POST /api/v1/waba-connections" [ref=e913]:
+                - generic [ref=e914]: POST
+                - generic [ref=e918]:
+                  - text: /api
+                  - text: /v1
+                  - text: /waba-connections
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e921]:
+                - img [ref=e922]
+              - button "post /api/v1/waba-connections" [ref=e924]:
+                - img [ref=e925]
+            - generic [ref=e929] [cursor=pointer]:
+              - 'button "GET /api/v1/waba-connections/{id}" [ref=e930]':
+                - generic [ref=e931]: GET
+                - generic [ref=e935]:
+                  - text: /api
+                  - text: /v1
+                  - text: /waba-connections
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e938]:
+                - img [ref=e939]
+              - 'button "get /api/v1/waba-connections/{id}" [ref=e941]':
+                - img [ref=e942]
+            - generic [ref=e946] [cursor=pointer]:
+              - 'button "PUT /api/v1/waba-connections/{id}" [ref=e947]':
+                - generic [ref=e948]: PUT
+                - generic [ref=e952]:
+                  - text: /api
+                  - text: /v1
+                  - text: /waba-connections
+                  - text: "/{id}"
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e955]:
+                - img [ref=e956]
+              - 'button "put /api/v1/waba-connections/{id}" [ref=e958]':
+                - img [ref=e959]
+            - generic [ref=e963] [cursor=pointer]:
+              - 'button "POST /api/v1/waba-connections/{id}/activate" [ref=e964]':
+                - generic [ref=e965]: POST
+                - generic [ref=e969]:
+                  - text: /api
+                  - text: /v1
+                  - text: /waba-connections
+                  - text: "/{id}"
+                  - text: /activate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e972]:
+                - img [ref=e973]
+              - 'button "post /api/v1/waba-connections/{id}/activate" [ref=e975]':
+                - img [ref=e976]
+            - generic [ref=e980] [cursor=pointer]:
+              - 'button "POST /api/v1/waba-connections/{id}/deactivate" [ref=e981]':
+                - generic [ref=e982]: POST
+                - generic [ref=e986]:
+                  - text: /api
+                  - text: /v1
+                  - text: /waba-connections
+                  - text: "/{id}"
+                  - text: /deactivate
+              - generic "Copy to clipboard"
+              - button "authorization button unlocked" [ref=e989]:
+                - img [ref=e990]
+              - 'button "post /api/v1/waba-connections/{id}/deactivate" [ref=e992]':
+                - img [ref=e993]
+      - generic [ref=e997]:
+        - heading "Schemas" [level=4] [ref=e998] [cursor=pointer]:
+          - button "Schemas" [expanded] [ref=e999]:
+            - generic [ref=e1000]: Schemas
+            - img [ref=e1001]
+        - generic [ref=e1003]:
+          - button "AddContactsToListRequest" [ref=e1006] [cursor=pointer]:
+            - generic [ref=e1008]: AddContactsToListRequest
+          - button "CreateCompanyRequest" [ref=e1012] [cursor=pointer]:
+            - generic [ref=e1014]: CreateCompanyRequest
+          - button "CreateCompanyUserRequest" [ref=e1018] [cursor=pointer]:
+            - generic [ref=e1020]: CreateCompanyUserRequest
+          - button "CreateContactListRequest" [ref=e1024] [cursor=pointer]:
+            - generic [ref=e1026]: CreateContactListRequest
+          - button "CreateContactRequest" [ref=e1030] [cursor=pointer]:
+            - generic [ref=e1032]: CreateContactRequest
+          - button "CreateUserRequest" [ref=e1036] [cursor=pointer]:
+            - generic [ref=e1038]: CreateUserRequest
+          - button "CreateWabaConnectionRequest" [ref=e1042] [cursor=pointer]:
+            - generic [ref=e1044]: CreateWabaConnectionRequest
+          - button "LoginRequest" [ref=e1048] [cursor=pointer]:
+            - generic [ref=e1050]: LoginRequest
+          - button "ResetPasswordRequest" [ref=e1054] [cursor=pointer]:
+            - generic [ref=e1056]: ResetPasswordRequest
+          - button "SendMessageRequest" [ref=e1060] [cursor=pointer]:
+            - generic [ref=e1062]: SendMessageRequest
+          - button "UpdateCompanyRequest" [ref=e1066] [cursor=pointer]:
+            - generic [ref=e1068]: UpdateCompanyRequest
+          - button "UpdateCompanyUserRequest" [ref=e1072] [cursor=pointer]:
+            - generic [ref=e1074]: UpdateCompanyUserRequest
+          - button "UpdateContactListRequest" [ref=e1078] [cursor=pointer]:
+            - generic [ref=e1080]: UpdateContactListRequest
+          - button "UpdateContactRequest" [ref=e1084] [cursor=pointer]:
+            - generic [ref=e1086]: UpdateContactRequest
+          - button "UpdateUserRequest" [ref=e1090] [cursor=pointer]:
+            - generic [ref=e1092]: UpdateUserRequest
+          - button "UpdateWabaConnectionRequest" [ref=e1096] [cursor=pointer]:
+            - generic [ref=e1098]: UpdateWabaConnectionRequest
+          - button "UserRole" [ref=e1102] [cursor=pointer]:
+            - generic [ref=e1104]: UserRole
+          - button "WabaConnectionStatus" [ref=e1108] [cursor=pointer]:
+            - generic [ref=e1110]: WabaConnectionStatus

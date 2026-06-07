@@ -81,6 +81,14 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.contactLists.details(), id] as const,
   },
 
+  // Messages (CompanyAdmin — outbound messages to contacts)
+  messages: {
+    all: ['messages'] as const,
+    lists: () => [...['messages'], 'list'] as const,
+    list: (filters?: any) => [...['messages', 'list'], filters] as const,
+    myWabaConnections: () => ['my-waba-connections', 'active'] as const,
+  },
+
   // Stats/Analytics
   stats: {
     all: ['stats'] as const,

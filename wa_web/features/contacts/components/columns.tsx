@@ -1,7 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { User, MoreHorizontal } from "lucide-react";
+import { User, MoreHorizontal, MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,10 +24,11 @@ export interface ContactColumnActions {
   openEdit: (id: string) => void;
   openActivate: (id: string) => void;
   openDeactivate: (id: string) => void;
+  openSendMessage: (id: string, name: string, phone: string) => void;
 }
 
 export function getContactColumns(actions: ContactColumnActions): ColumnDef<Contact>[] {
-  const { openEdit, openActivate, openDeactivate } = actions;
+  const { openEdit, openActivate, openDeactivate, openSendMessage } = actions;
 
   return [
     {
@@ -85,7 +86,12 @@ export function getContactColumns(actions: ContactColumnActions): ColumnDef<Cont
                 <span className="sr-only">Open actions</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => openSendMessage(c.id, c.name, c.phone)}>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Send Message
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => openEdit(c.id)}>Edit</DropdownMenuItem>
               <DropdownMenuSeparator />
               {c.isActive ? (

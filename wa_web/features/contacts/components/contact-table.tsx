@@ -12,18 +12,21 @@ import {
   useActivateContactDialog,
   useDeactivateContactDialog,
 } from "@/features/contacts/store/contact-store";
+import { useSendMessageDialog } from "@/features/messages/store/message-store";
 import { getContactColumns } from "./columns";
 import { ContactDialogs } from "./contact-dialogs";
+import { SendMessageDialog } from "@/features/messages/components/send-message-dialog";
 
 export function ContactTable() {
   const openCreate = useContactDialogStore((s) => s.openCreate);
   const { open: openEdit } = useEditContactDialog();
   const { open: openActivate } = useActivateContactDialog();
   const { open: openDeactivate } = useDeactivateContactDialog();
+  const { open: openSendMessage } = useSendMessageDialog();
 
   const getColumns = useCallback(
-    () => getContactColumns({ openEdit, openActivate, openDeactivate }),
-    [openEdit, openActivate, openDeactivate]
+    () => getContactColumns({ openEdit, openActivate, openDeactivate, openSendMessage }),
+    [openEdit, openActivate, openDeactivate, openSendMessage]
   );
 
   return (
@@ -57,6 +60,7 @@ export function ContactTable() {
       />
 
       <ContactDialogs />
+      <SendMessageDialog />
     </>
   );
 }

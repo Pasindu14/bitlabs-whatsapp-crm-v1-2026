@@ -5,6 +5,7 @@ using wa_api.Features.Auth;
 using wa_api.Features.Companies;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.ContactLists.Entities;
+using wa_api.Features.Messages.Entities;
 using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Infrastructure.Persistence;
@@ -27,6 +28,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<ContactList> ContactLists => Set<ContactList>();
     public DbSet<ContactListMember> ContactListMembers => Set<ContactListMember>();
+    public DbSet<Message> Messages => Set<Message>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -157,6 +159,32 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .WithMany()
                 .HasForeignKey(x => x.ContactId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Message>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Body).IsRequired().HasMaxLength(4096);
+            e.Property(x => x.Direction).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.ExternalMessageId).HasMaxLength(128);
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => x.ContactId);
+            e.HasIndex(x => x.WabaConnectionId);
+            e.HasOne(x => x.Contact)
+                .WithMany()
+                .HasForeignKey(x => x.ContactId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.WabaConnection)
+                .WithMany()
+                .HasForeignKey(x => x.WabaConnectionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
