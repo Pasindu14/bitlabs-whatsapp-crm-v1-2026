@@ -75,6 +75,9 @@ try
     // ── Authentication & Authorization (JWT bearer) ───────────────────────
     builder.Services.AddPlatformAuthentication(builder.Configuration);
 
+    // ── Feature services ───────────────────────────────────────────────────
+    builder.Services.AddScoped<wa_api.Features.Companies.ICompanyService, wa_api.Features.Companies.CompanyService>();
+
     // ── Observability ──────────────────────────────────────────────────────
     builder.Services.AddPlatformHealthChecks(builder.Configuration);
     var appInsightsConn = builder.Configuration["ApplicationInsights:ConnectionString"];
