@@ -1,6 +1,7 @@
 import axios from "axios";
 import https from "https";
 import { auth } from "@/auth";
+import { env } from "@/lib/env";
 
 // ─────────────────────────────────────────────────────────────
 // API contract types — mirrors C# records in Common/Errors/ApiResponse.cs
@@ -97,7 +98,7 @@ export function createIdempotencyKey(): string {
 // ─────────────────────────────────────────────────────────────
 
 const client = axios.create({
-  baseURL: process.env.SFA_API_DOMAIN,
+  baseURL: env.API_URL,
   headers: { "Content-Type": "application/json" },
   timeout: 30_000,
   httpsAgent: new https.Agent({

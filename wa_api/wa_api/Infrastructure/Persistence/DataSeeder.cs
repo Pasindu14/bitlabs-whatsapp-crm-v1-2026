@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using wa_api.Features.Auth;
 
 namespace wa_api.Infrastructure.Persistence;
 
@@ -24,6 +25,35 @@ public static class DataSeeder
 
         logger.LogInformation("Database ready ({Count} migration(s) applied this run).", pending.Count);
 
-        // ── Seed data is added per phase (Phase 2.5: platform super-admin). ──
+        await SeedSuperAdminAsync(db, scope.ServiceProvider, logger, cancellationToken);
+    }
+
+    /// <summary>
+    /// Ensures exactly one platform SuperAdmin exists. Credentials come from the
+    /// <c>Seed:SuperAdmin</c> config section, falling back to dev defaults (logged loudly).
+    /// </summary>
+    private static async Task SeedSuperAdminAsync(AppDbContext db, IServiceProvider services,
+        ILogger logger, CancellationToken ct)
+    {
+        if (await db.Users.AnyAsync(u => u.Role == UserRole.SuperAdmin, ct))
+            return;
+
+        var config = services.GetRequiredService<IConfiguration>();
+        var email = (config["Seed:SuperAdmin:Email"] ?? "superadmin@btilabs.com").Trim().ToLowerInvariant();
+        var password = config["Seed:SuperAdmin:Password"] ?? "ChangeMe123!";
+        var fullName = config["Seed:SuperAdmin:FullName"] ?? "Platform Super Admin";
+
+        db.Users.Add(new User
+        {
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            FullName = fullName,
+            Role = UserRole.SuperAdmin,
+            CompanyId = null
+        });
+        await db.SaveChangesAsync(ct);
+
+        logger.LogWarning(
+            "Seeded platform SuperAdmin '{Email}'. CHANGE THE PASSWORD if using the default.", email);
     }
 }

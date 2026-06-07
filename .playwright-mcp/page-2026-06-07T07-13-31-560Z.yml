@@ -1,0 +1,40 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - generic [ref=e2]:
+    - generic [ref=e13]:
+      - img [ref=e15]
+      - generic [ref=e17]:
+        - heading "WhatsApp CRM" [level=1] [ref=e18]
+        - paragraph [ref=e19]: Multi-tenant messaging platform for bulk campaigns, live chat, and contact management — powered by Meta's official API.
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - img [ref=e24]
+          - generic [ref=e26]: Bulk campaigns with throttled delivery
+        - generic [ref=e27]:
+          - img [ref=e29]
+          - generic [ref=e34]: Multi-tenant company isolation
+        - generic [ref=e35]:
+          - img [ref=e37]
+          - generic [ref=e39]: Delivery & cost analytics
+        - generic [ref=e40]:
+          - img [ref=e42]
+          - generic [ref=e44]: Live inbox with 24-hour window
+      - paragraph [ref=e45]: Powered by Meta WhatsApp Cloud API
+    - generic [ref=e47]:
+      - generic [ref=e48]:
+        - heading "Welcome back" [level=2] [ref=e49]
+        - paragraph [ref=e50]: Sign in to your WhatsApp CRM account
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]: Email
+          - textbox "Email" [ref=e54]:
+            - /placeholder: you@company.com
+        - generic [ref=e55]:
+          - generic [ref=e56]: Password
+          - generic [ref=e57]:
+            - textbox "Password" [ref=e58]:
+              - /placeholder: ••••••••
+            - button [ref=e59]:
+              - img [ref=e60]
+        - button "Sign in" [ref=e63]
+      - paragraph [ref=e64]: © 2026 WhatsApp CRM. All rights reserved.

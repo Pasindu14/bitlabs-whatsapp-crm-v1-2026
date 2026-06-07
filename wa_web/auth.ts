@@ -21,8 +21,8 @@ declare module "next-auth" {
     role: string;
     name: string | null;
     email?: string | null;
-    accessToken?: string; // JWT token from .NET Core API
-    refreshToken?: string; // Refresh token from .NET Core API
+    companyId?: string | null; // null for SuperAdmin; set for tenant users
+    accessToken?: string; // JWT token from wa_api
     accessTokenExpiry?: number; // Unix timestamp (ms)
   }
   interface Session {
@@ -31,14 +31,15 @@ declare module "next-auth" {
       name: string | null;
       email?: string | null;
       role: string;
-      accessToken?: string; // JWT token from .NET Core API
+      companyId?: string | null;
+      accessToken?: string; // JWT token from wa_api
     };
-    accessToken?: string; // JWT token from .NET Core API
+    accessToken?: string; // JWT token from wa_api
     accessTokenExpiry?: number; // Unix timestamp (ms)
     error?: "RefreshAccessTokenError";
   }
   interface JWT {
-    accessToken?: string; // JWT token from .NET Core API
+    accessToken?: string; // JWT token from wa_api
   }
 }
 
@@ -46,79 +47,59 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 24 hours
+    maxAge: 8 * 60 * 60, // 8 hours — matches wa_api access-token lifetime
   },
   providers: [
     Credentials({
       name: "credentials",
       credentials: {
-        username: { label: "Username", type: "text" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        deviceId: { label: "Device ID", type: "text" },
       },
       async authorize(credentials) {
         try {
           // Validate input
-          if (!credentials?.username || !credentials?.password) {
+          if (!credentials?.email || !credentials?.password) {
             return null;
           }
 
-          const username = (credentials.username as string).trim();
+          const email = (credentials.email as string).trim();
           const password = credentials.password as string;
 
-          // Basic username validation
-          if (username.length < 1 || password.length < 1) {
+          if (email.length < 1 || password.length < 1) {
             return null;
           }
 
-          // Call external API
+          // Call wa_api: POST /api/v1/auth/login → { success, data: { accessToken, expiresAt, user } }
           const response = await apiClient.post(
-            `${env.SFA_API_DOMAIN}/api/v1/auth/login`,
-            {
-              username,
-              password,
-              deviceId: "test-device-001",
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
-              },
-            },
+            `${env.API_URL}/api/v1/auth/login`,
+            { email, password },
+            { headers: { "Content-Type": "application/json" } },
           );
 
-          if (!response.data) {
-            console.error("Login failed: No data in response");
+          // wa_api wraps everything in ApiResponse<T>; success login => success:true
+          if (!response.data?.success || !response.data?.data) {
+            console.error("Login failed: unexpected response shape");
             return null;
           }
 
-          // Check if the response indicates an error
-          if (response.data.error || response.data.message) {
-            console.error(
-              "Login API returned error:",
-              response.data.error || response.data.message,
-            );
-            return null;
-          }
-
-          // Return user object in NextAuth format
-          // The API response should include a token field with the JWT
-          const data = response.data.data;
-          const user = data.user;
+          const data = response.data.data; // { accessToken, expiresAt, user }
+          const user = data.user;           // { id, email, fullName, role, companyId }
 
           if (process.env.NODE_ENV === "development") {
-            console.log("Login successful for user:", user.id);
+            console.log("Login successful for user:", user.id, user.role);
           }
 
           return {
             id: String(user.id),
             email: user.email,
-            name: user.name,
+            name: user.fullName,
             role: user.role,
+            companyId: user.companyId ?? null,
             accessToken: data.accessToken,
-            refreshToken: data.refreshToken,
-            accessTokenExpiry: data.accessTokenExpiry
-              ? new Date(data.accessTokenExpiry).getTime()
-              : Date.now() + 5 * 60 * 60 * 1000, // fallback: 5 hours
+            accessTokenExpiry: data.expiresAt
+              ? new Date(data.expiresAt).getTime()
+              : Date.now() + 8 * 60 * 60 * 1000, // fallback: 8 hours (matches API default)
           };
         } catch (error) {
           console.error("Auth error:", error);
@@ -142,66 +123,38 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user }) {
-      // On sign in, add user data and API token to JWT
+      // On sign in, add user data and API token to the JWT.
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.name = user.name;
         token.email = user.email;
+        token.companyId = user.companyId;
         token.accessToken = user.accessToken;
-        token.refreshToken = user.refreshToken;
         token.accessTokenExpiry = user.accessTokenExpiry;
         token.error = undefined;
         return token;
       }
 
-      // On subsequent calls, check if the access token is still valid
+      // wa_api issues stateless access tokens with NO refresh endpoint.
+      // Once the access token expires, the session is unrecoverable — flag it
+      // so SessionGuard signs the user out and forces a fresh login.
       const expiresAt = token.accessTokenExpiry as number | undefined;
-      const isExpiredOrExpiringSoon =
-        !expiresAt ||
-        Date.now() >= expiresAt - REFRESH_BUFFER_SECONDS * 1000;
-
-      if (!isExpiredOrExpiringSoon) {
-        return token;
-      }
-
-      // Access token expired or expiring soon — try to refresh
-      try {
-        const response = await apiClient.post(
-          `${env.SFA_API_DOMAIN}/api/v1/auth/refresh`,
-          {
-            refreshToken: token.refreshToken,
-            deviceId: "test-device-001",
-          },
-          {
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-
-        const data = response.data?.data;
-        if (!data?.accessToken) {
-          throw new Error("Refresh response missing accessToken");
-        }
-
-        token.accessToken = data.accessToken;
-        token.refreshToken = data.refreshToken ?? token.refreshToken;
-        token.accessTokenExpiry = data.accessTokenExpiry
-          ? new Date(data.accessTokenExpiry).getTime()
-          : Date.now() + 5 * 60 * 60 * 1000;
-        token.error = undefined;
-      } catch {
+      const isExpired = !expiresAt || Date.now() >= expiresAt - REFRESH_BUFFER_SECONDS * 1000;
+      if (isExpired) {
         token.error = "RefreshAccessTokenError";
       }
 
       return token;
     },
     async session({ session, token }) {
-      // Copy all user data from token to session
+      // Copy user data from token to session.
       if (token) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
         session.user.name = token.name as string;
         session.user.email = token.email as string;
+        session.user.companyId = (token.companyId as string | null) ?? null;
         session.user.accessToken = token.accessToken as string;
         session.accessToken = token.accessToken as string;
         session.accessTokenExpiry = token.accessTokenExpiry as number | undefined;

@@ -1,9 +1,8 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   AUTH_SECRET: z.string().min(1, "AUTH_SECRET is required"),
-  SFA_API_DOMAIN: z.string().min(1, "SFA_API_DOMAIN is required").default("http://localhost:3000"),
+  API_URL: z.string().min(1, "API_URL is required").default("http://localhost:5000"),
 });
 
 const parsed = envSchema.safeParse(process.env);

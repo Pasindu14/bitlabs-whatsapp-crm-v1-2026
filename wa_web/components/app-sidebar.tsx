@@ -1,12 +1,9 @@
 "use client";
 import {
-  Cog,
+  Building2,
   LayoutDashboard,
-  Map,
-  Package,
-  ShoppingCart,
-  Store,
-  UserCheck,
+  MessageCircle,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -36,97 +33,51 @@ type NavGroup = {
   items: NavSubItem[];
 };
 
+// Roles mirror wa_api UserRole: SuperAdmin | CompanyAdmin | Agent.
 const navConfig: NavGroup[] = [
-  {
-    title: "Masters",
-    url: "#",
-    icon: Cog,
-    isActive: true,
-    roles: ["Admin"],
-    items: [
-      { title: "Users", url: "/users" },
-      { title: "Distributors", url: "/distributors" },
-      { title: "Products", url: "/products" },
-      { title: "Product Categories", url: "/product-categories" },
-      { title: "Fleets", url: "/fleets" },
-      { title: "Outlets", url: "/outlets" },
-      { title: "Category Pricing", url: "/product-category-pricings" },
-    ],
-  },
-  {
-    title: "Assignments",
-    url: "#",
-    icon: UserCheck,
-    isActive: false,
-    roles: ["Admin"],
-    items: [
-      { title: "User Assignments", url: "/user-reporting-lines" },
-      { title: "Geo Assignments", url: "/geo-assignments" },
-      { title: "Route Cancellations", url: "/route-cancellations" },
-    ],
-  },
-  {
-    title: "Sales",
-    url: "#",
-    icon: ShoppingCart,
-    isActive: false,
-    roles: ["Admin"],
-    items: [
-      { title: "Purchase Orders", url: "/purchase-orders" },
-      { title: "Sales Invoices", url: "/sales-invoices" },
-      { title: "Sales Targets", url: "/sales-targets" },
-      { title: "GRNs", url: "/grns" },
-      { title: "Stock", url: "/stock" },
-      { title: "Stock Taking", url: "/stock-taking" },
-    ],
-  },
-  {
-    title: "Geography",
-    url: "#",
-    icon: Map,
-    isActive: false,
-    roles: ["Admin"],
-    items: [
-      { title: "Regions", url: "/regions" },
-      { title: "Areas", url: "/areas" },
-      { title: "Territories", url: "/territories" },
-      { title: "Divisions", url: "/divisions" },
-      { title: "Routes", url: "/routes" },
-    ],
-  },
-  // ── Distributor portal ──────────────────────────
   {
     title: "Overview",
     url: "#",
     icon: LayoutDashboard,
     isActive: true,
-    roles: ["Distributor"],
     items: [
-      { title: "Dashboard", url: "/distributor-dashboard" },
+      { title: "Dashboard", url: "/dashboard" },
+    ],
+  },
+  // ── Platform administration (SuperAdmin only) ──────────────────
+  {
+    title: "Platform",
+    url: "#",
+    icon: Building2,
+    isActive: true,
+    roles: ["SuperAdmin"],
+    items: [
+      { title: "Companies", url: "/superadmin/companies" },
+      { title: "WABA Connections", url: "/superadmin/waba-connections" },
+    ],
+  },
+  // ── Company workspace (CompanyAdmin / Agent) ───────────────────
+  {
+    title: "Messaging",
+    url: "#",
+    icon: MessageCircle,
+    isActive: false,
+    roles: ["CompanyAdmin", "Agent"],
+    items: [
+      { title: "Inbox", url: "/inbox" },
+      { title: "Campaigns", url: "/campaigns" },
+      { title: "Contacts", url: "/contacts" },
     ],
   },
   {
-    title: "Inventory",
+    title: "Company Settings",
     url: "#",
-    icon: Package,
+    icon: Users,
     isActive: false,
-    roles: ["Distributor"],
+    roles: ["CompanyAdmin"],
     items: [
-      { title: "Stock Balance", url: "/distributor-stock" },
-      { title: "Stock Taking", url: "/distributor-stock-taking" },
-      { title: "Bills", url: "/distributor-billings" },
-      { title: "GRNs", url: "/distributor-grns" },
-      { title: "Purchase Orders", url: "/distributor-purchase-orders" },
-    ],
-  },
-  {
-    title: "Network",
-    url: "#",
-    icon: Store,
-    isActive: false,
-    roles: ["Distributor"],
-    items: [
-      { title: "My Outlets", url: "/portal/outlets" },
+      { title: "Team", url: "/team" },
+      { title: "Connections", url: "/connections" },
     ],
   },
 ];

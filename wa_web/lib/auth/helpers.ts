@@ -42,6 +42,7 @@ export async function getAuthUser() {
   return {
     userId: session.user.id,
     role: session.user.role,
+    companyId: session.user.companyId ?? null,
   }
 }
 
@@ -65,5 +66,6 @@ export async function getAuthUserOrNull() {
   return {
     userId: session.user.id,
     role: session.user.role,
+    companyId: session.user.companyId ?? null,
   }
 }

@@ -72,6 +72,9 @@ try
     // ── Background jobs (Hangfire) ─────────────────────────────────────────
     builder.Services.AddPlatformHangfire(builder.Configuration);
 
+    // ── Authentication & Authorization (JWT bearer) ───────────────────────
+    builder.Services.AddPlatformAuthentication(builder.Configuration);
+
     // ── Observability ──────────────────────────────────────────────────────
     builder.Services.AddPlatformHealthChecks(builder.Configuration);
     var appInsightsConn = builder.Configuration["ApplicationInsights:ConnectionString"];
@@ -115,7 +118,28 @@ try
         });
 
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    builder.Services.AddSwaggerGen(c =>
+    {
+        var scheme = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+            Description = "Paste the JWT from /auth/login (no 'Bearer ' prefix needed).",
+            Reference = new Microsoft.OpenApi.Models.OpenApiReference
+            {
+                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                Id = "Bearer"
+            }
+        };
+        c.AddSecurityDefinition("Bearer", scheme);
+        c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+        {
+            [scheme] = Array.Empty<string>()
+        });
+    });
 
     var app = builder.Build();
 
@@ -137,6 +161,7 @@ try
     }
 
     app.UseHttpsRedirection();
+    app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
     app.MapPlatformHealthChecks();

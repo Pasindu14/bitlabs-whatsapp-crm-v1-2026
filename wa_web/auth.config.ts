@@ -9,41 +9,35 @@ export default {
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const userRole = auth?.user?.role;
+      const userRole = auth?.user?.role?.toLowerCase();
       const path = nextUrl.pathname;
 
-      // Always allow the unauthorized page (avoid redirect loops)
+      // Always allow the unauthorized page (avoid redirect loops).
       if (path === "/unauthorized") return true;
 
-      // Redirect logged-in users away from auth pages
-      if ((path === "/sign-in" || path === "/login") && isLoggedIn) {
-        if (userRole?.toLowerCase() === "distributor") {
-          return Response.redirect(new URL("/distributor-dashboard", nextUrl));
-        }
-        return Response.redirect(new URL("/dashboard", nextUrl));
+      const isAuthPage = path === "/sign-in" || path === "/login";
+
+      // Logged-in users should never see the sign-in page.
+      if (isAuthPage) {
+        return isLoggedIn
+          ? Response.redirect(new URL("/dashboard", nextUrl))
+          : true;
       }
 
-      // Public auth pages: allow unauthenticated access
-      if (path === "/sign-in" || path === "/login") return true;
-
-      // All other routes are protected — require login
+      // Every other route requires authentication.
       if (!isLoggedIn) {
         return Response.redirect(new URL("/sign-in", nextUrl));
       }
 
-      // Distributor portal — only Distributor role may enter
-      if (path.startsWith("/distributor-dashboard") || path.startsWith("/distributor-stock") || path.startsWith("/distributor-billings") || path.startsWith("/distributor-grns") || path.startsWith("/distributor-purchase-orders") || path.startsWith("/distributor-stock-taking") || path.startsWith("/portal/")) {
-        if (userRole?.toLowerCase() !== "distributor") {
+      // SuperAdmin-only area. CompanyAdmin/Agent get bounced to /unauthorized.
+      if (path.startsWith("/superadmin")) {
+        if (userRole !== "superadmin") {
           return Response.redirect(new URL("/unauthorized", nextUrl));
         }
         return true;
       }
 
-      // All remaining routes require Admin
-      if (userRole?.toLowerCase() !== "admin") {
-        return Response.redirect(new URL("/unauthorized", nextUrl));
-      }
-
+      // All other authenticated routes are allowed (finer role rules added per-feature).
       return true;
     },
     async jwt({ token, user }) {

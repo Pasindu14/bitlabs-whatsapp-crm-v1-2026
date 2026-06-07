@@ -1,21 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { signIn, getSession } from "next-auth/react"
+import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Loader2, Eye, EyeOff } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label";
+import { Label } from "@/components/ui/label"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -25,21 +26,19 @@ export function LoginForm({
 
     try {
       const result = await signIn("credentials", {
-        username,
+        email,
         password,
         redirect: false,
       })
 
       if (result?.error) {
-        toast.error("Invalid credentials")
+        toast.error("Invalid email or password")
       } else {
-        const session = await getSession()
-        const role = session?.user?.role?.toLowerCase()
-        router.push(role === "distributor" ? "/distributor-dashboard" : "/users")
+        router.push("/dashboard")
         router.refresh()
       }
-    } catch (err) {
-      toast.error("Sign in failed")
+    } catch {
+      toast.error("Sign in failed. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -52,36 +51,55 @@ export function LoginForm({
       {...props}
     >
       <div className="space-y-2">
-        <Label htmlFor="username">Username</Label>
+        <Label htmlFor="email">Email</Label>
         <Input
-          id="username"
-          type="text"
-          placeholder="Enter your username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          id="email"
+          type="email"
+          placeholder="you@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
-          autoComplete="username"
-          className="h-10"
+          autoComplete="email"
+          className="h-10 focus-visible:ring-[#25D366]"
         />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-          className="h-10"
-        />
+        <div className="relative">
+          <Input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+            className="h-10 pr-10 focus-visible:ring-[#25D366]"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            tabIndex={-1}
+          >
+            {showPassword
+              ? <EyeOff className="h-4 w-4" />
+              : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
-      <Button type="submit" disabled={loading}>
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
+      <Button
+        type="submit"
+        disabled={loading}
+        className="h-10 font-semibold text-white"
+        style={{ background: loading ? "#059669" : "#25D366" }}
+      >
+        {loading
+          ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Signing in…</>
+          : "Sign in"}
       </Button>
     </form>
-  );
+  )
 }
