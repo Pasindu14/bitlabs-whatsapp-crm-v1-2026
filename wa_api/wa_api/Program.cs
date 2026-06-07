@@ -72,6 +72,14 @@ try
     // ── Background jobs (Hangfire) ─────────────────────────────────────────
     builder.Services.AddPlatformHangfire(builder.Configuration);
 
+    // ── Observability ──────────────────────────────────────────────────────
+    builder.Services.AddPlatformHealthChecks(builder.Configuration);
+    var appInsightsConn = builder.Configuration["ApplicationInsights:ConnectionString"];
+    if (!string.IsNullOrWhiteSpace(appInsightsConn))
+    {
+        builder.Services.AddApplicationInsightsTelemetry(o => o.ConnectionString = appInsightsConn);
+    }
+
     // ── HTTP & API ────────────────────────────────────────────────────────
     builder.Services.AddControllers(options =>
         {
@@ -131,6 +139,7 @@ try
     app.UseHttpsRedirection();
     app.UseAuthorization();
     app.MapControllers();
+    app.MapPlatformHealthChecks();
 
     // ── Hangfire dashboard + recurring jobs ────────────────────────────────
     app.UseHangfireDashboard("/hangfire", new DashboardOptions
