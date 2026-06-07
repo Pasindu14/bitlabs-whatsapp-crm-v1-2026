@@ -7,6 +7,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     // ── Infrastructure tables ──────────────────────────────────────────────
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
 
     // Feature DbSets are added per phase (Company → Users → ... ).
 
@@ -21,6 +22,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.ChangedAt);
             e.HasIndex(x => x.CorrelationId);
             e.HasIndex(x => x.CompanyId);
+        });
+
+        modelBuilder.Entity<IdempotencyKey>(e =>
+        {
+            e.HasKey(x => x.Key);
+            e.HasIndex(x => x.ExpiresAt);
         });
     }
 }

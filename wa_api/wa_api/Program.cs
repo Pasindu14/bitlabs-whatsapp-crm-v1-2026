@@ -1,12 +1,17 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Hangfire;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using StackExchange.Redis;
 using wa_api.Common.Audit;
 using wa_api.Common.Errors;
 using wa_api.Common.Extensions;
 using wa_api.Common.Middleware;
+using wa_api.Infrastructure.Caching;
+using wa_api.Infrastructure.Jobs;
+using wa_api.Infrastructure.Locking;
 using wa_api.Infrastructure.Persistence;
 
 // Bootstrap logger — captures failures during startup before the host is built.
@@ -43,6 +48,29 @@ try
                    .CommandTimeout(30)
                    .EnableRetryOnFailure(3))
            .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
+
+    // ── Caching + Locking (Redis when configured, else memory / Postgres) ──
+    var redisConnection = builder.Configuration["REDIS_CONNECTION"];
+    if (!string.IsNullOrWhiteSpace(redisConnection))
+    {
+        builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redisConnection);
+        builder.Services.AddSingleton<IConnectionMultiplexer>(
+            _ => ConnectionMultiplexer.Connect(redisConnection));
+        builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
+    }
+    else
+    {
+        builder.Services.AddDistributedMemoryCache();
+        builder.Services.AddSingleton<IDistributedLockService, PostgresAdvisoryLockService>();
+    }
+    builder.Services.AddScoped<ICacheService, DistributedCacheService>();
+
+    // ── Idempotency ────────────────────────────────────────────────────────
+    builder.Services.AddScoped<IIdempotencyService, PostgresIdempotencyService>();
+    builder.Services.AddHostedService<IdempotencyCleanupService>();
+
+    // ── Background jobs (Hangfire) ─────────────────────────────────────────
+    builder.Services.AddPlatformHangfire(builder.Configuration);
 
     // ── HTTP & API ────────────────────────────────────────────────────────
     builder.Services.AddControllers(options =>
@@ -103,6 +131,13 @@ try
     app.UseHttpsRedirection();
     app.UseAuthorization();
     app.MapControllers();
+
+    // ── Hangfire dashboard + recurring jobs ────────────────────────────────
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = [new HangfireDashboardAuthorizationFilter(app.Environment)]
+    });
+    RecurringJob.AddOrUpdate<HeartbeatJob>("heartbeat", j => j.Run(), Cron.Hourly);
 
     app.Run();
 }
