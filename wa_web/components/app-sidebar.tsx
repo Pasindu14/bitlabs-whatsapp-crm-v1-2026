@@ -40,6 +40,7 @@ const navConfig: NavGroup[] = [
     url: "#",
     icon: LayoutDashboard,
     isActive: true,
+    roles: ["CompanyAdmin", "Agent"],
     items: [
       { title: "Dashboard", url: "/dashboard" },
     ],

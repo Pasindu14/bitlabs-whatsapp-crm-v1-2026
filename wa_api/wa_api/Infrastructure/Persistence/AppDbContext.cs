@@ -1,13 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Audit;
+using wa_api.Common.Tenancy;
 using wa_api.Features.Auth;
 using wa_api.Features.Companies;
 using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Infrastructure.Persistence;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext? tenant = null)
+    : DbContext(options)
 {
+    // Per-request tenant; falls back to the fail-closed null object for design-time
+    // (EF CLI) and other non-HTTP scopes where no ITenantContext is injected.
+    private readonly ITenantContext _tenant = tenant ?? NullTenantContext.Instance;
+
     // ── Infrastructure tables ──────────────────────────────────────────────
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
@@ -76,6 +82,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany()
                 .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // ── Phase 1.1/1.3 tenant isolation ──────────────────────────────
+            // SuperAdmin bypasses the filter (cross-tenant plane); every other caller
+            // sees only their own company's rows. The expression references the context
+            // instance member, so EF re-evaluates it per request (set from JWT claims).
+            // IsActive soft-delete is intentionally NOT folded in here so SuperAdmin
+            // management pages keep seeing deactivated rows.
+            e.HasQueryFilter(w => _tenant.IsSuperAdmin || w.CompanyId == _tenant.CompanyId);
         });
     }
 }

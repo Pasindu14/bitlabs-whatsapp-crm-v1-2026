@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using System.Security.Claims;
 using System.Text.Json;
 using wa_api.Common.Entities;
+using wa_api.Common.Tenancy;
 
 namespace wa_api.Common.Audit;
 
@@ -43,9 +45,13 @@ public class AuditInterceptor(IHttpContextAccessor httpContextAccessor) : SaveCh
         AddAuditLogs(context);
     }
 
-    private static void StampEntities(DbContext context)
+    private void StampEntities(DbContext context)
     {
         var now = DateTime.UtcNow;
+
+        // Resolved per-request from the same scope as the DbContext (null outside an HTTP
+        // request — migrations, seeding, jobs — in which case nothing is auto-stamped).
+        var tenant = _httpContextAccessor.HttpContext?.RequestServices.GetService<ITenantContext>();
 
         foreach (var entry in context.ChangeTracker.Entries<BaseEntity>())
         {
@@ -54,9 +60,11 @@ public class AuditInterceptor(IHttpContextAccessor httpContextAccessor) : SaveCh
                 case EntityState.Added:
                     entry.Entity.CreatedAt = now;
                     entry.Entity.UpdatedAt = now;
-                    // ── Phase 1.1 extension point ──────────────────────────────
-                    // if (entry.Entity is ITenantEntity te && te.CompanyId == Guid.Empty)
-                    //     te.CompanyId = _tenant.CompanyId;
+                    // Phase 1.1: auto-stamp the tenant on insert when the caller didn't set it
+                    // explicitly. SuperAdmin-driven inserts (which choose CompanyId) keep theirs.
+                    if (entry.Entity is ITenantEntity te && te.CompanyId == Guid.Empty
+                        && tenant?.CompanyId is { } companyId)
+                        te.CompanyId = companyId;
                     break;
                 case EntityState.Modified:
                     entry.Entity.UpdatedAt = now;

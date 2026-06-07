@@ -1,7 +1,8 @@
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 
-// Authenticated users land on the dashboard; unauthenticated requests are
-// redirected to /sign-in by proxy.ts before this ever renders.
-export default function Home() {
-  redirect("/dashboard");
+export default async function Home() {
+  const session = await auth();
+  const role = session?.user?.role?.toLowerCase();
+  redirect(role === "superadmin" ? "/superadmin/companies" : "/dashboard");
 }

@@ -19,9 +19,9 @@ export default {
 
       // Logged-in users should never see the sign-in page.
       if (isAuthPage) {
-        return isLoggedIn
-          ? Response.redirect(new URL("/dashboard", nextUrl))
-          : true;
+        if (!isLoggedIn) return true;
+        const dest = userRole === "superadmin" ? "/superadmin/companies" : "/dashboard";
+        return Response.redirect(new URL(dest, nextUrl));
       }
 
       // Every other route requires authentication.
@@ -35,6 +35,11 @@ export default {
           return Response.redirect(new URL("/unauthorized", nextUrl));
         }
         return true;
+      }
+
+      // Dashboard is not for SuperAdmin — send them to their home.
+      if (path === "/dashboard" && userRole === "superadmin") {
+        return Response.redirect(new URL("/superadmin/companies", nextUrl));
       }
 
       // All other authenticated routes are allowed (finer role rules added per-feature).

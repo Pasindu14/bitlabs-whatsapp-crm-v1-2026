@@ -31,6 +31,10 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddSingleton<AuditInterceptor>();
 
+    // Per-request tenant identity (resolved from JWT claims). Scoped so it can be
+    // injected into AppDbContext for the global query filter + CompanyId auto-stamp.
+    builder.Services.AddScoped<wa_api.Common.Tenancy.ITenantContext, wa_api.Common.Tenancy.HttpTenantContext>();
+
     var baseConnStr = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
     // The app-side Npgsql pool sits IN FRONT OF the Supavisor pooler, so its Max Pool
@@ -41,7 +45,11 @@ try
     var pooledConnStr = baseConnStr.TrimEnd(';')
         + ";Maximum Pool Size=10;Minimum Pool Size=2;Connection Idle Lifetime=300";
 
-    builder.Services.AddDbContextPool<AppDbContext>((sp, opt) =>
+    // AddDbContext (not pool): a pooled context can't take the scoped ITenantContext the
+    // global query filter needs. This is DbContext object-pooling only — the Npgsql
+    // CONNECTION pool sizing above (Maximum Pool Size) is in the connection string and
+    // is unaffected, so the Supavisor client cap still holds.
+    builder.Services.AddDbContext<AppDbContext>((sp, opt) =>
         opt.UseNpgsql(
                pooledConnStr,
                npgsql => npgsql
