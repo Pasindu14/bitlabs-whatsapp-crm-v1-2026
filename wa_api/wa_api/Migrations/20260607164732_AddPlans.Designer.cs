@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using wa_api.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using wa_api.Infrastructure.Persistence;
 namespace wa_api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260607164732_AddPlans")]
+    partial class AddPlans
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -447,54 +450,6 @@ namespace wa_api.Migrations
                     b.ToTable("Plans");
                 });
 
-            modelBuilder.Entity("wa_api.Features.Subscriptions.Entities.Subscription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CurrentPeriodEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CurrentPeriodStart")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("MessagesUsedThisPeriod")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("PlanId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("PlanId");
-
-                    b.HasIndex(new[] { "CompanyId" }, "UX_Subscriptions_CompanyId_Active")
-                        .IsUnique()
-                        .HasFilter("\"Status\" = 'Active'");
-
-                    b.ToTable("Subscriptions");
-                });
-
             modelBuilder.Entity("wa_api.Features.WhatsApp.Entities.WabaConnection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -637,25 +592,6 @@ namespace wa_api.Migrations
                     b.Navigation("Contact");
 
                     b.Navigation("WabaConnection");
-                });
-
-            modelBuilder.Entity("wa_api.Features.Subscriptions.Entities.Subscription", b =>
-                {
-                    b.HasOne("wa_api.Features.Companies.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("wa_api.Features.Plans.Entities.Plan", "Plan")
-                        .WithMany()
-                        .HasForeignKey("PlanId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Company");
-
-                    b.Navigation("Plan");
                 });
 
             modelBuilder.Entity("wa_api.Features.WhatsApp.Entities.WabaConnection", b =>

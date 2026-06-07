@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Auth;
+using wa_api.Features.Plans.Entities;
 
 namespace wa_api.Infrastructure.Persistence;
 
@@ -26,6 +27,55 @@ public static class DataSeeder
         logger.LogInformation("Database ready ({Count} migration(s) applied this run).", pending.Count);
 
         await SeedSuperAdminAsync(db, scope.ServiceProvider, logger, cancellationToken);
+        await SeedPlansAsync(db, logger, cancellationToken);
+    }
+
+    /// <summary>
+    /// Seeds the baseline plan catalog (Free / Starter / Pro) once. Idempotent: skips entirely
+    /// if any plan already exists, so edited quotas/prices are never overwritten on restart.
+    /// </summary>
+    private static async Task SeedPlansAsync(AppDbContext db, ILogger logger, CancellationToken ct)
+    {
+        if (await db.Plans.AnyAsync(ct))
+            return;
+
+        db.Plans.AddRange(
+            new Plan
+            {
+                Name = "Free",
+                MonthlyMessageQuota = 1_000,
+                Price = 0m,
+                Currency = "USD",
+                FeatureFlags = [Permission.LiveMessage, Permission.ContactList],
+            },
+            new Plan
+            {
+                Name = "Starter",
+                MonthlyMessageQuota = 10_000,
+                Price = 29m,
+                Currency = "USD",
+                FeatureFlags =
+                [
+                    Permission.LiveMessage, Permission.ContactList,
+                    Permission.ManageTemplate, Permission.ScheduleCampaign,
+                ],
+            },
+            new Plan
+            {
+                Name = "Pro",
+                MonthlyMessageQuota = 100_000,
+                Price = 99m,
+                Currency = "USD",
+                FeatureFlags =
+                [
+                    Permission.LiveMessage, Permission.ContactList,
+                    Permission.ManageTemplate, Permission.ScheduleCampaign,
+                    Permission.TokenPurchase, Permission.Analytics,
+                ],
+            });
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Seeded baseline plan catalog: Free, Starter, Pro.");
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using System.Text.Json;
 using wa_api.Common.Errors;
 using wa_api.Features.Messages.Dtos;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Subscriptions.Entities;
 using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.Messages;
@@ -88,7 +89,28 @@ public class MessageService(AppDbContext db, IHttpClientFactory httpClientFactor
         if (message.Status == MessageStatus.Failed)
             throw new BusinessRuleException("WHATSAPP_SEND_FAILED", errorMessage ?? "Failed to send message via WhatsApp.");
 
+        // Best-effort quota metering against the active subscription (PRD 3.1 gate stub).
+        // The authoritative per-message metering arrives with the Phase 6 send pipeline.
+        await IncrementSubscriptionUsageAsync(ct);
+
         return Map(message, contact.Name, contact.Phone, waba.DisplayPhoneNumber);
+    }
+
+    /// <summary>
+    /// Increments the caller company's active-subscription usage counter by one. The EF global
+    /// query filter scopes the lookup to the JWT company. No-op when no active subscription exists.
+    /// </summary>
+    private async Task IncrementSubscriptionUsageAsync(CancellationToken ct)
+    {
+        var sub = await db.Subscriptions
+            .Where(s => s.Status == SubscriptionStatus.Active)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (sub is null) return;
+
+        sub.MessagesUsedThisPeriod++;
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task<(string? ExternalId, string? Error)> CallMetaApiAsync(

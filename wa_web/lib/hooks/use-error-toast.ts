@@ -74,6 +74,18 @@ export function handleErrorToast(
       toast.error(errorMessage || 'Lead has already been converted')
       break
       
+    case 'SUBSCRIPTION_INACTIVE':
+      toast.error(errorMessage || 'Your subscription is inactive. Contact your administrator.')
+      break
+
+    case 'QUOTA_EXCEEDED':
+      toast.error(errorMessage || 'Monthly message quota reached.')
+      break
+
+    case 'PLAN_INACTIVE':
+      toast.error(errorMessage || 'The selected plan is inactive.')
+      break
+
     case 'RATE_LIMITED':
       toast.error('Too many requests. Please try again later.')
       break

@@ -63,6 +63,30 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.wabaConnections.details(), id] as const,
   },
 
+  // Plans (SuperAdmin — platform subscription catalog)
+  plans: {
+    all: ['plans'] as const,
+    lists: () => [...queryKeys.plans.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.plans.lists(), filters] as const,
+    details: () => [...queryKeys.plans.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.plans.details(), id] as const,
+  },
+
+  // Subscriptions (SuperAdmin — company ↔ plan assignments)
+  subscriptions: {
+    all: ['subscriptions'] as const,
+    lists: () => [...queryKeys.subscriptions.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.subscriptions.lists(), filters] as const,
+    forCompany: (companyId: string) =>
+      [...queryKeys.subscriptions.all, 'company', companyId] as const,
+  },
+
+  // My subscription (tenant — the caller's own plan + usage)
+  mySubscription: {
+    all: ['my-subscription'] as const,
+    current: () => [...queryKeys.mySubscription.all, 'current'] as const,
+  },
+
   // Contacts (CompanyAdmin — the caller's own company)
   contacts: {
     all: ['contacts'] as const,

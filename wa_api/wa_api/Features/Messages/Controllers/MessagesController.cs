@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using wa_api.Common.Errors;
+using wa_api.Common.Subscriptions;
 using wa_api.Features.Messages.Dtos;
 
 namespace wa_api.Features.Messages.Controllers;
@@ -27,7 +28,9 @@ public class MessagesController(IMessageService service) : ControllerBase
     }
 
     /// <summary>POST /api/v1/messages — send a WhatsApp message to a contact.</summary>
+    /// <remarks>Gated: blocked when the company's subscription is inactive or over quota (PRD 3.1 stub).</remarks>
     [HttpPost]
+    [RequireActiveSubscription]
     public async Task<IActionResult> Send(SendMessageRequest request, CancellationToken ct)
     {
         var result = await service.SendAsync(request, ct);

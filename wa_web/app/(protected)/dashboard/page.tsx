@@ -1,8 +1,13 @@
 import { auth } from "@/auth";
+import { CurrentPlanCard } from "@/features/my-subscription/components/current-plan-card";
 
 export default async function DashboardPage() {
   const session = await auth();
   const user = session?.user;
+
+  // Company users (CompanyAdmin / Agent) have a companyId and thus a subscription;
+  // the platform SuperAdmin does not, so we hide the plan card for them.
+  const isCompanyUser = user?.role === "CompanyAdmin" || user?.role === "Agent";
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -20,6 +25,7 @@ export default async function DashboardPage() {
           label="Company"
           value={user?.companyId ?? "Platform (no company)"}
         />
+        {isCompanyUser && <CurrentPlanCard />}
       </div>
     </div>
   );

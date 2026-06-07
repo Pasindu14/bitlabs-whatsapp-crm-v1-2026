@@ -6,6 +6,8 @@ using wa_api.Features.Companies;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.ContactLists.Entities;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Plans.Entities;
+using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Infrastructure.Persistence;
@@ -30,6 +32,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<ContactList> ContactLists => Set<ContactList>();
     public DbSet<ContactListMember> ContactListMembers => Set<ContactListMember>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<Plan> Plans => Set<Plan>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -199,6 +203,46 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Plan>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(120);
+            e.HasIndex(x => x.Name).IsUnique();          // plan name is platform-unique
+            e.Property(x => x.Price).HasColumnType("numeric(12,2)");
+            e.Property(x => x.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("USD");
+            e.Property(x => x.FeatureFlags)               // capability grants — Postgres text[]
+                .HasColumnType("text[]")
+                .IsRequired()
+                .HasDefaultValueSql("'{}'::text[]");
+            // Platform catalog — NO tenant query filter (shared across all companies, like Company).
+        });
+
+        modelBuilder.Entity<Subscription>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.HasIndex(x => x.CompanyId);
+            // One ACTIVE subscription per company — partial unique index. Cancelled/Inactive
+            // rows are excluded, so historical subscriptions can coexist. The named overload
+            // declares a SECOND, distinct index on CompanyId (a bare HasIndex(x => x.CompanyId)
+            // would reuse the plain index builder above instead of adding a new one).
+            e.HasIndex(x => x.CompanyId, "UX_Subscriptions_CompanyId_Active")
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Active'");
+            e.HasOne(x => x.Company)
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Plan)
+                .WithMany()
+                .HasForeignKey(x => x.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Tenant isolation (Phase 1.1/1.3): SuperAdmin bypasses; everyone else sees only
+            // their own company. IsActive is intentionally left out (mirrors WabaConnection).
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
     }
