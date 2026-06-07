@@ -56,6 +56,7 @@ public class UserService(AppDbContext db, ITenantContext tenant) : IUserService
                 u.FullName,
                 u.Email,
                 u.Role,
+                u.Permissions,
                 u.IsActive,
                 u.LastLoginAt,
                 u.CreatedAt))
@@ -206,6 +207,7 @@ public class UserService(AppDbContext db, ITenantContext tenant) : IUserService
                 u.FullName,
                 u.Email,
                 u.Role,
+                u.Permissions,
                 u.IsActive,
                 u.LastLoginAt,
                 u.CreatedAt))
@@ -241,6 +243,7 @@ public class UserService(AppDbContext db, ITenantContext tenant) : IUserService
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = role,
+            Permissions = NormalizePermissions(role, request.Permissions),
         };
         db.Users.Add(user);
         await db.SaveChangesAsync(ct);
@@ -265,6 +268,7 @@ public class UserService(AppDbContext db, ITenantContext tenant) : IUserService
         user.FullName = fullName;
         user.Email = email;
         user.Role = request.Role;
+        user.Permissions = NormalizePermissions(request.Role, request.Permissions);
 
         await db.SaveChangesAsync(ct);
         return Map(user);
@@ -307,6 +311,28 @@ public class UserService(AppDbContext db, ITenantContext tenant) : IUserService
     private Guid RequireCompanyId()
         => tenant.CompanyId ?? throw new AuthorizationException("company users");
 
+    // Permissions are meaningful only for Agents — CompanyAdmin is all-access by role, so its
+    // grant list is always stored empty. Validates every requested key against the catalog.
+    private static List<string> NormalizePermissions(UserRole role, IReadOnlyList<string>? requested)
+    {
+        if (role != UserRole.Agent || requested is null || requested.Count == 0)
+            return [];
+
+        var cleaned = requested
+            .Select(p => p.Trim())
+            .Where(p => p.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (!Permission.AreAllValid(cleaned))
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["permissions"] = ["One or more permissions are not recognised."],
+            });
+
+        return cleaned;
+    }
+
     private static void EnsureTenantRole(UserRole role)
     {
         if (role is not (UserRole.CompanyAdmin or UserRole.Agent))
@@ -314,5 +340,5 @@ public class UserService(AppDbContext db, ITenantContext tenant) : IUserService
     }
 
     private static UserResponse Map(User u)
-        => new(u.Id, u.CompanyId, u.Company?.Name, u.FullName, u.Email, u.Role, u.IsActive, u.LastLoginAt, u.CreatedAt);
+        => new(u.Id, u.CompanyId, u.Company?.Name, u.FullName, u.Email, u.Role, u.Permissions, u.IsActive, u.LastLoginAt, u.CreatedAt);
 }

@@ -69,6 +69,7 @@ const navConfig: NavGroup[] = [
       { title: "Inbox", url: "/inbox" },
       { title: "Campaigns", url: "/campaigns" },
       { title: "Contacts", url: "/contacts" },
+      { title: "Contact Lists", url: "/contact-lists" },
     ],
   },
   {

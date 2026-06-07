@@ -12,6 +12,7 @@ public record UserResponse(
     string FullName,
     string Email,
     UserRole Role,
+    IReadOnlyList<string> Permissions,
     bool IsActive,
     DateTime? LastLoginAt,
     DateTime CreatedAt

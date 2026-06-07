@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PERMISSION_KEYS } from "@/features/team/permissions";
 
 /** Roles a CompanyAdmin can create/manage — mirrors wa_api UserRole (minus SuperAdmin). */
 export const TEAM_ROLES = ["CompanyAdmin", "Agent"] as const;
@@ -26,6 +27,8 @@ export const createTeamMemberSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .max(128, "Password is too long"),
   role: z.enum(TEAM_ROLES).optional(),
+  // Capability grants — only applied for Agents (the API ignores them for CompanyAdmins).
+  permissions: z.array(z.enum(PERMISSION_KEYS)).optional(),
 });
 
 /**

@@ -8,11 +8,13 @@ export interface TeamMember {
   fullName: string;
   email: string;
   role: TeamRole;
+  permissions: string[];
   isActive: boolean;
   lastLoginAt: string | null;
   createdAt: string;
-  // Index signature required by the @data-table ExportableData constraint.
-  [key: string]: string | number | boolean | null | undefined;
+  // Index signature required by the @data-table ExportableData constraint
+  // (string[] included for the permissions array).
+  [key: string]: string | number | boolean | null | undefined | string[];
 }
 
 /** Filters/pagination the list endpoint accepts. */

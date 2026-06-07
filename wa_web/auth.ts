@@ -22,6 +22,7 @@ declare module "next-auth" {
     name: string | null;
     email?: string | null;
     companyId?: string | null; // null for SuperAdmin; set for tenant users
+    permissions?: string[]; // capability grants (Agents only); empty for SuperAdmin/CompanyAdmin
     accessToken?: string; // JWT token from wa_api
     accessTokenExpiry?: number; // Unix timestamp (ms)
   }
@@ -32,6 +33,7 @@ declare module "next-auth" {
       email?: string | null;
       role: string;
       companyId?: string | null;
+      permissions?: string[];
       accessToken?: string; // JWT token from wa_api
     };
     accessToken?: string; // JWT token from wa_api
@@ -96,6 +98,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: user.fullName,
             role: user.role,
             companyId: user.companyId ?? null,
+            permissions: user.permissions ?? [],
             accessToken: data.accessToken,
             accessTokenExpiry: data.expiresAt
               ? new Date(data.expiresAt).getTime()
@@ -105,14 +108,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.error("Auth error:", error);
 
           // Log API error response if available
-          if (error && typeof error === "object" && "response" in error) {
-            const axiosError = error as any;
-            if (axiosError.response?.data) {
-              console.error(
-                "API Error Response:",
-                JSON.stringify(axiosError.response.data, null, 2),
-              );
-            }
+          if (axios.isAxiosError(error) && error.response?.data) {
+            console.error(
+              "API Error Response:",
+              JSON.stringify(error.response.data, null, 2),
+            );
           }
 
           return null;
@@ -130,6 +130,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.name = user.name;
         token.email = user.email;
         token.companyId = user.companyId;
+        token.permissions = user.permissions;
         token.accessToken = user.accessToken;
         token.accessTokenExpiry = user.accessTokenExpiry;
         token.error = undefined;
@@ -155,6 +156,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.name = token.name as string;
         session.user.email = token.email as string;
         session.user.companyId = (token.companyId as string | null) ?? null;
+        session.user.permissions = (token.permissions as string[] | undefined) ?? [];
         session.user.accessToken = token.accessToken as string;
         session.accessToken = token.accessToken as string;
         session.accessTokenExpiry = token.accessTokenExpiry as number | undefined;

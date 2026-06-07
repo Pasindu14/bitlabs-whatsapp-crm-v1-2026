@@ -9,5 +9,6 @@ public record CurrentUserResponse(
     string Email,
     string FullName,
     UserRole Role,
+    IReadOnlyList<string> Permissions,
     Guid? CompanyId
 );

@@ -23,6 +23,13 @@ public class User : BaseEntity
 
     public UserRole Role { get; set; }
 
+    /// <summary>
+    /// Fine-grained capability grants from the <see cref="Permission"/> catalog. Meaningful
+    /// only for <see cref="UserRole.Agent"/> users — SuperAdmin/CompanyAdmin are all-access by
+    /// role and keep this empty. Stored as a Postgres <c>text[]</c> column.
+    /// </summary>
+    public List<string> Permissions { get; set; } = [];
+
     /// <summary>Null for SuperAdmin; required for every tenant-scoped role.</summary>
     public Guid? CompanyId { get; set; }
 

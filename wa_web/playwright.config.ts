@@ -29,6 +29,16 @@ export default defineConfig({
         storageState: 'e2e/.auth/superadmin.json',
       },
       dependencies: ['setup'],
+      testIgnore: '**/contacts/**',
+    },
+    {
+      name: 'chromium:companyadmin',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'e2e/.auth/companyadmin.json',
+      },
+      dependencies: ['setup'],
+      testMatch: '**/contacts/**',
     },
   ],
 })

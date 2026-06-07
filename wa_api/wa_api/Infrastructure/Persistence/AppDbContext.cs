@@ -3,6 +3,8 @@ using wa_api.Common.Audit;
 using wa_api.Common.Tenancy;
 using wa_api.Features.Auth;
 using wa_api.Features.Companies;
+using wa_api.Features.Contacts.Entities;
+using wa_api.Features.ContactLists.Entities;
 using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Infrastructure.Persistence;
@@ -22,6 +24,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<WabaConnection> WabaConnections => Set<WabaConnection>();
+    public DbSet<Contact> Contacts => Set<Contact>();
+    public DbSet<ContactList> ContactLists => Set<ContactList>();
+    public DbSet<ContactListMember> ContactListMembers => Set<ContactListMember>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +55,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.Property(x => x.PasswordHash).IsRequired();
             e.Property(x => x.FullName).IsRequired().HasMaxLength(200);
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(50).IsRequired();
+            e.Property(x => x.Permissions)              // capability grants — Postgres text[]
+                .HasColumnType("text[]")
+                .IsRequired()
+                .HasDefaultValueSql("'{}'::text[]");
             e.HasIndex(x => x.CompanyId);               // null for SuperAdmin; set for tenant users
             e.HasOne(x => x.Company)                    // optional FK — SuperAdmin's CompanyId is null
                 .WithMany()
@@ -90,6 +99,66 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             // IsActive soft-delete is intentionally NOT folded in here so SuperAdmin
             // management pages keep seeing deactivated rows.
             e.HasQueryFilter(w => _tenant.IsSuperAdmin || w.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Contact>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Phone).IsRequired().HasMaxLength(20);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            // Phone is unique PER COMPANY (composite), not globally — two companies can hold
+            // the same number, one company cannot duplicate it (PRD §1.2). This composite
+            // index also makes Excel re-import safe (upsert by CompanyId + Phone).
+            e.HasIndex(x => new { x.CompanyId, x.Phone }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Tenant isolation (Phase 1.1/1.3): SuperAdmin bypasses; everyone else sees only
+            // their own company. IsActive is intentionally left out so deactivated contacts
+            // stay visible on management pages (mirrors WabaConnection).
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<ContactList>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(120);
+            e.Property(x => x.Description).HasMaxLength(500);
+            // List name is unique PER COMPANY, not globally.
+            e.HasIndex(x => new { x.CompanyId, x.Name }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<ContactListMember>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // One membership per (list, contact) — re-adding the same contact is a no-op.
+            e.HasIndex(x => new { x.ContactListId, x.ContactId }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Hard-deleting a list or contact also clears its membership rows.
+            e.HasOne<ContactList>()
+                .WithMany()
+                .HasForeignKey(x => x.ContactListId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Contact>()
+                .WithMany()
+                .HasForeignKey(x => x.ContactId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
     }
 }

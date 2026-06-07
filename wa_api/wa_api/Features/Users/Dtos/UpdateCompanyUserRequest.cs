@@ -11,5 +11,7 @@ namespace wa_api.Features.Users.Dtos;
 public record UpdateCompanyUserRequest(
     [Required, StringLength(200, MinimumLength = 2)] string FullName,
     [Required, EmailAddress, StringLength(256)] string Email,
-    [Required] UserRole Role
+    [Required] UserRole Role,
+    // Capability grants from the Permission catalog. Honoured only for Agents.
+    IReadOnlyList<string>? Permissions
 );

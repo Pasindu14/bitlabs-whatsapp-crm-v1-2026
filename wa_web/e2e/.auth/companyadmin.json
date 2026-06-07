@@ -1,0 +1,35 @@
+{
+  "cookies": [
+    {
+      "name": "authjs.csrf-token",
+      "value": "748a856f9f1fb86a0894109fa649c633d10f62b783bcdab1a9775310ffb2f458%7C0c63a9057ce9c2d49ae814a78d50f9b42e0b3ccf316833e0b164f415c51f893b",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "authjs.callback-url",
+      "value": "http%3A%2F%2Flocalhost%3A3000%2Fsign-in",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "authjs.session-token",
+      "value": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2Q0JDLUhTNTEyIiwia2lkIjoiRWpFQVBDOVhIVmRrcTBMLTJHUUhMeUNSU0lBa3VHOVVoZjFGZjdTTlhHeHFUX2Q0X0dWVzlMVXZ5aE1FMmNXMmtVNHBCZGkzQjNma0FLSlpzTmJaN2cifQ..Fe5n0_Rq0r8FKRV3bACfdw.fATApu3loJMjHsaHFkiMMBRbmAVDh1JHp_fLEzsrYRFWwxKF8BKpBQxLx9LG-7n3TomE_58-tqTyZ-P71UQmeQ7sb3Od8-ZEYjCQceIfwx_fm-a5TgDZSctqxkO-VAY0kH-Re5KPRisevDYTw0Mz4EeFP-VHKtSHXureLlmnUSe98MyGJec_P82cLsdaZMvaIAvfglcRwzoMTWlv6-p80FREpsazcdGA3XmYmCHOANfRPl1seWq6PE0A76b2u0tgVFc2s-IalcDftyb8Lr35kbBBh1OYeG9CLG8URYTlfwYkbTNv7wvUebgsI9JBfI33OKzmm_Bkwrd5wFI-QCYCtgQ9pLbZuj3kmvFBFrR_NOFdK3cm9N2qciCb0e_xtOZrIFdnFlNbojL62QfnD7fZqii4uU9e027v-ik49Lv2LOZbfKnc98CJdgPHAfTXglgZOHNMt_MsM7rMeEyxj5h8OmSCYciNjqwIBtUnnu8RJYWcYyvTsJWeEhIGP8zWHmj99CDRTx330QJXlervQr4ANQvrHFmA6b9dGo-kPQm_4D3toMPybTFdg_fS1hYzvAQZ9CJ-PnJNtQmZVmCp40wBuDmXrARugLNASyB1ze6aaJdmFmXrn8wPSbhHpct6fkXYJxr2cahn3KvLg9p5U1jbhXGx05Tqp5XiM4og5oYwwDGyzbqSs9XbePB0Er6yZ1s6hvGOMT4xhA2Dfmo9Sc7R_PglJF3Jq9-M_QhatovZuiNfrtSeCEMdUWhuSgPIgNhvm8T5Cg-LqNpp9wNSXt9x8-hJg4PO3CwtQ2QQK1_3I7kYeqwQeo7gEnOFqhCLDB8zO0DJDy0f_fLafhLDA15Q7Z-Zvbpt5GWzZ82jxe5TMkH6oABWgbrmxVmj99u25g5_YTGh7yMjbKPwUBjwsGpZ15_kaC9yLgVtp1npmgcompaziNAT7Z8n3_M_y6M6s_XwKvs47cw2BeER2A9tlbcKTA.I4xawsDYE6Pw884x2e84YdnMSl5fecxagnFRMtyDsG4",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1783420507.213533,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

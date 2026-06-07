@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -29,6 +30,12 @@ public class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenService
 
         if (user.CompanyId is { } companyId)
             claims.Add(new Claim("companyId", companyId.ToString()));
+
+        // Fine-grained capability grants (Agents only) as a JSON array claim, for UI gating.
+        if (user.Permissions.Count > 0)
+            claims.Add(new Claim("permissions",
+                JsonSerializer.Serialize(user.Permissions),
+                JsonClaimValueTypes.JsonArray));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm, Controller, type Resolver } from "react-hook-form";
+import { useForm, useWatch, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
+import { PERMISSIONS, type PermissionKey } from "@/features/team/permissions";
 import {
   Select,
   SelectContent,
@@ -56,9 +58,14 @@ export function TeamForm({
       email: "",
       password: "",
       role: "Agent",
+      permissions: [],
       ...defaultValues,
     },
   });
+
+  // Permissions only apply to Agents — CompanyAdmins are all-access by role.
+  const role = useWatch({ control, name: "role" });
+  const isAgent = role === "Agent";
 
   // Bind API field errors (e.g. duplicate email) back onto the inputs.
   useEffect(() => {
@@ -125,6 +132,49 @@ export function TeamForm({
         />
         {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
       </div>
+
+      {isAgent && (
+        <div className="space-y-2">
+          <Label>Permissions</Label>
+          <p className="text-xs text-muted-foreground">
+            Choose what this agent can do. Company Admins always have full access.
+          </p>
+          <Controller
+            control={control}
+            name="permissions"
+            render={({ field }) => {
+              const selected = field.value ?? [];
+              const toggle = (key: PermissionKey, checked: boolean) =>
+                field.onChange(
+                  checked
+                    ? [...selected, key]
+                    : selected.filter((k) => k !== key)
+                );
+              return (
+                <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
+                  {PERMISSIONS.map((p) => (
+                    <label
+                      key={p.key}
+                      htmlFor={`perm-${p.key}`}
+                      className="flex items-center gap-2 text-sm font-normal"
+                    >
+                      <Checkbox
+                        id={`perm-${p.key}`}
+                        checked={selected.includes(p.key)}
+                        onCheckedChange={(c) => toggle(p.key, c === true)}
+                      />
+                      {p.label}
+                    </label>
+                  ))}
+                </div>
+              );
+            }}
+          />
+          {errors.permissions && (
+            <p className="text-xs text-destructive">{errors.permissions.message}</p>
+          )}
+        </div>
+      )}
 
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (

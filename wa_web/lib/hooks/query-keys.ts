@@ -63,6 +63,24 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.wabaConnections.details(), id] as const,
   },
 
+  // Contacts (CompanyAdmin — the caller's own company)
+  contacts: {
+    all: ['contacts'] as const,
+    lists: () => [...queryKeys.contacts.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.contacts.lists(), filters] as const,
+    details: () => [...queryKeys.contacts.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.contacts.details(), id] as const,
+  },
+
+  // Contact lists (CompanyAdmin — the caller's own company)
+  contactLists: {
+    all: ['contact-lists'] as const,
+    lists: () => [...queryKeys.contactLists.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.contactLists.lists(), filters] as const,
+    details: () => [...queryKeys.contactLists.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.contactLists.details(), id] as const,
+  },
+
   // Stats/Analytics
   stats: {
     all: ['stats'] as const,

@@ -14,6 +14,7 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import type { TeamMember } from "@/features/team/types";
 import type { TeamRole } from "@/features/team/schema/team-schema";
+import { permissionLabel } from "@/features/team/permissions";
 
 const dateFmt = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -69,6 +70,36 @@ export function getTeamColumns(actions: TeamColumnActions): ColumnDef<TeamMember
         <Badge variant={roleVariant[row.original.role]}>{roleLabel[row.original.role]}</Badge>
       ),
       size: 140,
+    },
+    {
+      accessorKey: "permissions",
+      header: "Permissions",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const u = row.original;
+        // CompanyAdmins are all-access by role; Agents carry an explicit grant list.
+        if (u.role === "CompanyAdmin") {
+          return <span className="text-muted-foreground">Full access</span>;
+        }
+        const perms = u.permissions ?? [];
+        if (perms.length === 0) {
+          return <span className="text-muted-foreground">None</span>;
+        }
+        const shown = perms.slice(0, 2);
+        return (
+          <div className="flex flex-wrap items-center gap-1">
+            {shown.map((p) => (
+              <Badge key={p} variant="secondary">
+                {permissionLabel(p)}
+              </Badge>
+            ))}
+            {perms.length > shown.length && (
+              <Badge variant="outline">+{perms.length - shown.length}</Badge>
+            )}
+          </div>
+        );
+      },
+      size: 200,
     },
     {
       accessorKey: "isActive",

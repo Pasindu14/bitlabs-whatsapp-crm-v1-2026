@@ -36,5 +36,5 @@ public class AuthService(AppDbContext db, IJwtTokenService tokenService) : IAuth
     }
 
     private static CurrentUserResponse Map(User u)
-        => new(u.Id, u.Email, u.FullName, u.Role, u.CompanyId);
+        => new(u.Id, u.Email, u.FullName, u.Role, u.Permissions, u.CompanyId);
 }

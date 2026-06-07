@@ -112,6 +112,7 @@ function EditTeamDialog() {
                     email: member.email,
                     password: "",
                     role: member.role,
+                    permissions: (member.permissions ?? []) as CreateTeamMemberInput["permissions"],
                   }
                 : undefined
             }

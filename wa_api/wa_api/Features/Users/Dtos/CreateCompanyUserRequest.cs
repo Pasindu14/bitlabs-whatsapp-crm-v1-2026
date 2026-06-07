@@ -15,5 +15,8 @@ public record CreateCompanyUserRequest(
     [Required, EmailAddress, StringLength(256)] string Email,
     [Required, StringLength(128, MinimumLength = 8)] string Password,
     // Defaults to Agent server-side when null. Must be a tenant role (CompanyAdmin/Agent).
-    UserRole? Role
+    UserRole? Role,
+    // Capability grants from the Permission catalog. Honoured only for Agents — a
+    // CompanyAdmin is all-access by role, so any value here is ignored for that role.
+    IReadOnlyList<string>? Permissions
 );
