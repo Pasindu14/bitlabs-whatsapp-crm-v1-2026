@@ -30,6 +30,14 @@ public class CompaniesController(ICompanyService companyService) : ControllerBas
         return Ok(ResponseHelper.Paged(items, page, pageSize, total, CorrelationId));
     }
 
+    /// <summary>GET /api/v1/companies/{id} — single company.</summary>
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
+    {
+        var result = await companyService.GetByIdAsync(id, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
     /// <summary>POST /api/v1/companies — create a company.</summary>
     [HttpPost]
     public async Task<IActionResult> Create(CreateCompanyRequest request, CancellationToken ct)
@@ -38,11 +46,27 @@ public class CompaniesController(ICompanyService companyService) : ControllerBas
         return StatusCode(StatusCodes.Status201Created, ResponseHelper.Created(result, CorrelationId));
     }
 
-    /// <summary>DELETE /api/v1/companies/{id} — soft-delete (deactivate) a company.</summary>
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    /// <summary>PUT /api/v1/companies/{id} — update all editable fields.</summary>
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, UpdateCompanyRequest request, CancellationToken ct)
     {
-        await companyService.DeleteAsync(id, ct);
-        return Ok(ResponseHelper.Ok(new { deleted = true }, CorrelationId));
+        var result = await companyService.UpdateAsync(id, request, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>POST /api/v1/companies/{id}/activate — mark active.</summary>
+    [HttpPost("{id:guid}/activate")]
+    public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
+    {
+        var result = await companyService.ActivateAsync(id, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>POST /api/v1/companies/{id}/deactivate — mark inactive (soft-delete).</summary>
+    [HttpPost("{id:guid}/deactivate")]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
+    {
+        var result = await companyService.DeactivateAsync(id, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
     }
 }

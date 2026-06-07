@@ -2,7 +2,10 @@ import client, { type ApiSuccessBody, createIdempotencyKey } from "@/lib/api/cli
 import { executeService } from "@/lib/services/wrapper";
 import type { PaginatedResponse } from "@/lib/types/actions";
 import type { Company, CompanyListParams } from "@/features/companies/types";
-import type { CreateCompanyInput } from "@/features/companies/schema/company-schema";
+import type {
+  CreateCompanyInput,
+  UpdateCompanyInput,
+} from "@/features/companies/schema/company-schema";
 
 /**
  * Talks to wa_api /api/v1/companies. The axios client attaches the SuperAdmin
@@ -45,6 +48,16 @@ export const CompanyService = {
     );
   },
 
+  async getById(id: string): Promise<Company> {
+    return executeService(
+      { context: "CompanyService", method: "getById" },
+      async () => {
+        const res = await client.get<ApiSuccessBody<Company>>(`/api/v1/companies/${id}`);
+        return res.data.data;
+      }
+    );
+  },
+
   async create(input: CreateCompanyInput): Promise<Company> {
     return executeService(
       { context: "CompanyService", method: "create" },
@@ -57,11 +70,32 @@ export const CompanyService = {
     );
   },
 
-  async remove(id: string): Promise<void> {
+  async update(id: string, input: UpdateCompanyInput): Promise<Company> {
     return executeService(
-      { context: "CompanyService", method: "remove" },
+      { context: "CompanyService", method: "update" },
       async () => {
-        await client.delete(`/api/v1/companies/${id}`);
+        const res = await client.put<ApiSuccessBody<Company>>(`/api/v1/companies/${id}`, input);
+        return res.data.data;
+      }
+    );
+  },
+
+  async activate(id: string): Promise<Company> {
+    return executeService(
+      { context: "CompanyService", method: "activate" },
+      async () => {
+        const res = await client.post<ApiSuccessBody<Company>>(`/api/v1/companies/${id}/activate`);
+        return res.data.data;
+      }
+    );
+  },
+
+  async deactivate(id: string): Promise<Company> {
+    return executeService(
+      { context: "CompanyService", method: "deactivate" },
+      async () => {
+        const res = await client.post<ApiSuccessBody<Company>>(`/api/v1/companies/${id}/deactivate`);
+        return res.data.data;
       }
     );
   },

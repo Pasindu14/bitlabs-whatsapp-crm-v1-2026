@@ -1,12 +1,18 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { Building2 } from "lucide-react";
+import { Building2, MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import type { Company } from "@/features/companies/types";
-import { CompanyRowActions } from "./company-row-actions";
 
 const dateFmt = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -14,44 +20,16 @@ const dateFmt = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
-export function getCompanyColumns(
-  handleRowDeselection: ((rowId: string) => void) | null | undefined
-): ColumnDef<Company>[] {
-  const columns: ColumnDef<Company>[] = [];
+export interface CompanyColumnActions {
+  openEdit: (id: string) => void;
+  openActivate: (id: string) => void;
+  openDeactivate: (id: string) => void;
+}
 
-  // Selection column only when row selection is enabled (handler provided).
-  if (handleRowDeselection !== null) {
-    columns.push({
-      id: "select",
-      header: ({ table }) => (
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-          className="translate-y-0.5"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => {
-            row.toggleSelected(!!value);
-            if (!value && handleRowDeselection) handleRowDeselection(row.id);
-          }}
-          aria-label="Select row"
-          className="translate-y-0.5"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-      size: 40,
-    });
-  }
+export function getCompanyColumns(actions: CompanyColumnActions): ColumnDef<Company>[] {
+  const { openEdit, openActivate, openDeactivate } = actions;
 
-  columns.push(
+  return [
     {
       accessorKey: "name",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Company" />,
@@ -90,12 +68,11 @@ export function getCompanyColumns(
       accessorKey: "isActive",
       header: "Status",
       enableSorting: false,
-      cell: ({ row }) =>
-        row.original.isActive ? (
-          <Badge variant="default">Active</Badge>
-        ) : (
-          <Badge variant="secondary">Inactive</Badge>
-        ),
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? "default" : "secondary"}>
+          {row.original.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
       size: 120,
     },
     {
@@ -113,10 +90,31 @@ export function getCompanyColumns(
       header: "Actions",
       enableSorting: false,
       enableHiding: false,
-      cell: ({ row }) => <CompanyRowActions company={row.original} />,
+      cell: ({ row }) => {
+        const c = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Open actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onClick={() => openEdit(c.id)}>Edit</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {c.isActive ? (
+                <DropdownMenuItem variant="destructive" onClick={() => openDeactivate(c.id)}>
+                  Deactivate
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => openActivate(c.id)}>Activate</DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
       size: 80,
-    }
-  );
-
-  return columns;
+    },
+  ];
 }

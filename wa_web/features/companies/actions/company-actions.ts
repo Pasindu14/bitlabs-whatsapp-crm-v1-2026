@@ -2,7 +2,10 @@
 
 import { createAction } from "@/lib/actions/wrapper";
 import { CompanyService } from "@/features/companies/services/company-service";
-import { createCompanySchema } from "@/features/companies/schema/company-schema";
+import {
+  createCompanySchema,
+  updateCompanySchema,
+} from "@/features/companies/schema/company-schema";
 import type { CompanyListParams } from "@/features/companies/types";
 
 // Every company action is SuperAdmin-only — the wrapper enforces auth + role
@@ -16,6 +19,13 @@ export const getCompaniesAction = createAction(
   }
 );
 
+export const getCompanyByIdAction = createAction(
+  { name: "getCompanyByIdAction", requireAuth: true, requiredRole: SUPERADMIN },
+  async (id: string) => {
+    return CompanyService.getById(id);
+  }
+);
+
 export const createCompanyAction = createAction(
   { name: "createCompanyAction", requireAuth: true, requiredRole: SUPERADMIN },
   async (raw: unknown) => {
@@ -24,10 +34,24 @@ export const createCompanyAction = createAction(
   }
 );
 
-export const deleteCompanyAction = createAction(
-  { name: "deleteCompanyAction", requireAuth: true, requiredRole: SUPERADMIN },
+export const updateCompanyAction = createAction(
+  { name: "updateCompanyAction", requireAuth: true, requiredRole: SUPERADMIN },
+  async (id: string, raw: unknown) => {
+    const input = updateCompanySchema.parse(raw);
+    return CompanyService.update(id, input);
+  }
+);
+
+export const activateCompanyAction = createAction(
+  { name: "activateCompanyAction", requireAuth: true, requiredRole: SUPERADMIN },
   async (id: string) => {
-    await CompanyService.remove(id);
-    return { id };
+    return CompanyService.activate(id);
+  }
+);
+
+export const deactivateCompanyAction = createAction(
+  { name: "deactivateCompanyAction", requireAuth: true, requiredRole: SUPERADMIN },
+  async (id: string) => {
+    return CompanyService.deactivate(id);
   }
 );

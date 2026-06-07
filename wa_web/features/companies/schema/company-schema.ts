@@ -31,4 +31,8 @@ export const createCompanySchema = z.object({
     .or(z.literal("").transform(() => undefined)),
 });
 
+// Update uses the same shape as create (full replace of editable fields).
+export const updateCompanySchema = createCompanySchema;
+
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
+export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
