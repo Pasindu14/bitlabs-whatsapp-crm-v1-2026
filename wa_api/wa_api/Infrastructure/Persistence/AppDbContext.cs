@@ -23,6 +23,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
 
     // ── Feature tables ─────────────────────────────────────────────────────
     public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<WabaConnection> WabaConnections => Set<WabaConnection>();
     public DbSet<Contact> Contacts => Set<Contact>();
@@ -66,6 +67,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .WithMany()
                 .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RefreshToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Token).IsRequired().HasMaxLength(128);
+            e.HasIndex(x => x.Token).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.IsRevoked });
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Company>(e =>

@@ -12,4 +12,5 @@ public class JwtOptions
     public string Issuer { get; set; } = "wa-api";
     public string Audience { get; set; } = "wa-api";
     public int AccessTokenExpiryMinutes { get; set; } = 480; // 8 hours
+    public int RefreshTokenExpiryDays { get; set; } = 30;
 }

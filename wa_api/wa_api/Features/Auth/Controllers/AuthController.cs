@@ -15,12 +15,21 @@ public class AuthController(IAuthService authService) : ControllerBase
 {
     private string? CorrelationId => HttpContext.Items["CorrelationId"]?.ToString();
 
-    /// <summary>POST /api/v1/auth/login → email + password → JWT.</summary>
+    /// <summary>POST /api/v1/auth/login → email + password → JWT + refresh token.</summary>
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
     {
         var result = await authService.LoginAsync(request, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>POST /api/v1/auth/refresh → exchange refresh token for new access + refresh tokens.</summary>
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Refresh(RefreshRequest request, CancellationToken ct)
+    {
+        var result = await authService.RefreshAsync(request.RefreshToken, ct);
         return Ok(ResponseHelper.Ok(result, CorrelationId));
     }
 
@@ -35,14 +44,16 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
 
     /// <summary>
-    /// POST /api/v1/auth/logout. Tokens are stateless (no server-side session),
-    /// so the client simply discards the token. This endpoint acknowledges the
-    /// action and is the seam where token revocation (a denylist) would live later.
+    /// POST /api/v1/auth/logout. Revokes the supplied refresh token (if any);
+    /// the access token is stateless and expires naturally.
     /// </summary>
     [HttpPost("logout")]
     [Authorize]
-    public IActionResult Logout()
-        => Ok(ResponseHelper.Ok(new { loggedOut = true }, CorrelationId));
+    public async Task<IActionResult> Logout(LogoutRequest? request, CancellationToken ct)
+    {
+        await authService.LogoutAsync(request?.RefreshToken, ct);
+        return Ok(ResponseHelper.Ok(new { loggedOut = true }, CorrelationId));
+    }
 
     private Guid GetUserId()
     {
