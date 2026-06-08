@@ -1,4 +1,7 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wa_api.Common.Audit;
 using wa_api.Common.Tenancy;
 using wa_api.Features.Auth;
@@ -8,6 +11,7 @@ using wa_api.Features.ContactLists.Entities;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Plans.Entities;
 using wa_api.Features.Subscriptions.Entities;
+using wa_api.Features.Templates.Entities;
 using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Infrastructure.Persistence;
@@ -18,6 +22,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     // Per-request tenant; falls back to the fail-closed null object for design-time
     // (EF CLI) and other non-HTTP scopes where no ITenantContext is injected.
     private readonly ITenantContext _tenant = tenant ?? NullTenantContext.Instance;
+
+    // Web-default (camelCase) JSON for the jsonb Components column (Plan 004 — Templates).
+    private static readonly JsonSerializerOptions ComponentsJsonOptions = new(JsonSerializerDefaults.Web);
 
     // ── Infrastructure tables ──────────────────────────────────────────────
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -34,6 +41,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<Template> Templates => Set<Template>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -243,6 +251,51 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
 
             // Tenant isolation (Phase 1.1/1.3): SuperAdmin bypasses; everyone else sees only
             // their own company. IsActive is intentionally left out (mirrors WabaConnection).
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Template>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(512);
+            e.Property(x => x.Language).IsRequired().HasMaxLength(20);
+            e.Property(x => x.WabaId).IsRequired().HasMaxLength(64);
+            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.ParameterFormat).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.MetaTemplateId).HasMaxLength(128);
+            e.Property(x => x.RejectionReason).HasMaxLength(2048);
+
+            // The normalized component tree is stored as jsonb. A value converter handles
+            // (de)serialization; the comparer lets EF detect edits to the object graph.
+            var componentsConverter = new ValueConverter<TemplateComponents, string>(
+                v => JsonSerializer.Serialize(v, ComponentsJsonOptions),
+                v => JsonSerializer.Deserialize<TemplateComponents>(v, ComponentsJsonOptions) ?? new TemplateComponents());
+            var componentsComparer = new ValueComparer<TemplateComponents>(
+                (a, b) => JsonSerializer.Serialize(a, ComponentsJsonOptions) == JsonSerializer.Serialize(b, ComponentsJsonOptions),
+                v => v == null ? 0 : JsonSerializer.Serialize(v, ComponentsJsonOptions).GetHashCode(),
+                v => JsonSerializer.Deserialize<TemplateComponents>(JsonSerializer.Serialize(v, ComponentsJsonOptions), ComponentsJsonOptions)!);
+            e.Property(x => x.Components)
+                .HasColumnType("jsonb")
+                .IsRequired()
+                .HasConversion(componentsConverter, componentsComparer);
+
+            // Uniqueness is per-company on (Name, Language) — same name + different language is a
+            // separate variant (mirrors the (CompanyId, Phone) convention on Contact).
+            e.HasIndex(x => new { x.CompanyId, x.Name, x.Language }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => x.Status);
+            e.HasOne(x => x.WabaConnection)
+                .WithMany()
+                .HasForeignKey(x => x.WabaConnectionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Tenant isolation (Phase 1.1/1.3): SuperAdmin bypasses; everyone else sees only their
+            // own company. IsActive is intentionally left out (mirrors WabaConnection).
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
     }

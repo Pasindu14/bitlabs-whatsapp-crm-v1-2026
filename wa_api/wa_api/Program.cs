@@ -81,6 +81,7 @@ try
     builder.Services.AddPlatformHangfire(builder.Configuration);
     builder.Services.AddTransient<WabaHealthCheckJob>();
     builder.Services.AddTransient<SubscriptionPeriodResetJob>();
+    builder.Services.AddTransient<TemplateStatusSyncJob>();
 
     // Named HttpClient for Meta Graph API calls (base address set here; auth header per-request).
     builder.Services.AddHttpClient("MetaGraph", c =>
@@ -101,6 +102,9 @@ try
     builder.Services.AddScoped<wa_api.Features.Messages.IMessageService, wa_api.Features.Messages.MessageService>();
     builder.Services.AddScoped<wa_api.Features.Plans.IPlanService, wa_api.Features.Plans.PlanService>();
     builder.Services.AddScoped<wa_api.Features.Subscriptions.ISubscriptionService, wa_api.Features.Subscriptions.SubscriptionService>();
+    builder.Services.AddScoped<wa_api.Features.Templates.ITemplateService, wa_api.Features.Templates.TemplateService>();
+    builder.Services.AddScoped<wa_api.Features.Templates.IMetaTemplateClient, wa_api.Features.Templates.MetaTemplateClient>();
+    builder.Services.AddScoped<wa_api.Features.Templates.IMetaMediaUploader, wa_api.Features.Templates.MetaMediaUploader>();
     builder.Services.AddScoped<wa_api.Common.Subscriptions.ISubscriptionGate, wa_api.Common.Subscriptions.SubscriptionGate>();
 
     // ── Observability ──────────────────────────────────────────────────────
@@ -202,6 +206,7 @@ try
     RecurringJob.AddOrUpdate<HeartbeatJob>("heartbeat", j => j.Run(), Cron.Hourly);
     RecurringJob.AddOrUpdate<WabaHealthCheckJob>("waba-health-check", j => j.RunAsync(), Cron.MinuteInterval(15));
     RecurringJob.AddOrUpdate<SubscriptionPeriodResetJob>("subscription-period-reset", j => j.RunAsync(), Cron.Daily);
+    RecurringJob.AddOrUpdate<TemplateStatusSyncJob>("template-status-sync", j => j.RunAsync(), Cron.MinuteInterval(15));
 
     app.Run();
 }

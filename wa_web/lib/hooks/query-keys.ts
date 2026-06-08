@@ -105,6 +105,15 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.contactLists.details(), id] as const,
   },
 
+  // Templates (CompanyAdmin — WhatsApp message templates)
+  templates: {
+    all: ['templates'] as const,
+    lists: () => [...queryKeys.templates.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.templates.lists(), filters] as const,
+    details: () => [...queryKeys.templates.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.templates.details(), id] as const,
+  },
+
   // Messages (CompanyAdmin — outbound messages to contacts)
   messages: {
     all: ['messages'] as const,
