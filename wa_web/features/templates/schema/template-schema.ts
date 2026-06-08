@@ -96,6 +96,11 @@ export const builderSchema = z
     const idx = placeholderIndices(v.body);
     const contiguous = idx.every((n, i) => n === i + 1);
     const literal = v.body.replace(/\{\{\d+\}\}/g, "").trim();
+    // Meta's variable-density rule: (words + variables) ≥ 3·variables + 1. `\s` already covers
+    // newlines, so newline-separated words tokenize correctly; filter empties so a stray space
+    // doesn't inflate the count. P is the distinct variable count (lenient on the rare repeat).
+    const tokenCount = v.body.split(/\s+/).filter(Boolean).length;
+    const minTokens = 3 * idx.length + 1;
     if (v.body && !literal) {
       ctx.addIssue({ code: "custom", path: ["body"], message: "The body needs some text, not just variables." });
     } else if (v.body.replace(/\r\n?/g, "\n").includes("\n\n\n")) {
@@ -104,6 +109,13 @@ export const builderSchema = z
       ctx.addIssue({ code: "custom", path: ["body"], message: "Use at most 10 emojis in the body." });
     } else if (!contiguous) {
       ctx.addIssue({ code: "custom", path: ["body"], message: "Variables must be numbered consecutively from {{1}}" });
+    } else if (idx.length > 0 && tokenCount < minTokens) {
+      const deficit = minTokens - tokenCount;
+      ctx.addIssue({
+        code: "custom",
+        path: ["body"],
+        message: `Too many variables for the message length — add ${deficit} more word${deficit === 1 ? "" : "s"} or remove a variable.`,
+      });
     } else {
       idx.forEach((_, i) => {
         if (!v.bodyExamples[i]?.value)

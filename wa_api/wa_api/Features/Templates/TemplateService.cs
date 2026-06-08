@@ -248,8 +248,19 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta) 
                 .Select(m => int.Parse(m.Groups[1].Value))
                 .Distinct().OrderBy(n => n).ToList();
 
+            // Meta's variable-density rule: (words + variables) ≥ 3·variables + 1. Splitting on
+            // null splits on all whitespace (incl. newlines) and RemoveEmptyEntries drops blanks,
+            // so a stray space can't inflate the count. indices is the distinct variable count.
+            var tokenCount = body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+            var minTokens = 3 * indices.Count + 1;
             if (!indices.SequenceEqual(Enumerable.Range(1, indices.Count)))
                 fields["components.body.text"] = ["Body variables must be numbered consecutively starting at {{1}}."];
+            else if (indices.Count > 0 && tokenCount < minTokens)
+            {
+                var deficit = minTokens - tokenCount;
+                fields["components.body.text"] =
+                    [$"Too many variables for the message length — add {deficit} more word{(deficit == 1 ? "" : "s")} or remove a variable."];
+            }
             else
             {
                 var examples = c.Body!.Examples ?? [];
