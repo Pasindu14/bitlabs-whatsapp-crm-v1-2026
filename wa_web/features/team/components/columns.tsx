@@ -1,0 +1,174 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import { User as UserIcon, MoreHorizontal } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DataTableColumnHeader } from "@/components/data-table/column-header";
+import type { TeamMember } from "@/features/team/types";
+import type { TeamRole } from "@/features/team/schema/team-schema";
+import { permissionLabel } from "@/features/team/permissions";
+
+const dateFmt = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+const roleLabel: Record<TeamRole, string> = {
+  CompanyAdmin: "Company Admin",
+  Agent: "Agent",
+};
+
+const roleVariant: Record<TeamRole, "default" | "secondary"> = {
+  CompanyAdmin: "default",
+  Agent: "secondary",
+};
+
+export interface TeamColumnActions {
+  openEdit: (id: string) => void;
+  openResetPassword: (id: string) => void;
+  openActivate: (id: string) => void;
+  openDeactivate: (id: string) => void;
+}
+
+export function getTeamColumns(actions: TeamColumnActions): ColumnDef<TeamMember>[] {
+  const { openEdit, openResetPassword, openActivate, openDeactivate } = actions;
+
+  return [
+    {
+      accessorKey: "fullName",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="User" />,
+      cell: ({ row }) => {
+        const u = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <UserIcon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="truncate font-medium">{u.fullName}</div>
+              <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+            </div>
+          </div>
+        );
+      },
+      size: 260,
+    },
+    {
+      accessorKey: "role",
+      header: "Role",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Badge variant={roleVariant[row.original.role]}>{roleLabel[row.original.role]}</Badge>
+      ),
+      size: 140,
+    },
+    {
+      accessorKey: "permissions",
+      header: "Permissions",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const u = row.original;
+        // CompanyAdmins are all-access by role; Agents carry an explicit grant list.
+        if (u.role === "CompanyAdmin") {
+          return <span className="text-muted-foreground">Full access</span>;
+        }
+        const perms = u.permissions ?? [];
+        if (perms.length === 0) {
+          return <span className="text-muted-foreground">None</span>;
+        }
+        const shown = perms.slice(0, 2);
+        return (
+          <div className="flex flex-wrap items-center gap-1">
+            {shown.map((p) => (
+              <Badge key={p} variant="secondary">
+                {permissionLabel(p)}
+              </Badge>
+            ))}
+            {perms.length > shown.length && (
+              <Badge variant="outline">+{perms.length - shown.length}</Badge>
+            )}
+          </div>
+        );
+      },
+      size: 200,
+    },
+    {
+      accessorKey: "isActive",
+      header: "Active",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? "default" : "secondary"}>
+          {row.original.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
+      size: 110,
+    },
+    {
+      accessorKey: "lastLoginAt",
+      header: "Last Login",
+      enableSorting: false,
+      cell: ({ row }) =>
+        row.original.lastLoginAt ? (
+          <span className="text-muted-foreground">
+            {dateFmt.format(new Date(row.original.lastLoginAt))}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Never</span>
+        ),
+      size: 130,
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Created" />,
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {dateFmt.format(new Date(row.original.createdAt))}
+        </span>
+      ),
+      size: 130,
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => {
+        const u = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Open actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onClick={() => openEdit(u.id)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openResetPassword(u.id)}>
+                Reset Password
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {u.isActive ? (
+                <DropdownMenuItem variant="destructive" onClick={() => openDeactivate(u.id)}>
+                  Deactivate
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => openActivate(u.id)}>Activate</DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+      size: 80,
+    },
+  ];
+}

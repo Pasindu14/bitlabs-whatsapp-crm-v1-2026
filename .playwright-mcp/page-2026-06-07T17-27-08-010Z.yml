@@ -1,0 +1,103 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - main [ref=e3]:
+    - generic [ref=e5]:
+      - button "Toggle Sidebar" [ref=e6]:
+        - img
+        - generic [ref=e7]: Toggle Sidebar
+      - navigation "breadcrumb" [ref=e8]:
+        - list [ref=e9]:
+          - listitem [ref=e10]:
+            - link "Superadmin" [ref=e11] [cursor=pointer]:
+              - /url: /superadmin
+          - listitem [ref=e12]:
+            - img [ref=e13]
+          - listitem [ref=e15]:
+            - link "Subscriptions" [disabled] [ref=e16]
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - heading "Subscriptions" [level=1] [ref=e19]
+        - paragraph [ref=e20]: Assign companies to plans and track their monthly message usage.
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - textbox "Search by company or plan..." [ref=e24]
+            - button "Search" [ref=e25]:
+              - img
+              - generic [ref=e26]: Search
+          - generic [ref=e27]:
+            - button "Assign Subscription" [ref=e28]:
+              - img
+              - text: Assign Subscription
+            - button "Toggle columns" [ref=e29]:
+              - img
+              - text: View
+            - button "Open table settings" [ref=e30]:
+              - img
+              - generic [ref=e31]: Open table settings
+        - generic "Data table" [ref=e32]:
+          - table [ref=e34]:
+            - rowgroup [ref=e35]:
+              - row "Company Plan Status Usage Renews Actions" [ref=e36]:
+                - columnheader "Company" [ref=e37]:
+                  - button "Company" [ref=e39]:
+                    - generic [ref=e40]: Company
+                    - img
+                  - generic [ref=e42]:
+                    - separator [ref=e43]
+                    - img [ref=e44]
+                - columnheader "Plan" [ref=e51]:
+                  - button "Plan" [ref=e53]:
+                    - generic [ref=e54]: Plan
+                    - img
+                  - generic [ref=e56]:
+                    - separator [ref=e57]
+                    - img [ref=e58]
+                - columnheader "Status" [ref=e65]:
+                  - button "Status" [ref=e67]:
+                    - generic [ref=e68]: Status
+                    - img
+                  - generic [ref=e70]:
+                    - separator [ref=e71]
+                    - img [ref=e72]
+                - columnheader "Usage" [ref=e79]:
+                  - text: Usage
+                  - generic [ref=e81]:
+                    - separator [ref=e82]
+                    - img [ref=e83]
+                - columnheader "Renews" [ref=e90]:
+                  - button "Renews" [ref=e92]:
+                    - generic [ref=e93]: Renews
+                    - img
+                  - generic [ref=e95]:
+                    - separator [ref=e96]
+                    - img [ref=e97]
+                - columnheader "Actions" [ref=e104]:
+                  - text: Actions
+                  - generic [ref=e106]:
+                    - separator [ref=e107]
+                    - img [ref=e108]
+            - rowgroup [ref=e115]:
+              - row "Loading" [ref=e116]:
+                - cell "Loading" [ref=e117]:
+                  - status "Loading" [ref=e119]
+        - generic [ref=e121]:
+          - generic [ref=e122]: 0 row(s) .
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - paragraph [ref=e125]: Rows per page
+              - combobox [ref=e126] [cursor=pointer]:
+                - img
+              - combobox [ref=e127]
+            - generic [ref=e128]: Page 1 of 1
+            - generic [ref=e129]:
+              - button "Go to first page" [disabled]:
+                - img
+              - button "Go to previous page" [disabled]:
+                - img
+              - button "Go to next page" [disabled]:
+                - img
+              - button "Go to last page" [disabled]:
+                - img
+  - button "Open Next.js Dev Tools" [ref=e135] [cursor=pointer]:
+    - img [ref=e136]

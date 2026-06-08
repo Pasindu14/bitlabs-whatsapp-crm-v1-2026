@@ -1,0 +1,101 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - main [ref=e3]:
+    - generic [ref=e5]:
+      - button "Toggle Sidebar" [ref=e6]:
+        - img
+        - generic [ref=e7]: Toggle Sidebar
+      - navigation "breadcrumb" [ref=e8]:
+        - list [ref=e9]:
+          - listitem [ref=e10]:
+            - link "Superadmin" [ref=e11] [cursor=pointer]:
+              - /url: /superadmin
+          - listitem [ref=e12]:
+            - img [ref=e13]
+          - listitem [ref=e15]:
+            - link "Companies" [disabled] [ref=e16]
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - heading "Company Management" [level=1] [ref=e19]
+        - paragraph [ref=e20]: Create and manage tenant companies on the platform.
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - textbox "Search companies..." [ref=e24]
+            - button "Search" [ref=e25]:
+              - img
+              - generic [ref=e26]: Search
+          - generic [ref=e27]:
+            - button "Add Company" [ref=e28]:
+              - img
+              - text: Add Company
+            - button "Toggle columns" [ref=e29]:
+              - img
+              - text: View
+            - button "Open table settings" [ref=e30]:
+              - img
+              - generic [ref=e31]: Open table settings
+        - generic "Data table" [ref=e32]:
+          - table [ref=e34]:
+            - rowgroup [ref=e35]:
+              - row "Company Email Phone Status Created Actions" [ref=e36]:
+                - columnheader "Company" [ref=e37]:
+                  - button "Company" [ref=e39]:
+                    - generic [ref=e40]: Company
+                    - img
+                  - generic [ref=e42]:
+                    - separator [ref=e43]
+                    - img [ref=e44]
+                - columnheader "Email" [ref=e51]:
+                  - button "Email" [ref=e53]:
+                    - generic [ref=e54]: Email
+                    - img
+                  - generic [ref=e56]:
+                    - separator [ref=e57]
+                    - img [ref=e58]
+                - columnheader "Phone" [ref=e65]:
+                  - text: Phone
+                  - generic [ref=e67]:
+                    - separator [ref=e68]
+                    - img [ref=e69]
+                - columnheader "Status" [ref=e76]:
+                  - text: Status
+                  - generic [ref=e78]:
+                    - separator [ref=e79]
+                    - img [ref=e80]
+                - columnheader "Created" [ref=e87]:
+                  - button "Created" [ref=e89]:
+                    - generic [ref=e90]: Created
+                    - img
+                  - generic [ref=e92]:
+                    - separator [ref=e93]
+                    - img [ref=e94]
+                - columnheader "Actions" [ref=e101]:
+                  - text: Actions
+                  - generic [ref=e103]:
+                    - separator [ref=e104]
+                    - img [ref=e105]
+            - rowgroup [ref=e112]:
+              - row "Loading" [ref=e113]:
+                - cell "Loading" [ref=e114]:
+                  - status "Loading" [ref=e116]
+        - generic [ref=e118]:
+          - generic [ref=e119]: 0 row(s) .
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - paragraph [ref=e122]: Rows per page
+              - combobox [ref=e123] [cursor=pointer]:
+                - img
+              - combobox [ref=e124]
+            - generic [ref=e125]: Page 1 of 1
+            - generic [ref=e126]:
+              - button "Go to first page" [disabled]:
+                - img
+              - button "Go to previous page" [disabled]:
+                - img
+              - button "Go to next page" [disabled]:
+                - img
+              - button "Go to last page" [disabled]:
+                - img
+  - button "Open Next.js Dev Tools" [ref=e132] [cursor=pointer]:
+    - img [ref=e133]

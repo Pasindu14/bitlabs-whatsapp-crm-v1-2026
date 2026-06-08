@@ -1,0 +1,272 @@
+- generic:
+  - region "Notifications alt+T"
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - list:
+              - listitem:
+                - link:
+                  - /url: /home
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: Bitlabs
+                    - generic: Enterprise
+          - generic:
+            - generic:
+              - generic: Administration
+              - list:
+                - listitem:
+                  - button [expanded]:
+                    - img
+                    - generic: Platform
+                    - img
+                  - generic:
+                    - list:
+                      - listitem:
+                        - link:
+                          - /url: /superadmin/companies
+                          - generic: Companies
+                      - listitem:
+                        - link:
+                          - /url: /superadmin/waba-connections
+                          - generic: WABA Connections
+                      - listitem:
+                        - link:
+                          - /url: /superadmin/plans
+                          - generic: Plans
+                      - listitem:
+                        - link:
+                          - /url: /superadmin/subscriptions
+                          - generic: Subscriptions
+                      - listitem:
+                        - link:
+                          - /url: /superadmin/users
+                          - generic: Users
+          - generic:
+            - list:
+              - listitem:
+                - button:
+                  - generic:
+                    - generic: P
+                  - generic:
+                    - generic: Platform Super Admin
+                    - generic: superadmin@btilabs.com
+                  - img
+          - button
+    - main:
+      - generic:
+        - generic:
+          - button:
+            - img
+            - generic: Toggle Sidebar
+          - navigation:
+            - list:
+              - listitem:
+                - link:
+                  - /url: /superadmin
+                  - text: Superadmin
+              - listitem:
+                - img
+              - listitem:
+                - link [disabled]: Subscriptions
+      - generic:
+        - generic:
+          - heading [level=1]: Subscriptions
+          - paragraph: Assign companies to plans and track their monthly message usage.
+        - generic:
+          - generic:
+            - generic:
+              - textbox:
+                - /placeholder: Search by company or plan...
+              - button:
+                - img
+                - generic: Search
+            - generic:
+              - button:
+                - img
+                - text: Assign Subscription
+              - button:
+                - img
+                - text: View
+              - button:
+                - img
+                - generic: Open table settings
+          - generic:
+            - generic:
+              - table:
+                - rowgroup:
+                  - row:
+                    - columnheader:
+                      - generic:
+                        - button:
+                          - generic: Company
+                          - img
+                      - generic:
+                        - generic:
+                          - separator
+                          - img
+                    - columnheader:
+                      - generic:
+                        - button:
+                          - generic: Plan
+                          - img
+                      - generic:
+                        - generic:
+                          - separator
+                          - img
+                    - columnheader:
+                      - generic:
+                        - button:
+                          - generic: Status
+                          - img
+                      - generic:
+                        - generic:
+                          - separator
+                          - img
+                    - columnheader:
+                      - text: Usage
+                      - generic:
+                        - generic:
+                          - separator
+                          - img
+                    - columnheader:
+                      - generic:
+                        - button:
+                          - generic: Renews
+                          - img
+                      - generic:
+                        - generic:
+                          - separator
+                          - img
+                    - columnheader:
+                      - text: Actions
+                      - generic:
+                        - generic:
+                          - separator
+                          - img
+                - rowgroup:
+                  - row:
+                    - cell:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - generic: Bitlabs
+                          - generic: Starter
+                    - cell: Starter
+                    - cell:
+                      - generic: Active
+                    - cell:
+                      - generic:
+                        - progressbar
+                        - generic: 1 / 10,000
+                    - cell: Jul 7, 2026
+                    - cell:
+                      - button:
+                        - img
+                        - generic: Open actions
+                  - row:
+                    - cell:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - generic: SmokeTest Co 1780851854
+                          - generic: ZeroQuota 1780851884
+                    - cell: ZeroQuota 1780851884
+                    - cell:
+                      - generic: Cancelled
+                    - cell: —
+                    - cell: Jul 7, 2026
+                    - cell:
+                      - button:
+                        - img
+                        - generic: Open actions
+                  - row:
+                    - cell:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - generic: SmokeTest Co 1780851854
+                          - generic: Pro
+                    - cell: Pro
+                    - cell:
+                      - generic: Cancelled
+                    - cell:
+                      - generic:
+                        - progressbar
+                        - generic: 0 / 100,000
+                    - cell: Jul 7, 2026
+                    - cell:
+                      - button:
+                        - img
+                        - generic: Open actions
+                  - row:
+                    - cell:
+                      - generic:
+                        - generic:
+                          - img
+                        - generic:
+                          - generic: SmokeTest Co 1780851854
+                          - generic: Free
+                    - cell: Free
+                    - cell:
+                      - generic: Cancelled
+                    - cell:
+                      - generic:
+                        - progressbar
+                        - generic: 0 / 1,000
+                    - cell: Jul 7, 2026
+                    - cell:
+                      - button:
+                        - img
+                        - generic: Open actions
+          - generic:
+            - generic: 4 row(s) .
+            - generic:
+              - generic:
+                - paragraph: Rows per page
+                - combobox:
+                  - generic: "10"
+                  - img
+              - generic: Page 1 of 1
+              - generic:
+                - button [disabled]:
+                  - img
+                - button [disabled]:
+                  - img
+                - button [disabled]:
+                  - img
+                - button [disabled]:
+                  - img
+  - button "Open Next.js Dev Tools" [ref=e135] [cursor=pointer]:
+    - img [ref=e136]
+  - alert
+  - dialog "Assign Subscription" [ref=e277]:
+    - generic [ref=e278]:
+      - heading "Assign Subscription" [level=2] [ref=e279]
+      - paragraph [ref=e280]: Place a company on a plan. Any existing active subscription is replaced.
+    - generic [ref=e281]:
+      - generic [ref=e282]:
+        - generic [ref=e283]: Company
+        - combobox "Company" [active] [ref=e284]:
+          - generic: SmokeTest Co 1780851854
+          - img
+        - combobox [ref=e285]
+      - generic [ref=e286]:
+        - generic [ref=e287]: Plan
+        - combobox "Plan" [ref=e288]:
+          - generic: Select a plan
+          - img
+        - combobox [ref=e289]
+      - generic [ref=e290]:
+        - generic [ref=e291]: Period (days)
+        - spinbutton "Period (days)" [ref=e292]: "30"
+      - button "Assign Subscription" [ref=e293]
+    - button "Close" [ref=e294]:
+      - img
+      - generic [ref=e295]: Close

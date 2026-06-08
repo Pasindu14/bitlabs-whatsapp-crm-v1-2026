@@ -1,0 +1,27 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - main [ref=e3]:
+    - generic [ref=e5]:
+      - button "Toggle Sidebar" [ref=e6]:
+        - img
+        - generic [ref=e7]: Toggle Sidebar
+      - navigation "breadcrumb" [ref=e8]:
+        - list [ref=e9]:
+          - listitem [ref=e10]:
+            - link "Dashboard" [disabled] [ref=e11]
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - heading "Dashboard" [level=1] [ref=e14]
+        - paragraph [ref=e15]: Welcome back, Platform Super Admin.
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - paragraph [ref=e18]: Signed in as
+          - paragraph [ref=e19]: superadmin@btilabs.com
+        - generic [ref=e20]:
+          - paragraph [ref=e21]: Role
+          - paragraph [ref=e22]: SuperAdmin
+        - generic [ref=e23]:
+          - paragraph [ref=e24]: Company
+          - paragraph [ref=e25]: Platform (no company)
+  - button "Open Next.js Dev Tools" [ref=e31] [cursor=pointer]:
+    - img [ref=e32]

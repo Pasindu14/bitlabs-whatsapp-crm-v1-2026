@@ -1,0 +1,84 @@
+- generic:
+  - region "Notifications alt+T"
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - list:
+              - listitem:
+                - link:
+                  - /url: /home
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: Bitlabs
+                    - generic: Enterprise
+          - generic:
+            - generic:
+              - generic: Administration
+              - list:
+                - listitem:
+                  - button [expanded]:
+                    - img
+                    - generic: Overview
+                    - img
+                  - generic:
+                    - list:
+                      - listitem:
+                        - link:
+                          - /url: /dashboard
+                          - generic: Dashboard
+                - listitem:
+                  - button:
+                    - img
+                    - generic: Platform
+                    - img
+          - generic:
+            - list:
+              - listitem:
+                - button [expanded]:
+                  - generic:
+                    - generic: P
+                  - generic:
+                    - generic: Platform Super Admin
+                    - generic: superadmin@btilabs.com
+                  - img
+          - button
+    - main:
+      - generic:
+        - generic:
+          - button:
+            - img
+            - generic: Toggle Sidebar
+          - navigation:
+            - list:
+              - listitem:
+                - link [disabled]: Dashboard
+      - generic:
+        - generic:
+          - heading [level=1]: Dashboard
+          - paragraph: Welcome back, Platform Super Admin.
+        - generic:
+          - generic:
+            - paragraph: Signed in as
+            - paragraph: superadmin@btilabs.com
+          - generic:
+            - paragraph: Role
+            - paragraph: SuperAdmin
+          - generic:
+            - paragraph: Company
+            - paragraph: Platform (no company)
+  - button "Open Next.js Dev Tools" [ref=e31] [cursor=pointer]:
+    - img [ref=e32]
+  - alert
+  - menu "P Platform Super Admin superadmin@btilabs.com" [active] [ref=e90]:
+    - generic [ref=e92]:
+      - generic [ref=e94]: P
+      - generic [ref=e95]:
+        - generic [ref=e96]: Platform Super Admin
+        - generic [ref=e97]: superadmin@btilabs.com
+    - separator [ref=e98]
+    - menuitem "Log out" [ref=e99]:
+      - img
+      - text: Log out
