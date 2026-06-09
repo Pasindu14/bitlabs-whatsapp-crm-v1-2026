@@ -8,12 +8,11 @@ import { Spinner } from "@/components/ui/spinner";
 
 const ACCEPT: Record<string, string> = {
   image: "image/jpeg,image/png",
-  video: "video/mp4",
   document: "application/pdf",
 };
 
 interface MediaUploadProps {
-  mediaType: "image" | "video" | "document";
+  mediaType: "image" | "document";
   /** Current handle ("" when none). */
   value: string;
   onChange: (handle: string) => void;

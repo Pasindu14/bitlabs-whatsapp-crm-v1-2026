@@ -6,7 +6,7 @@ export type TemplateCategory = "Marketing";
 export type TemplateParameterFormat = "Positional";
 
 /** Header kinds the builder offers (Meta also supports "location"; not built in v1). */
-export const HEADER_TYPES = ["none", "text", "image", "video", "document"] as const;
+export const HEADER_TYPES = ["none", "text", "image", "document"] as const;
 export type HeaderType = (typeof HEADER_TYPES)[number];
 
 /** Marketing button kinds. */

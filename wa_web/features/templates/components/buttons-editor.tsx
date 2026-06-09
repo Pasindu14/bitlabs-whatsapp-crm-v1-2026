@@ -110,8 +110,14 @@ export function ButtonsEditor({
 
             {type === "phone_number" && (
               <div>
-                <Input placeholder="+15555550100" disabled={disabled} {...register(`buttons.${i}.phoneNumber`)} />
-                {btnErr?.phoneNumber && <p className="mt-1 text-xs text-destructive">{btnErr.phoneNumber.message}</p>}
+                <Input placeholder="+14155552671" disabled={disabled} {...register(`buttons.${i}.phoneNumber`)} />
+                {btnErr?.phoneNumber ? (
+                  <p className="mt-1 text-xs text-destructive">{btnErr.phoneNumber.message}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    International format with country code, e.g. +14155552671.
+                  </p>
+                )}
               </div>
             )}
 

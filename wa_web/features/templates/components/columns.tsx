@@ -56,7 +56,7 @@ export function getTemplateColumns(actions: TemplateColumnActions): ColumnDef<Te
       cell: ({ row }) => {
         const t = row.original;
         return (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col items-start gap-1">
             <TemplateStatusBadge status={t.status} />
             {t.status === "Rejected" && t.rejectionReason && (
               <span className="max-w-[220px] truncate text-xs text-muted-foreground" title={t.rejectionReason}>

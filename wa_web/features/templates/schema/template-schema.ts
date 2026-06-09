@@ -10,6 +10,13 @@ import {
 
 const NAME_RE = /^[a-z0-9_]+$/;
 const PLACEHOLDER_RE = /\{\{(\d+)\}\}/g;
+/** WhatsApp phone-button numbers must be E.164: '+', country code, up to 15 digits total. */
+const E164_RE = /^\+[1-9]\d{1,14}$/;
+
+/** Keeps only '+' and digits so "+94 77 123-4567" → "+94771234567" before validating/sending. */
+export function normalizePhone(s: string): string {
+  return s.replace(/[^\d+]/g, "");
+}
 
 /** Distinct, sorted positional variable indices found in `text` (e.g. "{{1}} {{2}}" → [1,2]). */
 export function placeholderIndices(text: string): number[] {
@@ -86,7 +93,7 @@ export const builderSchema = z
       else if (count === 1 && !v.headerTextExample)
         ctx.addIssue({ code: "custom", path: ["headerTextExample"], message: "Provide an example for the header variable" });
     }
-    if ((v.headerType === "image" || v.headerType === "video" || v.headerType === "document") && !v.headerMediaHandle)
+    if ((v.headerType === "image" || v.headerType === "document") && !v.headerMediaHandle)
       ctx.addIssue({ code: "custom", path: ["headerMediaHandle"], message: "Upload a sample media file" });
 
     // ── Body: Meta content rules + variables/examples ─────────────────────
@@ -136,8 +143,16 @@ export const builderSchema = z
         else if (/\{\{\d+\}\}/.test(b.url) && !b.urlExample)
           ctx.addIssue({ code: "custom", path: ["buttons", i, "urlExample"], message: "Provide an example value" });
       }
-      if (b.type === "phone_number" && !b.phoneNumber)
-        ctx.addIssue({ code: "custom", path: ["buttons", i, "phoneNumber"], message: "Phone number is required" });
+      if (b.type === "phone_number") {
+        if (!b.phoneNumber)
+          ctx.addIssue({ code: "custom", path: ["buttons", i, "phoneNumber"], message: "Phone number is required" });
+        else if (!E164_RE.test(normalizePhone(b.phoneNumber)))
+          ctx.addIssue({
+            code: "custom",
+            path: ["buttons", i, "phoneNumber"],
+            message: "Use international format, e.g. +14155552671 — country code, no spaces.",
+          });
+      }
       if (b.type === "copy_code" && !b.example)
         ctx.addIssue({ code: "custom", path: ["buttons", i, "example"], message: "Sample code is required" });
     });
@@ -163,6 +178,26 @@ export function emptyBuilderValues(): BuilderFormValues {
   };
 }
 
+/**
+ * TESTING ONLY — a pre-filled, structurally-valid draft so a template can be created in one click
+ * during QA. The body has no variables (so no examples are required) which keeps it the smallest
+ * payload that passes both this schema and the API's `Validate`. The WhatsApp number is left blank
+ * and auto-selected in the form (first active connection); the form also gives it a unique name so
+ * repeated test-creates don't collide on (name, language).
+ *
+ * To go back to a blank form, swap this for `emptyBuilderValues()` in `template-builder.tsx` and
+ * delete the seeding effects in `template-builder-form.tsx`.
+ */
+export function testBuilderValues(): BuilderFormValues {
+  return {
+    ...emptyBuilderValues(),
+    name: "test_template",
+    body: "Hi there! This is a sample WhatsApp template created for testing.",
+    footerEnabled: true,
+    footer: "Reply STOP to unsubscribe",
+  };
+}
+
 /** Builds the API payload (normalized component tree) from validated form values. */
 export function buildTemplatePayload(v: BuilderFormValues): TemplatePayload {
   const header: TemplateHeader | null =
@@ -184,7 +219,7 @@ export function buildTemplatePayload(v: BuilderFormValues): TemplatePayload {
       text: b.type === "copy_code" ? "" : b.text,
       url: b.type === "url" ? b.url : null,
       urlExample: b.type === "url" && /\{\{\d+\}\}/.test(b.url) ? b.urlExample : null,
-      phoneNumber: b.type === "phone_number" ? b.phoneNumber : null,
+      phoneNumber: b.type === "phone_number" ? normalizePhone(b.phoneNumber) : null,
       example: b.type === "copy_code" ? b.example : null,
     })),
   };

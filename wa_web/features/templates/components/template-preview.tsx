@@ -1,13 +1,13 @@
 "use client";
 
-import { FileText, Image as ImageIcon, Video, ExternalLink, Phone, Copy, CornerUpLeft } from "lucide-react";
+import { FileText, Image as ImageIcon, ExternalLink, Phone, Copy, CornerUpLeft } from "lucide-react";
 import type { BuilderFormValues } from "@/features/templates/schema/template-schema";
 
 function fill(text: string, examples: string[]): string {
   return text.replace(/\{\{(\d+)\}\}/g, (_, n) => examples[Number(n) - 1] || `{{${n}}}`);
 }
 
-const MEDIA_ICON = { image: ImageIcon, video: Video, document: FileText } as const;
+const MEDIA_ICON = { image: ImageIcon, document: FileText } as const;
 
 export function TemplatePreview({ values }: { values: BuilderFormValues }) {
   const bodyExamples = values.bodyExamples.map((e) => e.value);
@@ -25,7 +25,7 @@ export function TemplatePreview({ values }: { values: BuilderFormValues }) {
               {fill(values.headerText, values.headerTextExample ? [values.headerTextExample] : [])}
             </p>
           )}
-          {(values.headerType === "image" || values.headerType === "video" || values.headerType === "document") && (
+          {(values.headerType === "image" || values.headerType === "document") && (
             <div className="mb-2 flex h-28 items-center justify-center rounded-md bg-zinc-100 text-zinc-400 dark:bg-zinc-600 dark:text-zinc-300">
               {(() => {
                 const Icon = MEDIA_ICON[values.headerType];

@@ -11,7 +11,7 @@ import {
   useRefreshTemplateStatus,
 } from "@/features/templates/hooks/use-templates";
 import { useDeleteTemplateDialog } from "@/features/templates/store/template-store";
-import { templateToFormValues, emptyBuilderValues } from "@/features/templates/schema/template-schema";
+import { templateToFormValues, testBuilderValues } from "@/features/templates/schema/template-schema";
 import type { Template, TemplatePayload } from "@/features/templates/types";
 import { TemplateBuilderForm } from "./template-builder-form";
 import { TemplatePreview } from "./template-preview";
@@ -101,15 +101,23 @@ export function TemplateBuilder({ templateId }: { templateId?: string }) {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push("/templates")} aria-label="Back to templates">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{isEdit ? "Template" : "New template"}</h1>
-          <p className="text-sm text-muted-foreground">
-            Build a WhatsApp marketing template and submit it to Meta for approval.
-          </p>
+      <div className="rounded-2xl border bg-gradient-to-br from-primary/5 via-card to-card px-6 py-5">
+        <div className="flex items-start gap-3">
+          <Button variant="ghost" size="icon" className="-ml-2 mt-0.5 shrink-0" onClick={() => router.push("/templates")} aria-label="Back to templates">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                Marketing
+              </span>
+              <span className="text-xs text-muted-foreground">WhatsApp Business Template</span>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">{isEdit ? "Edit template" : "New template"}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Build a WhatsApp marketing template and submit it to Meta for approval.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -129,7 +137,7 @@ export function TemplateBuilder({ templateId }: { templateId?: string }) {
         <TemplateBuilderForm
           key={templateId ?? "new"}
           mode={isEdit ? "edit" : "create"}
-          defaultValues={isEdit && template ? templateToFormValues(template) : emptyBuilderValues()}
+          defaultValues={isEdit && template ? templateToFormValues(template) : testBuilderValues()}
           onSave={onSave}
           isSaving={create.isPending || update.isPending}
           fieldErrors={isEdit ? update.fieldErrors : create.fieldErrors}

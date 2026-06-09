@@ -210,6 +210,9 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta) 
     [GeneratedRegex(@"\{\{(\d+)\}\}")]
     private static partial Regex PlaceholderRegex();
 
+    [GeneratedRegex(@"^\+[1-9]\d{1,14}$")]
+    private static partial Regex E164Regex();
+
     /// <summary>
     /// Structural validation that mirrors Meta's rules so we fail fast before any network call:
     /// name format, mandatory body, contiguous positional variables, and a sample value for every
@@ -297,8 +300,14 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta) 
             if (b.Type == "url" && !string.IsNullOrWhiteSpace(b.Url)
                 && PlaceholderRegex().IsMatch(b.Url!) && string.IsNullOrWhiteSpace(b.UrlExample))
                 fields[$"components.buttons[{i}].example"] = ["Provide an example for the dynamic URL."];
-            if (b.Type == "phone_number" && string.IsNullOrWhiteSpace(b.PhoneNumber))
-                fields[$"components.buttons[{i}].phoneNumber"] = ["A call button needs a phone number."];
+            if (b.Type == "phone_number")
+            {
+                if (string.IsNullOrWhiteSpace(b.PhoneNumber))
+                    fields[$"components.buttons[{i}].phoneNumber"] = ["A call button needs a phone number."];
+                else if (!E164Regex().IsMatch(NormalizePhone(b.PhoneNumber)))
+                    fields[$"components.buttons[{i}].phoneNumber"] =
+                        ["Use international format, e.g. +14155552671 — country code, no spaces."];
+            }
         }
 
         if (fields.Count > 0)
@@ -330,6 +339,10 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta) 
         return count;
     }
 
+    /// <summary>Keeps only '+' and digits so "+94 77 123-4567" → "+94771234567" (matches the web schema).</summary>
+    private static string NormalizePhone(string s) =>
+        new(s.Where(ch => ch == '+' || char.IsDigit(ch)).ToArray());
+
     /// <summary>Trims user text so stored components are clean; leaves variable tokens intact.</summary>
     private static TemplateComponents Normalize(TemplateComponents c)
     {
@@ -337,6 +350,9 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta) 
         c.Body.Examples = (c.Body.Examples ?? []).Select(e => e?.Trim() ?? string.Empty).ToList();
         if (c.Footer is not null) c.Footer.Text = c.Footer.Text?.Trim() ?? string.Empty;
         if (c.Header is { Type: "none" }) c.Header = null;
+        foreach (var b in c.Buttons ?? [])
+            if (b.Type == "phone_number" && !string.IsNullOrWhiteSpace(b.PhoneNumber))
+                b.PhoneNumber = NormalizePhone(b.PhoneNumber);
         return c;
     }
 

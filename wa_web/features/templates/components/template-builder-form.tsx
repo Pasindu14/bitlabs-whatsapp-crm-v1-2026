@@ -48,17 +48,24 @@ const HEADER_LABELS: Record<(typeof HEADER_TYPES)[number], string> = {
   none: "None",
   text: "Text",
   image: "Image",
-  video: "Video",
   document: "Document",
 };
 
-const SectionCard = ({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) => (
-  <section className="space-y-4 rounded-xl border p-4">
-    <div>
-      <h3 className="text-sm font-semibold">{title}</h3>
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+const SectionCard = ({ title, hint, step, children }: { title: string; hint?: string; step: number; children: React.ReactNode }) => (
+  <section className="relative overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow-md">
+    <div className="absolute inset-y-0 left-0 w-[3px] bg-primary" />
+    <div className="space-y-4 py-5 pl-6 pr-5">
+      <div className="flex items-center gap-3">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+          {step}
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold leading-none">{title}</h3>
+          {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+        </div>
+      </div>
+      {children}
     </div>
-    {children}
   </section>
 );
 
@@ -119,6 +126,24 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
     }
   }, [fieldErrors, setError]);
 
+  // ── TESTING ONLY ──────────────────────────────────────────────────────────
+  // Seed the create form so a valid draft saves in one click: give it a unique name
+  // (avoids (name, language) collisions on repeat) and auto-pick the first active
+  // WhatsApp number. Remove this block (and revert to emptyBuilderValues) before prod.
+  useEffect(() => {
+    if (mode === "create") {
+      setValue("name", `test_template_${Date.now().toString(36)}`, { shouldDirty: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (mode === "create" && connections?.length && !getValues("wabaConnectionId")) {
+      setValue("wabaConnectionId", connections[0].id, { shouldValidate: true, shouldDirty: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections, mode]);
+
   const insertVariable = () => {
     const next = placeholderIndices(getValues("body")).length + 1;
     const current = getValues("body");
@@ -135,11 +160,8 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* ── Form ─────────────────────────────────────────────────── */}
         <div className="space-y-6">
-          <SectionCard title="Basics">
+          <SectionCard title="Basics" step={1}>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                Marketing
-              </span>
               <span className="text-xs text-muted-foreground">Category is fixed to Marketing in this version.</span>
             </div>
 
@@ -216,7 +238,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
             </div>
           </SectionCard>
 
-          <SectionCard title="Header" hint="Optional. A title or media shown above the message.">
+          <SectionCard title="Header" hint="Optional. A title or media shown above the message." step={2}>
             <Controller
               control={control}
               name="headerType"
@@ -252,7 +274,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
               </div>
             )}
 
-            {(headerType === "image" || headerType === "video" || headerType === "document") && (
+            {(headerType === "image" || headerType === "document") && (
               <div className="space-y-1">
                 <MediaUpload
                   mediaType={headerType}
@@ -267,7 +289,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
             )}
           </SectionCard>
 
-          <SectionCard title="Body" hint="The main message. Use variables for personalization.">
+          <SectionCard title="Body" hint="The main message. Use variables for personalization." step={3}>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="body">Message text</Label>
@@ -300,7 +322,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
             )}
           </SectionCard>
 
-          <SectionCard title="Footer" hint="Optional. Small grey text below the message.">
+          <SectionCard title="Footer" hint="Optional. Small grey text below the message." step={4}>
             <div className="flex items-center gap-2">
               <Controller
                 control={control}
@@ -319,11 +341,14 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
             )}
           </SectionCard>
 
-          <SectionCard title="Buttons" hint="Optional. Up to 10 call-to-action or quick-reply buttons.">
+          <SectionCard title="Buttons" hint="Optional. Up to 10 call-to-action or quick-reply buttons." step={5}>
             <ButtonsEditor form={form} disabled={isSaving} />
           </SectionCard>
 
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between rounded-xl border bg-muted/40 px-5 py-3">
+            <p className="text-xs text-muted-foreground">
+              Template will be saved as a draft and submitted to Meta for review.
+            </p>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? (
                 <>
@@ -341,7 +366,11 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
         </div>
 
         {/* ── Preview ──────────────────────────────────────────────── */}
-        <div className="h-fit lg:sticky lg:top-6">
+        <div className="h-fit space-y-3 lg:sticky lg:top-6">
+          <div className="flex items-center gap-2 px-1">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Live Preview</p>
+          </div>
           <TemplatePreview values={values} />
         </div>
       </div>
