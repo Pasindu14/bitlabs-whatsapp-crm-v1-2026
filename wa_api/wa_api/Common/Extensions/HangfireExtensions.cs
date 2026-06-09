@@ -26,7 +26,13 @@ public static class HangfireExtensions
                 cfg.UseInMemoryStorage();
         });
 
-        services.AddHangfireServer();
+        // Dedicated "webhooks" queue (listed first = higher priority, drained before "default") so webhook
+        // processing latency isn't starved by the recurring poll / health-check jobs. Raised worker count.
+        services.AddHangfireServer(options =>
+        {
+            options.Queues = ["webhooks", "default"];
+            options.WorkerCount = Math.Max(4, Environment.ProcessorCount * 2);
+        });
         return services;
     }
 }

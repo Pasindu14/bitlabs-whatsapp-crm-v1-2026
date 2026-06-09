@@ -12,6 +12,7 @@ using wa_api.Features.Messages.Entities;
 using wa_api.Features.Plans.Entities;
 using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.Templates.Entities;
+using wa_api.Features.Webhooks.Entities;
 using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Infrastructure.Persistence;
@@ -29,6 +30,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     // ── Infrastructure tables ──────────────────────────────────────────────
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<IdempotencyKey> IdempotencyKeys => Set<IdempotencyKey>();
+    public DbSet<WhatsAppWebhookEvent> WhatsAppWebhookEvents => Set<WhatsAppWebhookEvent>();
 
     // ── Feature tables ─────────────────────────────────────────────────────
     public DbSet<User> Users => Set<User>();
@@ -60,6 +62,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
         {
             e.HasKey(x => x.Key);
             e.HasIndex(x => x.ExpiresAt);
+        });
+
+        modelBuilder.Entity<WhatsAppWebhookEvent>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.PayloadJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.PhoneNumberId).HasMaxLength(64);
+            e.Property(x => x.EventSignature).HasMaxLength(128);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.PhoneNumberId);
+            // Replay dedupe: a redelivered identical payload collides on its signature. Partial index
+            // (nullable) so rows without a computed signature never conflict. The inbox is platform-level
+            // (written before the company is known) — NO tenant query filter, like AuditLog/IdempotencyKey.
+            e.HasIndex(x => x.EventSignature, "UX_WhatsAppWebhookEvents_EventSignature")
+                .IsUnique()
+                .HasFilter("\"EventSignature\" IS NOT NULL");
         });
 
         modelBuilder.Entity<User>(e =>
@@ -195,8 +214,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.Property(x => x.Direction).HasConversion<string>().HasMaxLength(20).IsRequired();
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             e.Property(x => x.ExternalMessageId).HasMaxLength(128);
+            e.Property(x => x.ErrorCode).HasMaxLength(32);
+            e.Property(x => x.Category).HasMaxLength(32);
             e.HasIndex(x => x.CompanyId);
             e.HasIndex(x => x.ContactId);
+            e.HasIndex(x => x.ExternalMessageId);   // fast lookup by wamid for status webhooks (6.4)
             e.HasIndex(x => x.WabaConnectionId);
             e.HasOne(x => x.Contact)
                 .WithMany()
@@ -285,6 +307,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.HasIndex(x => new { x.CompanyId, x.Name, x.Language }).IsUnique();
             e.HasIndex(x => x.CompanyId);
             e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.MetaTemplateId);   // fast lookup by Meta id for the status webhook (5.2)
             e.HasOne(x => x.WabaConnection)
                 .WithMany()
                 .HasForeignKey(x => x.WabaConnectionId)

@@ -82,6 +82,8 @@ try
     builder.Services.AddTransient<WabaHealthCheckJob>();
     builder.Services.AddTransient<SubscriptionPeriodResetJob>();
     builder.Services.AddTransient<TemplateStatusSyncJob>();
+    builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookProcessingJob>();
+    builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>();
 
     // Named HttpClient for Meta Graph API calls (base address set here; auth header per-request).
     builder.Services.AddHttpClient("MetaGraph", c =>
@@ -106,6 +108,17 @@ try
     builder.Services.AddScoped<wa_api.Features.Templates.IMetaTemplateClient, wa_api.Features.Templates.MetaTemplateClient>();
     builder.Services.AddScoped<wa_api.Features.Templates.IMetaMediaUploader, wa_api.Features.Templates.MetaMediaUploader>();
     builder.Services.AddScoped<wa_api.Common.Subscriptions.ISubscriptionGate, wa_api.Common.Subscriptions.SubscriptionGate>();
+
+    // ── Webhooks (Meta inbound: template status 5.2 + delivery status 6.4; inbound stub → Phase 7) ──
+    builder.Services.AddScoped<wa_api.Features.Webhooks.Signature.IMetaSignatureVerifier, wa_api.Features.Webhooks.Signature.MetaSignatureVerifier>();
+    builder.Services.AddScoped<wa_api.Features.Webhooks.Ingestion.IWebhookInboxService, wa_api.Features.Webhooks.Ingestion.WebhookInboxService>();
+    builder.Services.AddScoped<wa_api.Features.Webhooks.Processing.IWebhookDispatcher, wa_api.Features.Webhooks.Processing.WebhookDispatcher>();
+    // All handlers share one interface so the dispatcher receives them via IEnumerable<IWebhookEventHandler>.
+    builder.Services.AddScoped<wa_api.Features.Webhooks.Handlers.IWebhookEventHandler, wa_api.Features.Webhooks.Handlers.TemplateStatusWebhookHandler>();
+    builder.Services.AddScoped<wa_api.Features.Webhooks.Handlers.IWebhookEventHandler, wa_api.Features.Webhooks.Handlers.MessageStatusWebhookHandler>();
+    builder.Services.AddScoped<wa_api.Features.Webhooks.Handlers.IWebhookEventHandler, wa_api.Features.Webhooks.Handlers.InboundMessageWebhookHandler>();
+    // Phase 7 seam: register the SignalR hub here and swap InboundMessageWebhookHandler's body for an
+    // IHubContext push + 24h-window Conversation update — the receiver, dispatcher, and queue stay unchanged.
 
     // ── Observability ──────────────────────────────────────────────────────
     builder.Services.AddPlatformHealthChecks(builder.Configuration);
@@ -207,6 +220,7 @@ try
     RecurringJob.AddOrUpdate<WabaHealthCheckJob>("waba-health-check", j => j.RunAsync(), Cron.MinuteInterval(15));
     RecurringJob.AddOrUpdate<SubscriptionPeriodResetJob>("subscription-period-reset", j => j.RunAsync(), Cron.Daily);
     RecurringJob.AddOrUpdate<TemplateStatusSyncJob>("template-status-sync", j => j.RunAsync(), Cron.MinuteInterval(15));
+    RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>("webhook-sweeper", j => j.RunAsync(), Cron.MinuteInterval(5));
 
     app.Run();
 }

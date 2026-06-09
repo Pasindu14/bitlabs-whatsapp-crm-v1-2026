@@ -7,7 +7,9 @@ namespace wa_api.Features.Messages.Entities;
 
 public enum MessageDirection { Outbound }
 
-public enum MessageStatus { Sent, Failed }
+// Forward-only delivery lifecycle (Sent < Delivered < Read; Failed is terminal). Stored as text,
+// so appending values never needs a backfill. Status webhooks (6.4) advance via StatusRank.
+public enum MessageStatus { Sent, Failed, Delivered, Read }
 
 /// <summary>
 /// A single WhatsApp message sent by the tenant to a contact.
@@ -29,6 +31,18 @@ public class Message : BaseEntity, ITenantEntity
 
     /// <summary>Error message from Meta when Status == Failed.</summary>
     public string? ErrorMessage { get; set; }
+
+    /// <summary>Meta error code when Status == Failed (from statuses[].errors[0].code).</summary>
+    public string? ErrorCode { get; set; }
+
+    /// <summary>UTC of the latest status transition (from a delivery-status webhook). Null until first update.</summary>
+    public DateTime? StatusAt { get; set; }
+
+    /// <summary>Whether Meta billed this message (from statuses[].pricing.billable). Null until known.</summary>
+    public bool? Billable { get; set; }
+
+    /// <summary>Pricing category from Meta (marketing/utility/authentication/service).</summary>
+    public string? Category { get; set; }
 
     public Contact Contact { get; set; } = null!;
     public WabaConnection WabaConnection { get; set; } = null!;

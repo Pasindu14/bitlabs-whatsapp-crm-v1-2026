@@ -1,4 +1,5 @@
 using wa_api.Features.WhatsApp.Dtos;
+using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Features.WhatsApp;
 
@@ -23,4 +24,11 @@ public interface IWabaConnectionService
 
     /// <summary>Marks a connection inactive (IsActive = false). Throws if not found.</summary>
     Task<WabaConnectionResponse> DeactivateAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves an active connection by its Meta phone-number id, ACROSS tenants — used by the webhook
+    /// processor (which has no JWT) to route an event to its owning company. Bypasses the tenant query
+    /// filter by design. Returns the entity (callers need CompanyId / access token); null when unknown.
+    /// </summary>
+    Task<WabaConnection?> GetConnectionByPhoneNumberIdAsync(string phoneNumberId, CancellationToken ct = default);
 }

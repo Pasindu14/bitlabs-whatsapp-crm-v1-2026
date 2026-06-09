@@ -59,6 +59,14 @@ public class WabaConnectionService(AppDbContext db) : IWabaConnectionService
         return Map(conn);
     }
 
+    public Task<WabaConnection?> GetConnectionByPhoneNumberIdAsync(string phoneNumberId, CancellationToken ct = default)
+        // Cross-tenant lookup for the webhook processor (no JWT/tenant context). Deliberate filter bypass,
+        // like the Hangfire jobs. AsNoTracking — the dispatcher only reads CompanyId / token off it.
+        => db.WabaConnections
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(w => w.PhoneNumberId == phoneNumberId && w.IsActive, ct);
+
     public async Task<WabaConnectionResponse> CreateAsync(CreateWabaConnectionRequest request, CancellationToken ct = default)
     {
         var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == request.CompanyId, ct)
