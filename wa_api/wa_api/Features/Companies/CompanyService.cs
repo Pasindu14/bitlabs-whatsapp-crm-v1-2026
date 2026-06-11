@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Errors;
+using wa_api.Features.Auth;
 using wa_api.Features.Companies.Dtos;
+using wa_api.Features.Users.Dtos;
 using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.Companies;
@@ -73,6 +75,47 @@ public class CompanyService(AppDbContext db) : ICompanyService
         return Map(company);
     }
 
+    public async Task<ProvisionCompanyResponse> ProvisionAsync(ProvisionCompanyRequest request, CancellationToken ct = default)
+    {
+        var name = request.Name.Trim();
+        var slug = Normalize(request.Slug)?.ToLowerInvariant();
+        var companyEmail = Normalize(request.CompanyEmail)?.ToLowerInvariant();
+        var phone = Normalize(request.Phone);
+        var adminEmail = request.AdminEmail.Trim().ToLowerInvariant();
+        var adminFullName = request.AdminFullName.Trim();
+
+        if (await db.Companies.AnyAsync(c => c.Name.ToLower() == name.ToLower(), ct))
+            throw new DuplicateResourceException("Company");
+
+        if (slug is not null && await db.Companies.AnyAsync(c => c.Slug == slug, ct))
+            throw new ConflictException("COMPANY_SLUG_DUPLICATE", "A company with this slug already exists.");
+
+        if (await db.Users.AnyAsync(u => u.Email == adminEmail, ct))
+            throw new ConflictException("USER_EMAIL_DUPLICATE", "A user with this email already exists.");
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        var company = new Company { Name = name, Slug = slug, Email = companyEmail, Phone = phone };
+        db.Companies.Add(company);
+        await db.SaveChangesAsync(ct);
+
+        var admin = new User
+        {
+            CompanyId = company.Id,
+            FullName = adminFullName,
+            Email = adminEmail,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
+            Role = UserRole.CompanyAdmin,
+        };
+        db.Users.Add(admin);
+        await db.SaveChangesAsync(ct);
+
+        await tx.CommitAsync(ct);
+
+        admin.Company = company;
+        return new ProvisionCompanyResponse(Map(company), MapUser(admin));
+    }
+
     public async Task<CompanyResponse> UpdateAsync(Guid id, UpdateCompanyRequest request, CancellationToken ct = default)
     {
         var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == id, ct)
@@ -120,4 +163,8 @@ public class CompanyService(AppDbContext db) : ICompanyService
 
     private static CompanyResponse Map(Company c)
         => new(c.Id, c.Name, c.Slug, c.Email, c.Phone, c.IsActive, c.CreatedAt);
+
+    private static UserResponse MapUser(User u)
+        => new(u.Id, u.CompanyId, u.Company?.Name, u.FullName, u.Email, u.Role,
+               u.Permissions.AsReadOnly(), u.IsActive, u.LastLoginAt, u.CreatedAt);
 }

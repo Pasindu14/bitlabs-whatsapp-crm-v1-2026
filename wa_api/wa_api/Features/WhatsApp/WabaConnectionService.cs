@@ -6,7 +6,7 @@ using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.WhatsApp;
 
-public class WabaConnectionService(AppDbContext db) : IWabaConnectionService
+public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator metaValidator) : IWabaConnectionService
 {
     public async Task<(IReadOnlyList<WabaConnectionResponse> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, string? sortBy, string? sortOrder,
@@ -79,6 +79,8 @@ public class WabaConnectionService(AppDbContext db) : IWabaConnectionService
             throw new ConflictException("WABA_PHONE_NUMBER_DUPLICATE",
                 "A connection with this phone number id already exists.");
 
+        await metaValidator.ValidateAsync(phoneNumberId, request.AccessToken.Trim(), ct);
+
         var conn = new WabaConnection
         {
             CompanyId = company.Id,
@@ -122,7 +124,10 @@ public class WabaConnectionService(AppDbContext db) : IWabaConnectionService
         // Replace the token only when a new (non-blank) one is supplied.
         var newToken = Normalize(request.AccessToken);
         if (newToken is not null)
+        {
+            await metaValidator.ValidateAsync(conn.PhoneNumberId, newToken, ct);
             conn.EncryptedAccessToken = newToken;
+        }
 
         await db.SaveChangesAsync(ct);
 

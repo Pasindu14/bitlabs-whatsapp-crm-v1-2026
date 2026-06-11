@@ -46,6 +46,14 @@ public class CompaniesController(ICompanyService companyService) : ControllerBas
         return StatusCode(StatusCodes.Status201Created, ResponseHelper.Created(result, CorrelationId));
     }
 
+    /// <summary>POST /api/v1/companies/provision — atomically create a company and its first CompanyAdmin.</summary>
+    [HttpPost("provision")]
+    public async Task<IActionResult> Provision(ProvisionCompanyRequest request, CancellationToken ct)
+    {
+        var result = await companyService.ProvisionAsync(request, ct);
+        return StatusCode(StatusCodes.Status201Created, ResponseHelper.Created(result, CorrelationId));
+    }
+
     /// <summary>PUT /api/v1/companies/{id} — update all editable fields.</summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, UpdateCompanyRequest request, CancellationToken ct)

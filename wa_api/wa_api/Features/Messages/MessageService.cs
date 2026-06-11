@@ -7,10 +7,15 @@ using wa_api.Features.Messages.Dtos;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Subscriptions.Entities;
 using wa_api.Infrastructure.Persistence;
+using wa_api.Infrastructure.RateLimiting;
 
 namespace wa_api.Features.Messages;
 
-public class MessageService(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<MessageService> logger)
+public class MessageService(
+    AppDbContext db,
+    IHttpClientFactory httpClientFactory,
+    IWabaRateLimiter rateLimiter,
+    ILogger<MessageService> logger)
     : IMessageService
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -70,6 +75,8 @@ public class MessageService(AppDbContext db, IHttpClientFactory httpClientFactor
         if (!waba.IsActive)
             throw new BusinessRuleException("WABA_INACTIVE",
                 "The selected WhatsApp connection is inactive.");
+
+        await rateLimiter.CheckAsync(waba.PhoneNumberId, ct);
 
         var (externalId, errorMessage) = await CallMetaApiAsync(waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, request.Body, ct);
 

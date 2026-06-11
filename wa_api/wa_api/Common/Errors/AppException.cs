@@ -32,6 +32,9 @@ public class InvalidTokenException()
 public class AuthorizationException(string resource)
     : AppException("FORBIDDEN_ACCESS", $"You do not have permission to access {resource}.");
 
+public class PermissionDeniedException(string permission)
+    : AppException("PERMISSION_DENIED", $"Permission '{permission}' is required.");
+
 // 404 — Not Found
 public class NotFoundException(string entity, object id)
     : AppException($"{entity.ToUpperInvariant()}_NOT_FOUND", $"{entity} with ID '{id}' was not found.");

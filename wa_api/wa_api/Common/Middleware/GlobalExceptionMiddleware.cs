@@ -41,6 +41,10 @@ public class GlobalExceptionMiddleware(RequestDelegate next,
                 aex.ErrorCode, aex.Message, null,
                 null, null, correlationId, DateTime.UtcNow)),
 
+            PermissionDeniedException pdEx => (403, new ApiError(
+                pdEx.ErrorCode, pdEx.Message, null,
+                null, null, correlationId, DateTime.UtcNow)),
+
             AuthorizationException forEx => (403, new ApiError(
                 forEx.ErrorCode, forEx.Message, null,
                 null, null, correlationId, DateTime.UtcNow)),

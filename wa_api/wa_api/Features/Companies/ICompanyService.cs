@@ -15,6 +15,9 @@ public interface ICompanyService
     /// <summary>Creates a company. Throws on duplicate name/slug.</summary>
     Task<CompanyResponse> CreateAsync(CreateCompanyRequest request, CancellationToken ct = default);
 
+    /// <summary>Atomically creates a company and its first CompanyAdmin in one transaction.</summary>
+    Task<ProvisionCompanyResponse> ProvisionAsync(ProvisionCompanyRequest request, CancellationToken ct = default);
+
     /// <summary>Updates all editable fields of a company. Throws on not found / duplicate name/slug.</summary>
     Task<CompanyResponse> UpdateAsync(Guid id, UpdateCompanyRequest request, CancellationToken ct = default);
 
