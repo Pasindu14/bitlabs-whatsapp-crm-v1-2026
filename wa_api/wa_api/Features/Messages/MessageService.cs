@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using wa_api.Common.Errors;
+using wa_api.Common.Subscriptions;
 using wa_api.Features.Messages.Dtos;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Subscriptions.Entities;
@@ -15,6 +16,7 @@ public class MessageService(
     AppDbContext db,
     IHttpClientFactory httpClientFactory,
     IWabaRateLimiter rateLimiter,
+    ISubscriptionGate subscriptionGate,
     ILogger<MessageService> logger)
     : IMessageService
 {
@@ -64,6 +66,10 @@ public class MessageService(
 
     public async Task<MessageResponse> SendAsync(SendMessageRequest request, CancellationToken ct = default)
     {
+        // Enforce the caller company's active, in-quota subscription BEFORE any send work.
+        // Throws SUBSCRIPTION_INACTIVE / QUOTA_EXCEEDED; SuperAdmin bypasses inside the gate.
+        await subscriptionGate.EnsureCanSendAsync(ct);
+
         var contact = await db.Contacts.AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == request.ContactId, ct)
             ?? throw new NotFoundException("Contact", request.ContactId);
@@ -104,20 +110,31 @@ public class MessageService(
     }
 
     /// <summary>
-    /// Increments the caller company's active-subscription usage counter by one. The EF global
-    /// query filter scopes the lookup to the JWT company. No-op when no active subscription exists.
+    /// Atomically increments the caller company's active-subscription usage counter by one. The target
+    /// row is resolved first (the EF global query filter scopes it to the JWT company; the unique
+    /// active-subscription index guarantees at most one), then bumped with a single
+    /// <c>UPDATE … SET col = col + 1 WHERE Id = …</c>. Scoping the update to that one Id keeps it
+    /// single-row even on the SuperAdmin plane (where the query filter is bypassed), so it can never
+    /// amplify across tenants — while <c>col = col + 1</c> stays lost-update-safe under concurrency.
+    /// No-op when no active subscription exists. ExecuteUpdate bypasses the audit interceptor, so
+    /// UpdatedAt is set explicitly here.
     /// </summary>
     private async Task IncrementSubscriptionUsageAsync(CancellationToken ct)
     {
-        var sub = await db.Subscriptions
+        var subId = await db.Subscriptions
             .Where(s => s.Status == SubscriptionStatus.Active)
             .OrderByDescending(s => s.CreatedAt)
+            .Select(s => (Guid?)s.Id)
             .FirstOrDefaultAsync(ct);
 
-        if (sub is null) return;
+        if (subId is null) return;
 
-        sub.MessagesUsedThisPeriod++;
-        await db.SaveChangesAsync(ct);
+        var now = DateTime.UtcNow;
+        await db.Subscriptions
+            .Where(s => s.Id == subId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.MessagesUsedThisPeriod, x => x.MessagesUsedThisPeriod + 1)
+                .SetProperty(x => x.UpdatedAt, now), ct);
     }
 
     private async Task<(string? ExternalId, string? Error)> CallMetaApiAsync(

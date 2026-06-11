@@ -41,14 +41,14 @@ public class AuditInterceptor(IHttpContextAccessor httpContextAccessor) : SaveCh
     private void Apply(DbContext? context)
     {
         if (context is null) return;
-        StampEntities(context);
-        AddAuditLogs(context);
+        // One timestamp for the whole SaveChanges so entity stamps and their audit rows share an instant.
+        var now = DateTime.UtcNow;
+        StampEntities(context, now);
+        AddAuditLogs(context, now);
     }
 
-    private void StampEntities(DbContext context)
+    private void StampEntities(DbContext context, DateTime now)
     {
-        var now = DateTime.UtcNow;
-
         // Resolved per-request from the same scope as the DbContext (null outside an HTTP
         // request — migrations, seeding, jobs — in which case nothing is auto-stamped).
         var tenant = _httpContextAccessor.HttpContext?.RequestServices.GetService<ITenantContext>();
@@ -74,7 +74,7 @@ public class AuditInterceptor(IHttpContextAccessor httpContextAccessor) : SaveCh
         }
     }
 
-    private void AddAuditLogs(DbContext context)
+    private void AddAuditLogs(DbContext context, DateTime now)
     {
         var httpContext = _httpContextAccessor.HttpContext;
         var correlationId = httpContext?.Items["CorrelationId"]?.ToString();
@@ -100,7 +100,7 @@ public class AuditInterceptor(IHttpContextAccessor httpContextAccessor) : SaveCh
             OldValues = e.State == EntityState.Added ? null : Serialize(e, original: true),
             NewValues = e.State == EntityState.Deleted ? null : Serialize(e, original: false),
             ChangedBy = changedBy,
-            ChangedAt = DateTime.UtcNow,
+            ChangedAt = now,
             CorrelationId = correlationId,
             IpAddress = ipAddress
         });

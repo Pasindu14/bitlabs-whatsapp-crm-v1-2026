@@ -11,7 +11,9 @@ namespace wa_api.Features.Webhooks.Processing;
 /// </summary>
 public sealed class WebhookSweeperJob(IServiceScopeFactory scopeFactory, ILogger<WebhookSweeperJob> logger)
 {
-    private static readonly TimeSpan StuckThreshold = TimeSpan.FromMinutes(5);
+    // Reuse the processing lease so a row is only re-enqueued once its claim is genuinely reclaimable —
+    // the two thresholds can't drift apart.
+    private static readonly TimeSpan StuckThreshold = WebhookProcessingJob.ProcessingLease;
     private const int BatchSize = 200;
 
     public async Task RunAsync()

@@ -48,11 +48,36 @@ public sealed class WebhookInboxService(AppDbContext db) : IWebhookInboxService
     public Task<WhatsAppWebhookEvent?> GetForProcessingAsync(Guid id, CancellationToken ct = default)
         => db.WhatsAppWebhookEvents.IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == id, ct);
 
-    public async Task MarkProcessingAsync(WhatsAppWebhookEvent row, CancellationToken ct = default)
+    public async Task<bool> TryClaimForProcessingAsync(
+        WhatsAppWebhookEvent row, TimeSpan lease, CancellationToken ct = default)
     {
+        var now = DateTime.UtcNow;
+        var leaseCutoff = now - lease;
+
+        // Atomic compare-and-set: the WHERE predicate IS the lock. Only Received/Failed rows, or a
+        // Processing row whose lease has expired, match — so two concurrent workers can't both claim,
+        // and a crashed worker's row becomes reclaimable once the lease elapses. ExecuteUpdate commits
+        // immediately (its own statement), which is required for the claim to be visible to rivals.
+        var affected = await db.WhatsAppWebhookEvents.IgnoreQueryFilters()
+            .Where(e => e.Id == row.Id
+                && (e.Status == WebhookEventStatus.Received
+                 || e.Status == WebhookEventStatus.Failed
+                 || (e.Status == WebhookEventStatus.Processing && e.UpdatedAt < leaseCutoff)))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(e => e.Status, WebhookEventStatus.Processing)
+                .SetProperty(e => e.Attempts, e => e.Attempts + 1)
+                .SetProperty(e => e.UpdatedAt, now), ct);
+
+        if (affected == 0)
+            return false;
+
+        // ExecuteUpdate bypasses the change tracker, so sync the tracked entity: otherwise the later
+        // MarkProcessedAsync SaveChanges would write Attempts back to its loaded value (off-by-one on
+        // the dead-letter check) and dispatch/logging would see stale state.
         row.Status = WebhookEventStatus.Processing;
         row.Attempts += 1;
-        await db.SaveChangesAsync(ct);
+        row.UpdatedAt = now;
+        return true;
     }
 
     public async Task MarkProcessedAsync(WhatsAppWebhookEvent row, CancellationToken ct = default)

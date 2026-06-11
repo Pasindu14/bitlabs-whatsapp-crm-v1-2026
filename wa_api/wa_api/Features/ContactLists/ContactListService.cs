@@ -36,15 +36,26 @@ public class ContactListService(AppDbContext db) : IContactListService
         };
 
         var total = await query.CountAsync(ct);
-        var items = await query
+        var page0 = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(l => new { l.Id, l.Name, l.Description, l.IsActive, l.CreatedAt })
+            .ToListAsync(ct);
+
+        // One grouped COUNT for the whole page instead of a correlated subquery per row.
+        var pageIds = page0.Select(l => l.Id).ToList();
+        var counts = await db.ContactListMembers
+            .Where(m => pageIds.Contains(m.ContactListId))
+            .GroupBy(m => m.ContactListId)
+            .Select(g => new { ListId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.ListId, g => g.Count, ct);
+
+        var items = page0
             .Select(l => new ContactListResponse(
                 l.Id, l.Name, l.Description,
-                // Member count — the global filter scopes members to this company too.
-                db.ContactListMembers.Count(m => m.ContactListId == l.Id),
+                counts.GetValueOrDefault(l.Id),
                 l.IsActive, l.CreatedAt))
-            .ToListAsync(ct);
+            .ToList();
 
         return (items, total);
     }
@@ -98,7 +109,8 @@ public class ContactListService(AppDbContext db) : IContactListService
         list.Description = Normalize(request.Description);
         await db.SaveChangesAsync(ct);
 
-        return await GetByIdAsync(id, ct);
+        // Build from the already-tracked entity + one COUNT, instead of re-SELECTing the row we just wrote.
+        return await ToResponseAsync(list, ct);
     }
 
     public Task<ContactListResponse> ActivateAsync(Guid id, CancellationToken ct = default)
@@ -113,7 +125,14 @@ public class ContactListService(AppDbContext db) : IContactListService
             ?? throw new NotFoundException("ContactList", id);
         list.IsActive = isActive;
         await db.SaveChangesAsync(ct);
-        return await GetByIdAsync(id, ct);
+        return await ToResponseAsync(list, ct);
+    }
+
+    /// <summary>Maps a loaded list to its response, fetching the member count in a single COUNT query.</summary>
+    private async Task<ContactListResponse> ToResponseAsync(ContactList list, CancellationToken ct)
+    {
+        var memberCount = await db.ContactListMembers.CountAsync(m => m.ContactListId == list.Id, ct);
+        return new ContactListResponse(list.Id, list.Name, list.Description, memberCount, list.IsActive, list.CreatedAt);
     }
 
     public async Task<ContactListResponse> AddContactsAsync(Guid id, IReadOnlyCollection<Guid> contactIds, CancellationToken ct = default)

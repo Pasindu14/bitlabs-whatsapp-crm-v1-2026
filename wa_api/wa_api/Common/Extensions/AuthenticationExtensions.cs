@@ -24,6 +24,12 @@ public static class AuthenticationExtensions
             ?? throw new InvalidOperationException("Jwt configuration section is missing.");
         if (string.IsNullOrWhiteSpace(jwt.SecretKey))
             throw new InvalidOperationException("Jwt:SecretKey is not configured.");
+        // HS256 requires a key of at least 256 bits (RFC 7518 §3.2). A shorter key silently produces
+        // brute-forceable tokens, so fail fast at startup rather than issue weak ones.
+        const int MinSecretKeyBytes = 32;
+        if (Encoding.UTF8.GetByteCount(jwt.SecretKey) < MinSecretKeyBytes)
+            throw new InvalidOperationException(
+                $"Jwt:SecretKey must be at least {MinSecretKeyBytes} bytes ({MinSecretKeyBytes * 8}-bit) for HS256.");
 
         // Auth feature services.
         services.AddScoped<IJwtTokenService, JwtTokenService>();

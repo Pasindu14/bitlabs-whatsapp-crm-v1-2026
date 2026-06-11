@@ -7,8 +7,9 @@ namespace wa_api.Infrastructure.RateLimiting;
 /// Fixed one-minute window rate limiter per WABA phone-number id.
 /// Bucket key: <c>rl:waba:{phoneNumberId}:{epochMinute}</c> — the minute number encodes the
 /// window boundary so no sliding-window math is needed. Each key TTL is 120 s so Redis
-/// auto-cleans the previous minute's key. Best-effort: Get+Set is not atomic, so bursts of
-/// highly concurrent calls may overshoot by a few messages — acceptable for a protective guard.
+/// auto-cleans the previous minute's key. Uses an atomic <see cref="ICacheService.IncrementAsync"/>
+/// (Redis <c>INCR</c>, or a process-wide gate for the memory cache) so concurrent bursts can't each
+/// read a stale count and slip past the limit.
 /// Limit defaults to 80/min (Meta Tier-1) and is overridable via <c>RateLimit:WabaSendPerMinute</c>.
 /// </summary>
 public class FixedWindowWabaRateLimiter(ICacheService cache, IConfiguration config) : IWabaRateLimiter
@@ -20,10 +21,10 @@ public class FixedWindowWabaRateLimiter(ICacheService cache, IConfiguration conf
         var epochMinute = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 60;
         var key = $"rl:waba:{phoneNumberId}:{epochMinute}";
 
-        var count = await cache.GetAsync<int?>(key, ct) ?? 0;
-        if (count >= _limit)
+        // Increment-then-check: the atomic increment reserves this call's slot in one step, so the
+        // (limit+1)-th caller in the window is the first to see a value over the limit and is rejected.
+        var count = await cache.IncrementAsync(key, TimeSpan.FromSeconds(120), ct);
+        if (count > _limit)
             throw new RateLimitException();
-
-        await cache.SetAsync(key, count + 1, TimeSpan.FromSeconds(120), ct);
     }
 }
