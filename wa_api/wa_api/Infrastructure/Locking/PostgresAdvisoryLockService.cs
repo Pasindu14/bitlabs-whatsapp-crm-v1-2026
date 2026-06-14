@@ -18,22 +18,33 @@ public class PostgresAdvisoryLockService(IConfiguration config,
     {
         var lockKey = StableHash(resource);
         var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync(ct);
-
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT pg_try_advisory_lock(@key)";
-        cmd.Parameters.AddWithValue("key", lockKey);
-
-        var acquired = (bool)(await cmd.ExecuteScalarAsync(ct))!;
-        if (!acquired)
+        try
         {
-            _logger.LogWarning("Failed to acquire advisory lock for resource {Resource}", resource);
-            await conn.DisposeAsync();
-            return null;
-        }
+            await conn.OpenAsync(ct);
 
-        _logger.LogDebug("Acquired advisory lock for {Resource}", resource);
-        return new AdvisoryLockHandle(conn, lockKey, resource, _logger);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT pg_try_advisory_lock(@key)";
+            cmd.Parameters.AddWithValue("key", lockKey);
+
+            var acquired = (bool)(await cmd.ExecuteScalarAsync(ct))!;
+            if (!acquired)
+            {
+                _logger.LogWarning("Failed to acquire advisory lock for resource {Resource}", resource);
+                await conn.DisposeAsync();
+                return null;
+            }
+
+            _logger.LogDebug("Acquired advisory lock for {Resource}", resource);
+            return new AdvisoryLockHandle(conn, lockKey, resource, _logger);
+        }
+        catch
+        {
+            // Cancellation (or any failure) after OpenAsync would otherwise abandon an open session
+            // and leak it from the pool — dispose the connection on every non-success exit. The
+            // handle owns the connection only on the success path above.
+            await conn.DisposeAsync();
+            throw;
+        }
     }
 
     // Deterministic 64-bit key (string.GetHashCode is randomized per-process).

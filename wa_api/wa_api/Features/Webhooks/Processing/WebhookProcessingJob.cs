@@ -16,6 +16,14 @@ public sealed class WebhookProcessingJob(IServiceScopeFactory scopeFactory, ILog
     /// <summary>Max attempts before dead-lettering — kept in sync with the [AutomaticRetry] budget below.</summary>
     private const int MaxAttempts = 5;
 
+    /// <summary>
+    /// How long a row's Processing claim is owned before a crashed worker's lease can be reclaimed by
+    /// another worker. Must exceed the dispatch wall-clock budget (Meta HttpClient timeout is 15 s) so a
+    /// healthy-but-slow dispatch is never stolen mid-flight (which would re-introduce double-processing).
+    /// Reused by <c>WebhookSweeperJob</c> as its stuck threshold so the two values can't drift.
+    /// </summary>
+    public static readonly TimeSpan ProcessingLease = TimeSpan.FromMinutes(5);
+
     [Queue("webhooks")]
     [AutomaticRetry(Attempts = MaxAttempts, DelaysInSeconds = new[] { 10, 30, 90, 300, 900 },
         OnAttemptsExceeded = AttemptsExceededAction.Fail)]
@@ -34,7 +42,14 @@ public sealed class WebhookProcessingJob(IServiceScopeFactory scopeFactory, ILog
         if (row.Status == WebhookEventStatus.Processed)
             return; // job redelivered after success — idempotent no-op.
 
-        await inbox.MarkProcessingAsync(row, ct);
+        // Atomic claim: if another worker already holds the live lease (concurrent run or a sweeper
+        // re-enqueue racing the original), bail WITHOUT dispatching. Returning (not throwing) keeps
+        // Hangfire from recording a spurious failure/retry for a row that is already being handled.
+        if (!await inbox.TryClaimForProcessingAsync(row, ProcessingLease, ct))
+        {
+            logger.LogInformation("Webhook {Id} already claimed by another worker — skipping.", row.Id);
+            return;
+        }
 
         try
         {
