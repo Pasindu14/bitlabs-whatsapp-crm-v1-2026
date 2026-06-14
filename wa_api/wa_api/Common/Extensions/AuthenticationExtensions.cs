@@ -50,6 +50,18 @@ public static class AuthenticationExtensions
                 // Emit the standard ApiError envelope for 401/403 instead of an empty body.
                 options.Events = new JwtBearerEvents
                 {
+                    // SignalR WebSockets can't send an Authorization header on the handshake, so the
+                    // client passes the JWT via ?access_token=. Lift it onto the request for hub paths only.
+                    OnMessageReceived = ctx =>
+                    {
+                        var accessToken = ctx.Request.Query["access_token"];
+                        if (!string.IsNullOrEmpty(accessToken) &&
+                            ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                        {
+                            ctx.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = ctx =>
                     {
                         ctx.HandleResponse();

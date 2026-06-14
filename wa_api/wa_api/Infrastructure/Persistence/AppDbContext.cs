@@ -8,6 +8,7 @@ using wa_api.Features.Auth;
 using wa_api.Features.Companies;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.ContactLists.Entities;
+using wa_api.Features.Conversations.Entities;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Plans.Entities;
 using wa_api.Features.Subscriptions.Entities;
@@ -41,6 +42,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<ContactList> ContactLists => Set<ContactList>();
     public DbSet<ContactListMember> ContactListMembers => Set<ContactListMember>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<Template> Templates => Set<Template>();
@@ -220,6 +222,46 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.HasIndex(x => x.ContactId);
             e.HasIndex(x => x.ExternalMessageId);   // fast lookup by wamid for status webhooks (6.4)
             e.HasIndex(x => x.WabaConnectionId);
+            e.HasIndex(x => x.ConversationId);      // thread history lookup
+            e.HasOne(x => x.Contact)
+                .WithMany()
+                .HasForeignKey(x => x.ContactId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.WabaConnection)
+                .WithMany()
+                .HasForeignKey(x => x.WabaConnectionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Conversation)
+                .WithMany()
+                .HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Restrict);   // conversations are soft-deleted, never hard-removed
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Conversation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.LastMessageBody).HasMaxLength(512);
+            e.Property(x => x.LastMessageDirection).HasConversion<string>().HasMaxLength(20).IsRequired();
+
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => x.ContactId);
+            e.HasIndex(x => new { x.CompanyId, x.LastMessageAt });   // inbox sort within a tenant
+
+            // One OPEN conversation per (company, contact, WABA number). Partial-unique mirrors the
+            // Subscriptions "active" index: Status is stored as text, so the filter is on 'Open'.
+            // Closed threads (a future feature) are excluded, so a contact can keep history plus one
+            // live thread. FindOrCreate tolerates a concurrent insert on this index (catch + re-query).
+            e.HasIndex(x => new { x.CompanyId, x.ContactId, x.WabaConnectionId }, "UX_Conversations_OpenThread")
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Open'");
+
             e.HasOne(x => x.Contact)
                 .WithMany()
                 .HasForeignKey(x => x.ContactId)
@@ -233,6 +275,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Tenant isolation (Phase 1.1/1.3): SuperAdmin bypasses; everyone else sees only their own
+            // company. The webhook writer sets CompanyId explicitly + IgnoreQueryFilters (it has no JWT).
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
 

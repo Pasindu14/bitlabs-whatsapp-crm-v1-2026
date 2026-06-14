@@ -122,6 +122,15 @@ export const queryKeys = {
     myWabaConnections: () => ['my-waba-connections', 'active'] as const,
   },
 
+  // Conversations (CompanyAdmin — WhatsApp inbox threads)
+  conversations: {
+    all: ['conversations'] as const,
+    lists: () => [...queryKeys.conversations.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.conversations.lists(), filters] as const,
+    detail: (id: string) => [...queryKeys.conversations.all, 'detail', id] as const,
+    messages: (id: string) => [...queryKeys.conversations.all, 'messages', id] as const,
+  },
+
   // Stats/Analytics
   stats: {
     all: ['stats'] as const,

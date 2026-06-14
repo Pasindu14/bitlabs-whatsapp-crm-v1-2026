@@ -104,6 +104,14 @@ try
     builder.Services.AddScoped<wa_api.Features.ContactLists.IContactListService, wa_api.Features.ContactLists.ContactListService>();
     builder.Services.AddScoped<wa_api.Infrastructure.RateLimiting.IWabaRateLimiter, wa_api.Infrastructure.RateLimiting.FixedWindowWabaRateLimiter>();
     builder.Services.AddScoped<wa_api.Features.Messages.IMessageService, wa_api.Features.Messages.MessageService>();
+    builder.Services.AddScoped<wa_api.Features.Messages.IWhatsAppMessageSender, wa_api.Features.Messages.WhatsAppMessageSender>();
+    builder.Services.AddScoped<wa_api.Features.Conversations.IConversationService, wa_api.Features.Conversations.ConversationService>();
+    builder.Services.AddScoped<wa_api.Features.Conversations.Realtime.IChatNotifier, wa_api.Features.Conversations.Realtime.ChatNotifier>();
+
+    // ── Real-time chat (SignalR) ───────────────────────────────────────────
+    // camelCase payloads so the hub matches the REST API's JSON shape on the client.
+    builder.Services.AddSignalR()
+        .AddJsonProtocol(o => o.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
     builder.Services.AddScoped<wa_api.Features.Plans.IPlanService, wa_api.Features.Plans.PlanService>();
     builder.Services.AddScoped<wa_api.Features.Subscriptions.ISubscriptionService, wa_api.Features.Subscriptions.SubscriptionService>();
     builder.Services.AddScoped<wa_api.Features.Templates.ITemplateService, wa_api.Features.Templates.TemplateService>();
@@ -119,8 +127,8 @@ try
     builder.Services.AddScoped<wa_api.Features.Webhooks.Handlers.IWebhookEventHandler, wa_api.Features.Webhooks.Handlers.TemplateStatusWebhookHandler>();
     builder.Services.AddScoped<wa_api.Features.Webhooks.Handlers.IWebhookEventHandler, wa_api.Features.Webhooks.Handlers.MessageStatusWebhookHandler>();
     builder.Services.AddScoped<wa_api.Features.Webhooks.Handlers.IWebhookEventHandler, wa_api.Features.Webhooks.Handlers.InboundMessageWebhookHandler>();
-    // Phase 7 seam: register the SignalR hub here and swap InboundMessageWebhookHandler's body for an
-    // IHubContext push + 24h-window Conversation update — the receiver, dispatcher, and queue stay unchanged.
+    // Phase 7 (Conversation module): InboundMessageWebhookHandler now upserts the contact + conversation,
+    // writes the inbound message, and pushes a realtime event via IChatNotifier (mapped to ChatHub below).
 
     // ── Observability ──────────────────────────────────────────────────────
     builder.Services.AddPlatformHealthChecks(builder.Configuration);
@@ -188,6 +196,16 @@ try
         });
     });
 
+    // ── CORS (browser SPA + SignalR WebSocket need explicit origins WITH credentials) ──
+    var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+        ?? ["http://localhost:3000"];
+    builder.Services.AddCors(options =>
+        options.AddPolicy("spa", policy => policy
+            .WithOrigins(corsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()));
+
     var app = builder.Build();
 
     // ── Migrate & seed (dev/staging only) ─────────────────────────────────
@@ -207,10 +225,13 @@ try
         app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "WhatsApp API v1"));
     }
 
-    app.UseHttpsRedirection();
+    if (!app.Environment.IsDevelopment())
+        app.UseHttpsRedirection();
+    app.UseCors("spa");                              // before auth; SignalR negotiate needs it
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
+    app.MapHub<wa_api.Features.Conversations.Realtime.ChatHub>("/hubs/chat");
     app.MapPlatformHealthChecks();
 
     // ── Hangfire dashboard + recurring jobs ────────────────────────────────

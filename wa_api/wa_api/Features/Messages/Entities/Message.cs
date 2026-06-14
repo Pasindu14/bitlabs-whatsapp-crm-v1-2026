@@ -5,7 +5,7 @@ using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Features.Messages.Entities;
 
-public enum MessageDirection { Outbound }
+public enum MessageDirection { Outbound, Inbound }
 
 // Forward-only delivery lifecycle (Sent < Delivered < Read; Failed is terminal). Stored as text,
 // so appending values never needs a backfill. Status webhooks (6.4) advance via StatusRank.
@@ -20,6 +20,10 @@ public class Message : BaseEntity, ITenantEntity
     public Guid CompanyId { get; set; }
     public Guid ContactId { get; set; }
     public Guid WabaConnectionId { get; set; }
+
+    /// <summary>Owning conversation. Nullable: messages sent before the Conversation module (and any
+    /// row created outside a thread) have none. Inbound + conversation-scoped sends always set it.</summary>
+    public Guid? ConversationId { get; set; }
 
     public string Body { get; set; } = string.Empty;
 
@@ -46,4 +50,5 @@ public class Message : BaseEntity, ITenantEntity
 
     public Contact Contact { get; set; } = null!;
     public WabaConnection WabaConnection { get; set; } = null!;
+    public Conversations.Entities.Conversation? Conversation { get; set; }
 }
