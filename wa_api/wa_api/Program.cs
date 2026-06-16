@@ -118,6 +118,11 @@ try
     builder.Services.AddScoped<wa_api.Features.Templates.IMetaTemplateClient, wa_api.Features.Templates.MetaTemplateClient>();
     builder.Services.AddScoped<wa_api.Features.Templates.IMetaMediaUploader, wa_api.Features.Templates.MetaMediaUploader>();
     builder.Services.AddScoped<wa_api.Common.Subscriptions.ISubscriptionGate, wa_api.Common.Subscriptions.SubscriptionGate>();
+    builder.Services.AddScoped<wa_api.Features.Campaigns.ICampaignService, wa_api.Features.Campaigns.CampaignService>();
+    builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignLaunchJob>();
+    builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignBatchSendJob>();
+    builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignSchedulerJob>();
+    builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignPoisonHandlerJob>();
 
     // ── Webhooks (Meta inbound: template status 5.2 + delivery status 6.4; inbound stub → Phase 7) ──
     builder.Services.AddScoped<wa_api.Features.Webhooks.Signature.IMetaSignatureVerifier, wa_api.Features.Webhooks.Signature.MetaSignatureVerifier>();
@@ -244,6 +249,7 @@ try
     RecurringJob.AddOrUpdate<SubscriptionPeriodResetJob>("subscription-period-reset", j => j.RunAsync(), Cron.Daily);
     RecurringJob.AddOrUpdate<TemplateStatusSyncJob>("template-status-sync", j => j.RunAsync(), Cron.MinuteInterval(15));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>("webhook-sweeper", j => j.RunAsync(), Cron.MinuteInterval(5));
+    RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.CampaignSchedulerJob>("campaign-scheduler", j => j.RunAsync(), Cron.Minutely);
 
     app.Run();
 }

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wa_api.Common.Audit;
 using wa_api.Common.Tenancy;
 using wa_api.Features.Auth;
+using wa_api.Features.Campaigns.Entities;
 using wa_api.Features.Companies;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.ContactLists.Entities;
@@ -46,6 +47,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<Template> Templates => Set<Template>();
+    public DbSet<Campaign> Campaigns => Set<Campaign>();
+    public DbSet<CampaignRecipient> CampaignRecipients => Set<CampaignRecipient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -223,6 +226,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.HasIndex(x => x.ExternalMessageId);   // fast lookup by wamid for status webhooks (6.4)
             e.HasIndex(x => x.WabaConnectionId);
             e.HasIndex(x => x.ConversationId);      // thread history lookup
+            e.HasIndex(x => x.CampaignId);          // campaign delivery rollup
             e.HasOne(x => x.Contact)
                 .WithMany()
                 .HasForeignKey(x => x.ContactId)
@@ -363,6 +367,66 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
 
             // Tenant isolation (Phase 1.1/1.3): SuperAdmin bypasses; everyone else sees only their
             // own company. IsActive is intentionally left out (mirrors WabaConnection).
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Campaign>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.ScheduleType).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.VariableMapping).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.RecurrenceCron).HasMaxLength(120);
+            e.Property(x => x.HangfireJobId).HasMaxLength(128);
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.ScheduledAt);
+            e.HasOne(x => x.Template)
+                .WithMany()
+                .HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ContactList)
+                .WithMany()
+                .HasForeignKey(x => x.ContactListId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<CampaignRecipient>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.ErrorCode).HasMaxLength(64);
+            e.Property(x => x.ResolvedVariables).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.IdempotencyKey).IsRequired().HasMaxLength(256);
+            // One row per (campaign, contact) — re-sending to the same contact is idempotent.
+            e.HasIndex(x => new { x.CampaignId, x.ContactId }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.MessageId);
+            e.HasOne(x => x.Campaign)
+                .WithMany(c => c.Recipients)
+                .HasForeignKey(x => x.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Contact)
+                .WithMany()
+                .HasForeignKey(x => x.ContactId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Message)
+                .WithMany()
+                .HasForeignKey(x => x.MessageId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
     }

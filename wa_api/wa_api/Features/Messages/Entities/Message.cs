@@ -48,6 +48,9 @@ public class Message : BaseEntity, ITenantEntity
     /// <summary>Pricing category from Meta (marketing/utility/authentication/service).</summary>
     public string? Category { get; set; }
 
+    /// <summary>FK to Campaign when this message was sent via a campaign. Null for direct sends.</summary>
+    public Guid? CampaignId { get; set; }
+
     public Contact Contact { get; set; } = null!;
     public WabaConnection WabaConnection { get; set; } = null!;
     public Conversations.Entities.Conversation? Conversation { get; set; }

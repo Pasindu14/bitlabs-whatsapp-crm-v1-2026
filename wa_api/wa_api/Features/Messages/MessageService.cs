@@ -5,7 +5,10 @@ using System.Text.Json;
 using wa_api.Common.Errors;
 using wa_api.Common.Subscriptions;
 using wa_api.Features.Messages.Dtos;
+using wa_api.Features.Messages.Entities;
+using wa_api.Features.Subscriptions.Entities;
 using wa_api.Infrastructure.Persistence;
+using wa_api.Infrastructure.RateLimiting;
 
 namespace wa_api.Features.Messages;
 
