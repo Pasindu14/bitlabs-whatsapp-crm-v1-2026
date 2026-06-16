@@ -23,7 +23,8 @@ public class CampaignService(
 
         var query = db.Campaigns.AsNoTracking()
             .Include(c => c.Template)
-            .Include(c => c.ContactList)
+            .Include(c => c.ContactLists).ThenInclude(cl => cl.ContactList)
+            .Include(c => c.IndividualContacts)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -39,13 +40,13 @@ public class CampaignService(
         }
 
         var total = await query.CountAsync(ct);
-        var items = await query
+        var campaigns = await query
             .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(c => MapToResponse(c))
             .ToListAsync(ct);
 
+        var items = campaigns.Select(MapToResponse).ToList();
         return (items, total);
     }
 
@@ -53,7 +54,8 @@ public class CampaignService(
     {
         var campaign = await db.Campaigns.AsNoTracking()
             .Include(c => c.Template)
-            .Include(c => c.ContactList)
+            .Include(c => c.ContactLists).ThenInclude(cl => cl.ContactList)
+            .Include(c => c.IndividualContacts)
             .FirstOrDefaultAsync(c => c.Id == id, ct)
             ?? throw new NotFoundException("Campaign", id);
 
@@ -62,14 +64,13 @@ public class CampaignService(
 
     public async Task<CampaignResponse> CreateAsync(CreateCampaignRequest request, CancellationToken ct = default)
     {
-        await ValidateTemplateAndListAsync(request.TemplateId, request.ContactListId, ct);
+        await ValidateTargetsAsync(request.TemplateId, request.ContactListIds, request.ContactIds, ct);
         ValidateSchedule(request.ScheduleType, request.ScheduledAt, request.RecurrenceCron);
 
         var campaign = new Campaign
         {
             Name = request.Name,
             TemplateId = request.TemplateId,
-            ContactListId = request.ContactListId,
             VariableMapping = request.VariableMapping ?? "{}",
             ScheduleType = request.ScheduleType,
             ScheduledAt = request.ScheduledAt,
@@ -79,6 +80,8 @@ public class CampaignService(
 
         db.Campaigns.Add(campaign);
         await db.SaveChangesAsync(ct);
+
+        await SaveTargetsAsync(campaign.Id, campaign.CompanyId, request.ContactListIds, request.ContactIds, ct);
 
         return await GetByIdAsync(campaign.Id, ct);
     }
@@ -92,18 +95,23 @@ public class CampaignService(
             throw new BusinessRuleException("CAMPAIGN_NOT_EDITABLE",
                 "Only Draft campaigns can be edited.");
 
-        await ValidateTemplateAndListAsync(request.TemplateId, request.ContactListId, ct);
+        await ValidateTargetsAsync(request.TemplateId, request.ContactListIds, request.ContactIds, ct);
         ValidateSchedule(request.ScheduleType, request.ScheduledAt, request.RecurrenceCron);
 
         campaign.Name = request.Name;
         campaign.TemplateId = request.TemplateId;
-        campaign.ContactListId = request.ContactListId;
         campaign.VariableMapping = request.VariableMapping ?? "{}";
         campaign.ScheduleType = request.ScheduleType;
         campaign.ScheduledAt = request.ScheduledAt;
         campaign.RecurrenceCron = request.RecurrenceCron;
 
         await db.SaveChangesAsync(ct);
+
+        // Replace join rows with the new selection.
+        await db.CampaignContactLists.Where(x => x.CampaignId == id).ExecuteDeleteAsync(ct);
+        await db.CampaignContacts.Where(x => x.CampaignId == id).ExecuteDeleteAsync(ct);
+        await SaveTargetsAsync(id, campaign.CompanyId, request.ContactListIds, request.ContactIds, ct);
+
         return await GetByIdAsync(id, ct);
     }
 
@@ -134,6 +142,12 @@ public class CampaignService(
         if (campaign.Template.Status != TemplateStatus.Approved)
             throw new BusinessRuleException("TEMPLATE_NOT_APPROVED",
                 "The campaign template must be Approved before launching.");
+
+        var hasTargets = await db.CampaignContactLists.AnyAsync(x => x.CampaignId == id, ct)
+            || await db.CampaignContacts.AnyAsync(x => x.CampaignId == id, ct);
+        if (!hasTargets)
+            throw new BusinessRuleException("NO_RECIPIENTS",
+                "Add at least one contact list or individual contact before launching.");
 
         string jobId;
         if (campaign.ScheduleType == ScheduleType.OneTime && campaign.ScheduledAt.HasValue)
@@ -220,7 +234,6 @@ public class CampaignService(
                 recurringJobs.RemoveIfExists($"campaign-recurring-{id}");
         }
 
-        // Flip all Queued recipients to Skipped.
         await db.CampaignRecipients
             .Where(r => r.CampaignId == id && r.Status == RecipientStatus.Queued)
             .ExecuteUpdateAsync(s => s
@@ -236,7 +249,6 @@ public class CampaignService(
 
     public async Task<CampaignStatsResponse> GetStatsAsync(Guid id, CancellationToken ct = default)
     {
-        // Verify campaign exists and is visible to the caller.
         var exists = await db.Campaigns.AnyAsync(c => c.Id == id, ct);
         if (!exists) throw new NotFoundException("Campaign", id);
 
@@ -303,6 +315,8 @@ public class CampaignService(
     public async Task<CampaignResponse> DuplicateAsync(Guid id, CancellationToken ct = default)
     {
         var source = await db.Campaigns.AsNoTracking()
+            .Include(c => c.ContactLists)
+            .Include(c => c.IndividualContacts)
             .FirstOrDefaultAsync(c => c.Id == id, ct)
             ?? throw new NotFoundException("Campaign", id);
 
@@ -310,7 +324,6 @@ public class CampaignService(
         {
             Name = $"{source.Name} (Copy)",
             TemplateId = source.TemplateId,
-            ContactListId = source.ContactListId,
             VariableMapping = source.VariableMapping,
             ScheduleType = source.ScheduleType,
             ScheduledAt = source.ScheduledAt,
@@ -321,18 +334,73 @@ public class CampaignService(
         db.Campaigns.Add(copy);
         await db.SaveChangesAsync(ct);
 
+        var listIds = source.ContactLists.Select(x => x.ContactListId).ToList();
+        var contactIds = source.IndividualContacts.Select(x => x.ContactId).ToList();
+        await SaveTargetsAsync(copy.Id, copy.CompanyId, listIds, contactIds, ct);
+
         return await GetByIdAsync(copy.Id, ct);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private async Task ValidateTemplateAndListAsync(Guid templateId, Guid listId, CancellationToken ct)
+    private async Task ValidateTargetsAsync(
+        Guid templateId,
+        List<Guid>? contactListIds,
+        List<Guid>? contactIds,
+        CancellationToken ct)
     {
         var templateExists = await db.Templates.AnyAsync(t => t.Id == templateId, ct);
         if (!templateExists) throw new NotFoundException("Template", templateId);
 
-        var listExists = await db.ContactLists.AnyAsync(l => l.Id == listId, ct);
-        if (!listExists) throw new NotFoundException("ContactList", listId);
+        if (contactListIds is { Count: > 0 })
+        {
+            foreach (var listId in contactListIds)
+            {
+                var listExists = await db.ContactLists.AnyAsync(l => l.Id == listId, ct);
+                if (!listExists) throw new NotFoundException("ContactList", listId);
+            }
+        }
+
+        if (contactIds is { Count: > 0 })
+        {
+            foreach (var contactId in contactIds)
+            {
+                var contactExists = await db.Contacts.AnyAsync(c => c.Id == contactId, ct);
+                if (!contactExists) throw new NotFoundException("Contact", contactId);
+            }
+        }
+    }
+
+    private async Task SaveTargetsAsync(
+        Guid campaignId,
+        Guid companyId,
+        List<Guid>? contactListIds,
+        List<Guid>? contactIds,
+        CancellationToken ct)
+    {
+        if (contactListIds is { Count: > 0 })
+        {
+            var rows = contactListIds.Select(listId => new CampaignContactList
+            {
+                CompanyId = companyId,
+                CampaignId = campaignId,
+                ContactListId = listId,
+            });
+            db.CampaignContactLists.AddRange(rows);
+        }
+
+        if (contactIds is { Count: > 0 })
+        {
+            var rows = contactIds.Select(contactId => new CampaignContact
+            {
+                CompanyId = companyId,
+                CampaignId = campaignId,
+                ContactId = contactId,
+            });
+            db.CampaignContacts.AddRange(rows);
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 
     private static void ValidateSchedule(ScheduleType type, DateTime? scheduledAt, string? cron)
@@ -349,7 +417,9 @@ public class CampaignService(
     private static CampaignResponse MapToResponse(Campaign c) => new(
         c.Id, c.Name,
         c.TemplateId, c.Template?.Name ?? string.Empty,
-        c.ContactListId, c.ContactList?.Name ?? string.Empty,
+        c.ContactLists.Select(x => x.ContactListId).ToList(),
+        c.ContactLists.Select(x => x.ContactList?.Name ?? string.Empty).ToList(),
+        c.IndividualContacts.Select(x => x.ContactId).ToList(),
         c.VariableMapping, c.Status, c.ScheduleType,
         c.ScheduledAt, c.RecurrenceCron,
         c.TotalRecipients, c.SentCount,

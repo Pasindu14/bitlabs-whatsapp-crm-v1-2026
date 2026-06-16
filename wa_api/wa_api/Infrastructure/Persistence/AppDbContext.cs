@@ -48,6 +48,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
+    public DbSet<CampaignContactList> CampaignContactLists => Set<CampaignContactList>();
+    public DbSet<CampaignContact> CampaignContacts => Set<CampaignContact>();
     public DbSet<CampaignRecipient> CampaignRecipients => Set<CampaignRecipient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -379,6 +381,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.Property(x => x.VariableMapping).HasColumnType("jsonb").IsRequired();
             e.Property(x => x.RecurrenceCron).HasMaxLength(120);
             e.Property(x => x.HangfireJobId).HasMaxLength(128);
+            // ContactListId kept as nullable legacy column; use CampaignContactLists for actual targeting.
+            e.Property(x => x.ContactListId).IsRequired(false);
             e.HasIndex(x => x.CompanyId);
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.ScheduledAt);
@@ -390,6 +394,50 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .WithMany()
                 .HasForeignKey(x => x.ContactListId)
                 .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.ContactLists)
+                .WithOne(x => x.Campaign)
+                .HasForeignKey(x => x.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.IndividualContacts)
+                .WithOne(x => x.Campaign)
+                .HasForeignKey(x => x.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<CampaignContactList>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // One row per (campaign, list) — adding the same list twice is a no-op.
+            e.HasIndex(x => new { x.CampaignId, x.ContactListId }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne(x => x.ContactList)
+                .WithMany()
+                .HasForeignKey(x => x.ContactListId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<CampaignContact>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // One row per (campaign, contact) — adding the same contact twice is a no-op.
+            e.HasIndex(x => new { x.CampaignId, x.ContactId }).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne(x => x.Contact)
+                .WithMany()
+                .HasForeignKey(x => x.ContactId)
+                .OnDelete(DeleteBehavior.Cascade);
             e.HasOne<Company>()
                 .WithMany()
                 .HasForeignKey(x => x.CompanyId)

@@ -131,6 +131,15 @@ export const queryKeys = {
     messages: (id: string) => [...queryKeys.conversations.all, 'messages', id] as const,
   },
 
+  // Campaigns (CompanyAdmin — bulk WhatsApp messaging campaigns)
+  campaigns: {
+    all: ['campaigns'] as const,
+    lists: () => [...queryKeys.campaigns.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.campaigns.lists(), filters] as const,
+    details: () => [...queryKeys.campaigns.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.campaigns.details(), id] as const,
+  },
+
   // Stats/Analytics
   stats: {
     all: ['stats'] as const,

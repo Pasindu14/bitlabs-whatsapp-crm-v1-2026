@@ -7,8 +7,11 @@ public record CampaignResponse(
     string Name,
     Guid TemplateId,
     string TemplateName,
-    Guid ContactListId,
-    string ContactListName,
+    /// <summary>All targeted contact lists (replaces the old single ContactListId).</summary>
+    List<Guid> ContactListIds,
+    List<string> ContactListNames,
+    /// <summary>Individually targeted contacts (empty when targeting full lists).</summary>
+    List<Guid> ContactIds,
     string VariableMapping,
     CampaignStatus Status,
     ScheduleType ScheduleType,

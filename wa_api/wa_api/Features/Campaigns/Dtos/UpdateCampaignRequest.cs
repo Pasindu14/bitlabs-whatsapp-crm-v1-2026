@@ -6,7 +6,8 @@ namespace wa_api.Features.Campaigns.Dtos;
 public record UpdateCampaignRequest(
     [Required][MaxLength(200)] string Name,
     [Required] Guid TemplateId,
-    [Required] Guid ContactListId,
+    List<Guid>? ContactListIds,
+    List<Guid>? ContactIds,
     string? VariableMapping,
     [Required] ScheduleType ScheduleType,
     DateTime? ScheduledAt,

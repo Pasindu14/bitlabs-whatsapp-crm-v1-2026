@@ -1,15 +1,14 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Campaigns.Entities;
-using wa_api.Features.ContactLists.Entities;
 using wa_api.Features.Templates.Entities;
 using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.Campaigns.Jobs;
 
 /// <summary>
-/// Snapshots the contact list into CampaignRecipient rows, updates TotalRecipients,
-/// and chains into CampaignBatchSendJob.
+/// Snapshots the campaign's targeted contacts (from one or more lists and/or individual picks)
+/// into CampaignRecipient rows, updates TotalRecipients, and chains into CampaignBatchSendJob.
 ///
 /// Runs cross-tenant (Hangfire has no HttpContext): loads campaign via IgnoreQueryFilters,
 /// stamps CompanyId manually on every insert (AuditInterceptor skips when CompanyId != Guid.Empty).
@@ -27,7 +26,6 @@ public class CampaignLaunchJob(
         var campaign = await db.Campaigns
             .IgnoreQueryFilters()
             .Include(c => c.Template)
-            .Include(c => c.ContactList)
             .FirstOrDefaultAsync(c => c.Id == campaignId, ct);
 
         if (campaign is null)
@@ -43,7 +41,6 @@ public class CampaignLaunchJob(
             return;
         }
 
-        // Re-validate template is still approved at fire time.
         if (campaign.Template.Status != TemplateStatus.Approved)
         {
             logger.LogError("CampaignLaunchJob: campaign {Id} template {TemplateId} is not Approved ({Status}). Marking campaign Failed.",
@@ -53,17 +50,38 @@ public class CampaignLaunchJob(
             return;
         }
 
-        // Load contact IDs from the list. All active members are included.
-        var contactIds = await db.ContactListMembers
+        // Gather contacts from all targeted lists (union across lists, deduplicate).
+        var listIds = await db.CampaignContactLists
             .IgnoreQueryFilters()
-            .Where(m => m.ContactListId == campaign.ContactListId && m.IsActive)
-            .Select(m => m.ContactId)
+            .Where(x => x.CampaignId == campaignId)
+            .Select(x => x.ContactListId)
             .ToListAsync(ct);
+
+        var contactIdsFromLists = listIds.Count > 0
+            ? await db.ContactListMembers
+                .IgnoreQueryFilters()
+                .Where(m => listIds.Contains(m.ContactListId) && m.IsActive)
+                .Select(m => m.ContactId)
+                .Distinct()
+                .ToListAsync(ct)
+            : new List<Guid>();
+
+        // Gather individually selected contacts.
+        var individualContactIds = await db.CampaignContacts
+            .IgnoreQueryFilters()
+            .Where(x => x.CampaignId == campaignId)
+            .Select(x => x.ContactId)
+            .ToListAsync(ct);
+
+        // Union both sources, deduplicate.
+        var contactIds = contactIdsFromLists
+            .Concat(individualContactIds)
+            .Distinct()
+            .ToList();
 
         if (contactIds.Count == 0)
         {
-            logger.LogWarning("CampaignLaunchJob: campaign {Id} has no contacts in list {ListId}. Marking Completed.",
-                campaignId, campaign.ContactListId);
+            logger.LogWarning("CampaignLaunchJob: campaign {Id} has no contacts. Marking Completed.", campaignId);
             campaign.Status = CampaignStatus.Completed;
             campaign.TotalRecipients = 0;
             campaign.CompletedAt = DateTime.UtcNow;
@@ -71,7 +89,7 @@ public class CampaignLaunchJob(
             return;
         }
 
-        // Bulk-insert CampaignRecipient rows (skip any that already exist to be idempotent on retry).
+        // Bulk-insert CampaignRecipient rows (skip any that already exist — idempotent on retry).
         var existingContactIds = await db.CampaignRecipients
             .IgnoreQueryFilters()
             .Where(r => r.CampaignId == campaignId)
@@ -83,7 +101,7 @@ public class CampaignLaunchJob(
             .Where(cid => !existingSet.Contains(cid))
             .Select(cid => new CampaignRecipient
             {
-                CompanyId = campaign.CompanyId,   // manual stamp — no HttpContext
+                CompanyId = campaign.CompanyId,
                 CampaignId = campaignId,
                 ContactId = cid,
                 Status = RecipientStatus.Queued,
@@ -104,7 +122,6 @@ public class CampaignLaunchJob(
         logger.LogInformation("CampaignLaunchJob: campaign {Id} launched with {Count} recipients.",
             campaignId, campaign.TotalRecipients);
 
-        // Chain into batch sender.
         jobClient.Enqueue<CampaignBatchSendJob>(j => j.RunAsync(campaignId, CancellationToken.None));
     }
 }

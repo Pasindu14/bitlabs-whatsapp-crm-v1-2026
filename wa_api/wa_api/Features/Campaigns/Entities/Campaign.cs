@@ -32,7 +32,9 @@ public class Campaign : BaseEntity, ITenantEntity
 {
     public Guid CompanyId { get; set; }
     public Guid TemplateId { get; set; }
-    public Guid ContactListId { get; set; }
+
+    /// <summary>Legacy single-list FK — kept nullable; prefer CampaignContactLists for multi-list campaigns.</summary>
+    public Guid? ContactListId { get; set; }
 
     public string Name { get; set; } = string.Empty;
 
@@ -67,6 +69,8 @@ public class Campaign : BaseEntity, ITenantEntity
     public string? HangfireJobId { get; set; }
 
     public Template Template { get; set; } = null!;
-    public ContactList ContactList { get; set; } = null!;
+    public ContactList? ContactList { get; set; }
+    public ICollection<CampaignContactList> ContactLists { get; set; } = [];
+    public ICollection<CampaignContact> IndividualContacts { get; set; } = [];
     public ICollection<CampaignRecipient> Recipients { get; set; } = [];
 }
