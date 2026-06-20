@@ -25,6 +25,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { usePathname } from "next/navigation";
 import { SessionGuard } from "@/components/session-guard";
+import { NotificationBell } from "@/components/notification-bell";
 
 export default function ProtectedLayout({
   children,
@@ -66,7 +67,7 @@ export default function ProtectedLayout({
           <AppSidebar />
           <SidebarInset>
             <header className="flex h-12 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-10">
-              <div className="flex items-center gap-2 px-4">
+              <div className="flex flex-1 items-center gap-2 px-4">
                 <SidebarTrigger className="-ml-1" />
                 <Separator
                   orientation="vertical"
@@ -100,6 +101,9 @@ export default function ProtectedLayout({
                     })}
                   </BreadcrumbList>
                 </Breadcrumb>
+              </div>
+              <div className="flex items-center gap-1 px-4">
+                <NotificationBell />
               </div>
             </header>
             <Separator />

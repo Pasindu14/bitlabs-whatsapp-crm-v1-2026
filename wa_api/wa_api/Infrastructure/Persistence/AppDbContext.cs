@@ -14,6 +14,7 @@ using wa_api.Features.Messages.Entities;
 using wa_api.Features.Plans.Entities;
 using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.Templates.Entities;
+using wa_api.Features.Notifications.Entities;
 using wa_api.Features.Webhooks.Entities;
 using wa_api.Features.WhatsApp.Entities;
 
@@ -51,6 +52,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<CampaignContactList> CampaignContactLists => Set<CampaignContactList>();
     public DbSet<CampaignContact> CampaignContacts => Set<CampaignContact>();
     public DbSet<CampaignRecipient> CampaignRecipients => Set<CampaignRecipient>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -474,6 +476,38 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .WithMany()
                 .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Notification>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(40).IsRequired();
+            e.Property(x => x.Title).IsRequired().HasMaxLength(300);
+            e.Property(x => x.Body).IsRequired().HasMaxLength(1000);
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => new { x.CompanyId, x.IsRead, x.CreatedAt });
+            // One warning per type per campaign — makes the checker job idempotent.
+            e.HasIndex(x => new { x.CampaignId, x.Type }, "UX_Notifications_CampaignId_Type")
+                .IsUnique()
+                .HasFilter("\"CampaignId\" IS NOT NULL");
+            // One approval per type per template — makes the sync job idempotent.
+            e.HasIndex(x => new { x.TemplateId, x.Type }, "UX_Notifications_TemplateId_Type")
+                .IsUnique()
+                .HasFilter("\"TemplateId\" IS NOT NULL");
+            e.HasOne(x => x.Campaign)
+                .WithMany()
+                .HasForeignKey(x => x.CampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Template)
+                .WithMany()
+                .HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<wa_api.Features.Companies.Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });

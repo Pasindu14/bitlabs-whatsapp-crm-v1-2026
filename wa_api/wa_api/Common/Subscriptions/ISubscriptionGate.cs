@@ -13,4 +13,11 @@ public interface ISubscriptionGate
     /// SuperAdmin (platform plane) bypasses the check.
     /// </summary>
     Task EnsureCanSendAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Throws when the remaining quota in the current period is less than <paramref name="count"/>.
+    /// Use before launching or resuming a campaign to verify the full batch fits in the quota.
+    /// SuperAdmin (platform plane) bypasses the check.
+    /// </summary>
+    Task EnsureCanSendBatchAsync(int count, CancellationToken ct = default);
 }

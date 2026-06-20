@@ -1,6 +1,7 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Errors;
+using wa_api.Common.Subscriptions;
 using wa_api.Features.Campaigns.Dtos;
 using wa_api.Features.Campaigns.Entities;
 using wa_api.Features.Campaigns.Jobs;
@@ -12,7 +13,8 @@ namespace wa_api.Features.Campaigns;
 public class CampaignService(
     AppDbContext db,
     IBackgroundJobClient jobClient,
-    IRecurringJobManager recurringJobs)
+    IRecurringJobManager recurringJobs,
+    ISubscriptionGate subscriptionGate)
     : ICampaignService
 {
     public async Task<(IReadOnlyList<CampaignResponse> Items, int Total)> GetPagedAsync(
@@ -66,6 +68,12 @@ public class CampaignService(
     {
         await ValidateTargetsAsync(request.TemplateId, request.ContactListIds, request.ContactIds, ct);
         ValidateSchedule(request.ScheduleType, request.ScheduledAt, request.RecurrenceCron);
+
+        if (request.ScheduleType != ScheduleType.Recurring)
+        {
+            var recipientCount = await EstimateRecipientCountAsync(request.ContactListIds, request.ContactIds, ct);
+            await subscriptionGate.EnsureCanSendBatchAsync(recipientCount, ct);
+        }
 
         var campaign = new Campaign
         {
@@ -149,6 +157,13 @@ public class CampaignService(
             throw new BusinessRuleException("NO_RECIPIENTS",
                 "Add at least one contact list or individual contact before launching.");
 
+        // Quota pre-check: skip for Recurring campaigns (fire at future times when quota may have reset).
+        if (campaign.ScheduleType != ScheduleType.Recurring)
+        {
+            var recipientCount = await EstimateRecipientCountAsync(id, ct);
+            await subscriptionGate.EnsureCanSendBatchAsync(recipientCount, ct);
+        }
+
         string jobId;
         if (campaign.ScheduleType == ScheduleType.OneTime && campaign.ScheduledAt.HasValue)
         {
@@ -207,6 +222,10 @@ public class CampaignService(
 
         if (campaign.Status != CampaignStatus.Paused)
             throw new BusinessRuleException("CAMPAIGN_NOT_PAUSED", "Only Paused campaigns can be resumed.");
+
+        var queuedCount = await db.CampaignRecipients
+            .CountAsync(r => r.CampaignId == id && r.Status == RecipientStatus.Queued, ct);
+        await subscriptionGate.EnsureCanSendBatchAsync(queuedCount, ct);
 
         var jobId = jobClient.Enqueue<CampaignBatchSendJob>(
             j => j.RunAsync(id, CancellationToken.None));
@@ -401,6 +420,38 @@ public class CampaignService(
         }
 
         await db.SaveChangesAsync(ct);
+    }
+
+    private async Task<int> EstimateRecipientCountAsync(Guid campaignId, CancellationToken ct)
+    {
+        var listIds = await db.CampaignContactLists
+            .Where(x => x.CampaignId == campaignId)
+            .Select(x => x.ContactListId)
+            .ToListAsync(ct);
+
+        var individualContactIds = await db.CampaignContacts
+            .Where(x => x.CampaignId == campaignId)
+            .Select(x => x.ContactId)
+            .ToListAsync(ct);
+
+        return await EstimateRecipientCountAsync(listIds, individualContactIds, ct);
+    }
+
+    private async Task<int> EstimateRecipientCountAsync(
+        List<Guid>? contactListIds, List<Guid>? contactIds, CancellationToken ct)
+    {
+        var contactIdsFromLists = contactListIds is { Count: > 0 }
+            ? await db.ContactListMembers
+                .Where(m => contactListIds.Contains(m.ContactListId) && m.IsActive)
+                .Select(m => m.ContactId)
+                .Distinct()
+                .ToListAsync(ct)
+            : new List<Guid>();
+
+        return contactIdsFromLists
+            .Concat(contactIds ?? Enumerable.Empty<Guid>())
+            .Distinct()
+            .Count();
     }
 
     private static void ValidateSchedule(ScheduleType type, DateTime? scheduledAt, string? cron)

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Campaigns.Entities;
+using wa_api.Features.Notifications;
+using wa_api.Features.Notifications.Entities;
 using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.Campaigns.Jobs;
@@ -16,6 +18,7 @@ public class CampaignPoisonHandlerJob(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var notifier = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
         var campaign = await db.Campaigns
             .IgnoreQueryFilters()
@@ -40,6 +43,14 @@ public class CampaignPoisonHandlerJob(
                 .SetProperty(r => r.UpdatedAt, now));
 
         await db.SaveChangesAsync();
+
+        await notifier.CreateAsync(
+            campaign.CompanyId,
+            campaign.Id,
+            null,
+            NotificationType.CampaignFailed,
+            $"Campaign \"{campaign.Name}\" failed",
+            "Maximum retries exceeded. Check the campaign logs for details.");
 
         logger.LogError(
             "CampaignPoisonHandlerJob: campaign {Id} marked Failed — all remaining Queued recipients set to Failed.",

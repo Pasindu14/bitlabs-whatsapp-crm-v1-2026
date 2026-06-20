@@ -123,6 +123,8 @@ try
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignBatchSendJob>();
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignSchedulerJob>();
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignPoisonHandlerJob>();
+    builder.Services.AddScoped<wa_api.Features.Notifications.INotificationService, wa_api.Features.Notifications.NotificationService>();
+    builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>();
 
     // ── Webhooks (Meta inbound: template status 5.2 + delivery status 6.4; inbound stub → Phase 7) ──
     builder.Services.AddScoped<wa_api.Features.Webhooks.Signature.IMetaSignatureVerifier, wa_api.Features.Webhooks.Signature.MetaSignatureVerifier>();
@@ -250,6 +252,7 @@ try
     RecurringJob.AddOrUpdate<TemplateStatusSyncJob>("template-status-sync", j => j.RunAsync(), Cron.MinuteInterval(15));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>("webhook-sweeper", j => j.RunAsync(), Cron.MinuteInterval(5));
     RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.CampaignSchedulerJob>("campaign-scheduler", j => j.RunAsync(), Cron.Minutely);
+    RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>("quota-warning-checker", j => j.RunAsync(CancellationToken.None), "0 6 * * *");
 
     app.Run();
 }

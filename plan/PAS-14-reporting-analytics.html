@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAS-14 — Reporting &amp; Analytics (Phase 9)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f8fa; --surface: #ffffff; --surface-alt: #f0f2f6;
+      --border: #e2e6ee; --text: #1a1d23; --text-muted: #6b7280;
+      --accent: #4f6ef7; --accent-soft: #eef0fd;
+      --green: #16a34a; --green-soft: #f0fdf4;
+      --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --tag-bg: #e8ebf5; --tag-text: #3b4a80;
+      --radius: 10px; --font: 'Jost', system-ui, sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    }
+    body { font-family: var(--font); font-size: 15px; line-height: 1.7;
+           color: var(--text); background: var(--bg); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .page { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    .plan-header { margin-bottom: 40px; }
+    .plan-tag { display: inline-block; background: var(--tag-bg); color: var(--tag-text);
+                font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+                padding: 4px 10px; border-radius: 20px; margin-bottom: 14px; }
+    .plan-title { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .plan-subtitle { margin-top: 10px; color: var(--text-muted); font-size: 15px; max-width: 680px; }
+    .plan-meta { display: flex; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+    .plan-meta-item { font-size: 13px; color: var(--text-muted); }
+    .plan-meta-item strong { color: var(--text); font-weight: 600; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+    h2 { font-size: 18px; font-weight: 700; color: var(--text); margin: 36px 0 14px; }
+    h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 24px 0 10px; }
+
+    p { margin-bottom: 12px; }
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; }
+    li::marker { color: var(--accent); }
+
+    .step { background: var(--surface); border: 1px solid var(--border);
+             border-radius: var(--radius); padding: 24px 28px; margin-bottom: 18px; }
+    .step-label { font-size: 11px; font-weight: 700; letter-spacing: .08em;
+                  text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+    .step-title { font-size: 17px; font-weight: 700; margin-bottom: 12px; }
+    .step-file { display: inline-flex; align-items: center; gap: 6px;
+                 background: var(--surface-alt); border: 1px solid var(--border);
+                 border-radius: 6px; padding: 3px 9px; font-size: 12px; font-family: var(--mono);
+                 color: var(--text-muted); margin: 3px 4px 3px 0; }
+    .step-file.new { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+    .step-file.edit { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+
+    pre { background: var(--surface-alt); border: 1px solid var(--border);
+          border-radius: 8px; padding: 16px 18px; overflow-x: auto;
+          font-family: var(--mono); font-size: 13px; line-height: 1.6;
+          color: var(--text); margin: 14px 0; }
+    code { font-family: var(--mono); font-size: 13px;
+           background: var(--surface-alt); padding: 2px 5px; border-radius: 4px; }
+    pre code { background: none; padding: 0; }
+
+    .table-wrap { overflow-x: auto; margin: 16px 0; border-radius: var(--radius);
+                   border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th { background: var(--surface-alt); font-weight: 600; text-align: left;
+               padding: 10px 14px; border-bottom: 1px solid var(--border);
+               color: var(--text-muted); font-size: 12px; letter-spacing: .04em;
+               text-transform: uppercase; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-alt); }
+
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-soft);
+               border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 14px; }
+    .callout.warning { border-color: var(--warning); background: #fef9ec; }
+    .callout.danger  { border-color: var(--danger);  background: #fef2f2; }
+    .callout.success { border-color: var(--green);   background: var(--green-soft); }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px;
+             font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+    .badge-new     { background: #dcfce7; color: #15803d; }
+    .badge-edit    { background: #fef9c3; color: #854d0e; }
+    .badge-api     { background: #ede9fe; color: #5b21b6; }
+    .badge-web     { background: #dbeafe; color: #1e40af; }
+    .badge-db      { background: #fce7f3; color: #9d174d; }
+    .badge-job     { background: #ffedd5; color: #c2410c; }
+
+    .files-grid { display: grid; gap: 8px; margin: 12px 0; }
+    .file-row { display: flex; gap: 12px; align-items: flex-start; background: var(--surface);
+                border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+    .file-path { font-family: var(--mono); font-size: 12px; color: var(--accent);
+                 font-weight: 500; min-width: 0; word-break: break-all; }
+    .file-note { font-size: 13px; color: var(--text-muted); flex: 1; }
+
+    .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+           padding: 20px 24px; margin: 24px 0; }
+    .toc-title { font-size: 13px; font-weight: 700; text-transform: uppercase;
+                 letter-spacing: .06em; color: var(--text-muted); margin-bottom: 12px; }
+    .toc ol { margin: 0; padding-left: 18px; }
+    .toc li { font-size: 14px; margin-bottom: 4px; }
+
+    .endpoint-block { background: var(--surface-alt); border: 1px solid var(--border);
+                      border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+    .endpoint-line { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .method { font-family: var(--mono); font-size: 12px; font-weight: 700;
+              padding: 2px 7px; border-radius: 4px; background: #dbeafe; color: #1e40af; }
+    .method.get  { background: #dcfce7; color: #15803d; }
+    .endpoint-path { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+    .endpoint-perm { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+
+    .plan-footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border);
+                   font-size: 12px; color: var(--text-muted); display: flex;
+                   justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    strong { font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header class="plan-header">
+    <div class="plan-tag">PAS-14 · Implementation Plan</div>
+    <h1 class="plan-title">Reporting &amp; Analytics — Phase 9</h1>
+    <p class="plan-subtitle">
+      Build the three analytics pillars defined in PRD § 9: message delivery metrics (9.1),
+      campaign performance dashboards (9.2), and cost analytics by pricing category (9.3).
+      All data is already being captured — this phase surfaces it.
+    </p>
+    <div class="plan-meta">
+      <div class="plan-meta-item"><strong>PRD ref</strong> § 9.1 · 9.2 · 9.3</div>
+      <div class="plan-meta-item"><strong>Status</strong> Draft</div>
+      <div class="plan-meta-item"><strong>Steps</strong> 7</div>
+      <div class="plan-meta-item"><strong>Scope</strong> API + Web</div>
+      <div class="plan-meta-item"><strong>Depends on</strong> Phases 6, 8 (both done)</div>
+    </div>
+  </header>
+
+  <hr>
+
+  <!-- TOC -->
+  <nav class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#context">Context &amp; Data Availability</a></li>
+      <li><a href="#decisions">Decisions</a></li>
+      <li><a href="#api-feature">Step 1 — API: Analytics feature slice</a></li>
+      <li><a href="#api-endpoints">Step 2 — API: Three endpoint contracts</a></li>
+      <li><a href="#web-feature">Step 3 — Web: Analytics feature module</a></li>
+      <li><a href="#web-page">Step 4 — Web: Analytics page route</a></li>
+      <li><a href="#sidebar">Step 5 — Web: Sidebar nav entry</a></li>
+      <li><a href="#my-sub">Step 6 — Web: Fix missing /my-subscription route (bonus)</a></li>
+      <li><a href="#done">Definition of Done</a></li>
+    </ol>
+  </nav>
+
+  <hr>
+
+  <!-- CONTEXT -->
+  <section id="context">
+    <h2>Context &amp; Data Availability</h2>
+    <p>
+      All three analytics pillars read from tables that are <strong>already populated</strong>
+      by the running pipeline. No new DB columns or migrations are needed for 9.1 and 9.2.
+      Phase 9.3 (cost) is limited to <em>billable message counts by category</em> because
+      Meta's status webhooks do not include a dollar amount — only <code>billable: bool</code>
+      and <code>category: string</code>. Estimating spend from published per-country rates is
+      out of scope for this plan.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>PRD item</th><th>Data source</th><th>Key fields already captured</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>9.1</strong> Message metrics</td>
+            <td><code>Messages</code> table</td>
+            <td><code>Status</code> (Sent/Delivered/Read/Failed), <code>Direction</code>, <code>CreatedAt</code>, <code>CampaignId</code></td>
+          </tr>
+          <tr>
+            <td><strong>9.2</strong> Campaign performance</td>
+            <td><code>CampaignRecipients</code> table</td>
+            <td><code>CampaignId</code>, <code>Status</code> (Queued/Sent/Delivered/Read/Failed/Skipped), <code>ErrorCode</code></td>
+          </tr>
+          <tr>
+            <td><strong>9.3</strong> Cost analytics</td>
+            <td><code>Messages</code> table</td>
+            <td><code>Billable</code> (bool?), <code>Category</code> (string?  marketing/utility/authentication/service), <code>CreatedAt</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout warning">
+      <strong>9.3 scope note:</strong> Meta's pricing object in the status webhook contains
+      <code>billable</code> and <code>category</code> only — no price amount.
+      This plan delivers <em>billable message counts per category</em>, which is the correct
+      foundation. A separate plan can add a configurable rate table (price per category × country)
+      to derive estimated spend if needed later.
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- DECISIONS -->
+  <section id="decisions">
+    <h2>Decisions</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Topic</th><th>Decision</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Feature location</td>
+            <td>New vertical slice <code>Features/Analytics/</code> in the API. Single controller, single service. No repository layer — all queries are read-only projections via EF Core.</td>
+          </tr>
+          <tr>
+            <td>Permission gate</td>
+            <td><code>[RequirePermission("Analytics")]</code> on all three endpoints. Company Admins already implicitly hold all permissions. Super-admin bypasses via <code>IsSuperAdmin</code>.</td>
+          </tr>
+          <tr>
+            <td>Date range param</td>
+            <td>Optional <code>?from=</code> and <code>?to=</code> query params (ISO-8601 UTC). Default: last 30 days. Capped at 365 days server-side to prevent full-table scans.</td>
+          </tr>
+          <tr>
+            <td>Tenant isolation</td>
+            <td>All three endpoints rely on the global EF Core query filter — no manual <code>WHERE CompanyId</code>. Super-admin calls use <code>IgnoreQueryFilters</code> + explicit <code>?companyId=</code> param (existing pattern from other super-admin endpoints).</td>
+          </tr>
+          <tr>
+            <td>9.1 granularity</td>
+            <td>Return totals + a daily breakdown (one row per calendar day in the range) for trend charts. Inbound and outbound split included.</td>
+          </tr>
+          <tr>
+            <td>9.2 endpoint</td>
+            <td>Paginated list of campaigns with stats columns (total/sent/delivered/read/failed/skipped) so the frontend can render a sortable table. No charting needed for per-campaign stats — a table with color-coded delivery rate is sufficient.</td>
+          </tr>
+          <tr>
+            <td>9.3 grouping</td>
+            <td>Group by <code>Category</code> (nullable — use "unknown" for rows where webhook has not arrived yet). Only <code>Billable = true</code> rows count toward cost; show <code>Billable = false</code> separately as a free-tier count.</td>
+          </tr>
+          <tr>
+            <td>Caching</td>
+            <td>No caching in v1 — queries are fast on the indexed columns (<code>CompanyId</code>, <code>CreatedAt</code>, <code>Status</code>). Add Redis cache if query time exceeds 500 ms under production load.</td>
+          </tr>
+          <tr>
+            <td>Web route</td>
+            <td>New protected route <code>/analytics</code>. Three sections on one page (tabs or scroll sections). Use Recharts (already installed) for the bar/line charts. No separate sub-pages needed.</td>
+          </tr>
+          <tr>
+            <td>Sidebar</td>
+            <td>Add "Analytics" nav entry under the company section. Guard with <code>usePermissions("Analytics")</code> — same pattern used by other nav items.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- STEP 1 -->
+  <section id="api-feature">
+    <h2>Implementation Steps</h2>
+
+    <div class="step">
+      <div class="step-label">Step 1 · API</div>
+      <div class="step-title">Create the Analytics feature slice</div>
+
+      <p>Create the following files under <code>wa_api/wa_api/Features/Analytics/</code>:</p>
+
+      <div class="files-grid">
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">Features/Analytics/AnalyticsController.cs</span>
+          <span class="file-note">Three GET endpoints, all behind <code>[RequirePermission("Analytics")]</code></span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">Features/Analytics/AnalyticsService.cs</span>
+          <span class="file-note">EF Core projections; injected with <code>AppDbContext</code> and <code>ITenantContext</code></span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">Features/Analytics/DTOs/MessageMetricsResponse.cs</span>
+          <span class="file-note">Totals + daily breakdown for 9.1</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">Features/Analytics/DTOs/CampaignPerformanceResponse.cs</span>
+          <span class="file-note">Per-campaign stats rows for 9.2</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">Features/Analytics/DTOs/CostAnalyticsResponse.cs</span>
+          <span class="file-note">Billable counts per category for 9.3</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-edit">EDIT</span>
+          <span class="file-path">Program.cs</span>
+          <span class="file-note">Register <code>AnalyticsService</code> as scoped (<code>builder.Services.AddScoped&lt;AnalyticsService&gt;()</code>)</span>
+        </div>
+      </div>
+
+      <h3>AnalyticsController.cs — skeleton</h3>
+      <pre><code>[ApiController]
+[Route("[controller]")]
+[Authorize]
+public class AnalyticsController(AnalyticsService svc) : ControllerBase
+{
+    [HttpGet("messages")]
+    [RequirePermission("Analytics")]
+    public async Task&lt;IActionResult&gt; GetMessageMetrics(
+        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+        CancellationToken ct)
+    {
+        var result = await svc.GetMessageMetricsAsync(from, to, ct);
+        return Ok(ResponseHelper.Ok(result));
+    }
+
+    [HttpGet("campaigns")]
+    [RequirePermission("Analytics")]
+    public async Task&lt;IActionResult&gt; GetCampaignPerformance(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+        CancellationToken ct)
+    {
+        var result = await svc.GetCampaignPerformanceAsync(page, pageSize, from, to, ct);
+        return Ok(ResponseHelper.Ok(result));
+    }
+
+    [HttpGet("costs")]
+    [RequirePermission("Analytics")]
+    public async Task&lt;IActionResult&gt; GetCostAnalytics(
+        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+        CancellationToken ct)
+    {
+        var result = await svc.GetCostAnalyticsAsync(from, to, ct);
+        return Ok(ResponseHelper.Ok(result));
+    }
+}</code></pre>
+
+      <div class="callout">
+        The controller uses <code>ResponseHelper.Ok()</code> — the existing pattern from all other
+        controllers. No new helper needed.
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step" id="api-endpoints">
+      <div class="step-label">Step 2 · API</div>
+      <div class="step-title">Implement the three endpoint queries in AnalyticsService</div>
+
+      <h3>Date range helper (shared)</h3>
+      <pre><code>private (DateTime from, DateTime to) ResolveRange(DateTime? from, DateTime? to)
+{
+    var end   = (to   ?? DateTime.UtcNow).Date.AddDays(1).AddTicks(-1);
+    var start = (from ?? end.AddDays(-29).Date);
+    if ((end - start).TotalDays &gt; 365)
+        start = end.AddDays(-365);
+    return (start, end);
+}</code></pre>
+
+      <h3>9.1 — Message metrics query</h3>
+      <pre><code>public async Task&lt;MessageMetricsResponse&gt; GetMessageMetricsAsync(
+    DateTime? from, DateTime? to, CancellationToken ct)
+{
+    var (start, end) = ResolveRange(from, to);
+
+    var messages = await _db.Messages
+        .Where(m =&gt; m.CreatedAt &gt;= start &amp;&amp; m.CreatedAt &lt;= end)
+        .Select(m =&gt; new { m.Status, m.Direction, m.CreatedAt.Date })
+        .ToListAsync(ct);
+
+    return new MessageMetricsResponse
+    {
+        TotalSent      = messages.Count(m =&gt; m.Direction == MessageDirection.Outbound),
+        TotalInbound   = messages.Count(m =&gt; m.Direction == MessageDirection.Inbound),
+        TotalDelivered = messages.Count(m =&gt; m.Status == MessageStatus.Delivered),
+        TotalRead      = messages.Count(m =&gt; m.Status == MessageStatus.Read),
+        TotalFailed    = messages.Count(m =&gt; m.Status == MessageStatus.Failed),
+        Daily = messages
+            .GroupBy(m =&gt; m.Date)
+            .OrderBy(g =&gt; g.Key)
+            .Select(g =&gt; new DailyMessageStats
+            {
+                Date      = g.Key,
+                Sent      = g.Count(m =&gt; m.Direction == MessageDirection.Outbound),
+                Delivered = g.Count(m =&gt; m.Status == MessageStatus.Delivered),
+                Read      = g.Count(m =&gt; m.Status == MessageStatus.Read),
+                Failed    = g.Count(m =&gt; m.Status == MessageStatus.Failed),
+                Inbound   = g.Count(m =&gt; m.Direction == MessageDirection.Inbound),
+            }).ToList()
+    };
+}</code></pre>
+
+      <h3>9.2 — Campaign performance query</h3>
+      <pre><code>public async Task&lt;PagedResult&lt;CampaignPerformanceRow&gt;&gt; GetCampaignPerformanceAsync(
+    int page, int pageSize, DateTime? from, DateTime? to, CancellationToken ct)
+{
+    var (start, end) = ResolveRange(from, to);
+
+    var query = _db.Campaigns
+        .Where(c =&gt; c.CreatedAt &gt;= start &amp;&amp; c.CreatedAt &lt;= end)
+        .Select(c =&gt; new CampaignPerformanceRow
+        {
+            CampaignId   = c.Id,
+            Name         = c.Name,
+            Status       = c.Status.ToString(),
+            LaunchedAt   = c.LaunchedAt,
+            TotalRecipients = c.Recipients.Count(),
+            Sent         = c.Recipients.Count(r =&gt; r.Status != RecipientStatus.Queued
+                                                  &amp;&amp; r.Status != RecipientStatus.Skipped),
+            Delivered    = c.Recipients.Count(r =&gt; r.Status == RecipientStatus.Delivered
+                                                 || r.Status == RecipientStatus.Read),
+            Read         = c.Recipients.Count(r =&gt; r.Status == RecipientStatus.Read),
+            Failed       = c.Recipients.Count(r =&gt; r.Status == RecipientStatus.Failed),
+            Skipped      = c.Recipients.Count(r =&gt; r.Status == RecipientStatus.Skipped),
+        })
+        .OrderByDescending(c =&gt; c.LaunchedAt);
+
+    var total = await query.CountAsync(ct);
+    var rows  = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+
+    return new PagedResult&lt;CampaignPerformanceRow&gt;(rows, total, page, pageSize);
+}</code></pre>
+
+      <h3>9.3 — Cost analytics query</h3>
+      <pre><code>public async Task&lt;CostAnalyticsResponse&gt; GetCostAnalyticsAsync(
+    DateTime? from, DateTime? to, CancellationToken ct)
+{
+    var (start, end) = ResolveRange(from, to);
+
+    var rows = await _db.Messages
+        .Where(m =&gt; m.Direction == MessageDirection.Outbound
+                 &amp;&amp; m.CreatedAt &gt;= start &amp;&amp; m.CreatedAt &lt;= end
+                 &amp;&amp; m.Billable != null)
+        .GroupBy(m =&gt; new { m.Category, m.Billable })
+        .Select(g =&gt; new { g.Key.Category, g.Key.Billable, Count = g.Count() })
+        .ToListAsync(ct);
+
+    return new CostAnalyticsResponse
+    {
+        TotalBillable = rows.Where(r =&gt; r.Billable == true).Sum(r =&gt; r.Count),
+        TotalFree     = rows.Where(r =&gt; r.Billable == false).Sum(r =&gt; r.Count),
+        ByCategory    = rows
+            .GroupBy(r =&gt; r.Category ?? "unknown")
+            .Select(g =&gt; new CategoryBreakdown
+            {
+                Category = g.Key,
+                Billable = g.Where(r =&gt; r.Billable == true).Sum(r =&gt; r.Count),
+                Free     = g.Where(r =&gt; r.Billable == false).Sum(r =&gt; r.Count),
+            }).ToList()
+    };
+}</code></pre>
+
+      <h3>Response DTOs</h3>
+      <pre><code>// MessageMetricsResponse.cs
+public record MessageMetricsResponse
+{
+    public int TotalSent      { get; init; }
+    public int TotalInbound   { get; init; }
+    public int TotalDelivered { get; init; }
+    public int TotalRead      { get; init; }
+    public int TotalFailed    { get; init; }
+    public List&lt;DailyMessageStats&gt; Daily { get; init; } = [];
+}
+
+public record DailyMessageStats
+{
+    public DateTime Date      { get; init; }
+    public int Sent      { get; init; }
+    public int Delivered { get; init; }
+    public int Read      { get; init; }
+    public int Failed    { get; init; }
+    public int Inbound   { get; init; }
+}
+
+// CampaignPerformanceRow.cs
+public record CampaignPerformanceRow
+{
+    public Guid     CampaignId      { get; init; }
+    public string   Name            { get; init; } = string.Empty;
+    public string   Status          { get; init; } = string.Empty;
+    public DateTime? LaunchedAt     { get; init; }
+    public int TotalRecipients { get; init; }
+    public int Sent      { get; init; }
+    public int Delivered { get; init; }
+    public int Read      { get; init; }
+    public int Failed    { get; init; }
+    public int Skipped   { get; init; }
+}
+
+// CostAnalyticsResponse.cs
+public record CostAnalyticsResponse
+{
+    public int TotalBillable { get; init; }
+    public int TotalFree     { get; init; }
+    public List&lt;CategoryBreakdown&gt; ByCategory { get; init; } = [];
+}
+
+public record CategoryBreakdown
+{
+    public string Category { get; init; } = string.Empty;
+    public int Billable { get; init; }
+    public int Free     { get; init; }
+}</code></pre>
+
+      <h3>Endpoint contracts summary</h3>
+
+      <div class="endpoint-block">
+        <div class="endpoint-line">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/api/v1/analytics/messages</span>
+          <span class="endpoint-perm">Permission: Analytics</span>
+        </div>
+        <p style="font-size:13px; color: var(--text-muted);">
+          Query params: <code>from</code>, <code>to</code> (ISO-8601, optional).<br>
+          Returns: totals (sent/inbound/delivered/read/failed) + daily array for the range.
+        </p>
+      </div>
+
+      <div class="endpoint-block">
+        <div class="endpoint-line">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/api/v1/analytics/campaigns</span>
+          <span class="endpoint-perm">Permission: Analytics</span>
+        </div>
+        <p style="font-size:13px; color: var(--text-muted);">
+          Query params: <code>page</code>, <code>pageSize</code>, <code>from</code>, <code>to</code>.<br>
+          Returns: paginated list of campaigns with per-campaign delivery counts.
+        </p>
+      </div>
+
+      <div class="endpoint-block">
+        <div class="endpoint-line">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/api/v1/analytics/costs</span>
+          <span class="endpoint-perm">Permission: Analytics</span>
+        </div>
+        <p style="font-size:13px; color: var(--text-muted);">
+          Query params: <code>from</code>, <code>to</code> (optional).<br>
+          Returns: total billable count, total free count, breakdown by pricing category.
+        </p>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step" id="web-feature">
+      <div class="step-label">Step 3 · Web</div>
+      <div class="step-title">Create the analytics feature module</div>
+
+      <p>Mirror the 5-layer pattern used by every other feature: <code>types → actions → hooks → store → components</code>.</p>
+
+      <div class="files-grid">
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/types.ts</span>
+          <span class="file-note">TypeScript interfaces mirroring the three response DTOs</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/actions/analytics-actions.ts</span>
+          <span class="file-note">Server actions calling <code>GET /api/v1/analytics/*</code> via the axios client</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/hooks/use-message-metrics.ts</span>
+          <span class="file-note">TanStack Query hook for 9.1 — <code>queryKey: ['analytics','messages', from, to]</code></span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/hooks/use-campaign-performance.ts</span>
+          <span class="file-note">TanStack Query hook for 9.2 (paginated)</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/hooks/use-cost-analytics.ts</span>
+          <span class="file-note">TanStack Query hook for 9.3</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/components/message-metrics-chart.tsx</span>
+          <span class="file-note">Recharts BarChart — daily sent/delivered/read/failed stacked bars</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/components/message-stats-cards.tsx</span>
+          <span class="file-note">Four stat cards: total sent, delivered, read, failed</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/components/campaign-performance-table.tsx</span>
+          <span class="file-note">DataTable showing campaigns with delivery rate column (delivered/total %)</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/components/cost-breakdown-chart.tsx</span>
+          <span class="file-note">Recharts PieChart — billable message count by category</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">features/analytics/components/date-range-picker.tsx</span>
+          <span class="file-note">Shared date range input — syncs <code>from</code>/<code>to</code> state for all three sections</span>
+        </div>
+      </div>
+
+      <h3>types.ts</h3>
+      <pre><code>export interface DailyMessageStats {
+  date: string; // ISO date
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  inbound: number;
+}
+
+export interface MessageMetrics {
+  totalSent: number;
+  totalInbound: number;
+  totalDelivered: number;
+  totalRead: number;
+  totalFailed: number;
+  daily: DailyMessageStats[];
+}
+
+export interface CampaignPerformanceRow {
+  campaignId: string;
+  name: string;
+  status: string;
+  launchedAt: string | null;
+  totalRecipients: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  skipped: number;
+}
+
+export interface CategoryBreakdown {
+  category: string;
+  billable: number;
+  free: number;
+}
+
+export interface CostAnalytics {
+  totalBillable: number;
+  totalFree: number;
+  byCategory: CategoryBreakdown[];
+}</code></pre>
+
+      <h3>Query keys — add to <code>lib/hooks/query-keys.ts</code></h3>
+      <pre><code>analytics: {
+  messages: (from?: string, to?: string) =&gt;
+    ['analytics', 'messages', from, to] as const,
+  campaigns: (page: number, from?: string, to?: string) =&gt;
+    ['analytics', 'campaigns', page, from, to] as const,
+  costs: (from?: string, to?: string) =&gt;
+    ['analytics', 'costs', from, to] as const,
+},</code></pre>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step" id="web-page">
+      <div class="step-label">Step 4 · Web</div>
+      <div class="step-title">Create the /analytics page route</div>
+
+      <div class="files-grid">
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">app/(protected)/analytics/page.tsx</span>
+          <span class="file-note">Client component — three tabbed sections (Messages, Campaigns, Costs)</span>
+        </div>
+      </div>
+
+      <h3>Page structure</h3>
+      <pre><code>"use client";
+
+import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRangePicker } from "@/features/analytics/components/date-range-picker";
+import { MessageStatsCards }     from "@/features/analytics/components/message-stats-cards";
+import { MessageMetricsChart }   from "@/features/analytics/components/message-metrics-chart";
+import { CampaignPerformanceTable } from "@/features/analytics/components/campaign-performance-table";
+import { CostBreakdownChart }    from "@/features/analytics/components/cost-breakdown-chart";
+
+export default function AnalyticsPage() {
+  const [from, setFrom] = useState&lt;string | undefined&gt;();
+  const [to,   setTo  ] = useState&lt;string | undefined&gt;();
+
+  return (
+    &lt;div className="flex flex-1 flex-col gap-6 p-6"&gt;
+      &lt;div className="flex items-center justify-between"&gt;
+        &lt;div&gt;
+          &lt;h1 className="text-2xl font-bold"&gt;Analytics&lt;/h1&gt;
+          &lt;p className="text-sm text-muted-foreground"&gt;
+            Delivery metrics, campaign performance, and messaging costs.
+          &lt;/p&gt;
+        &lt;/div&gt;
+        &lt;DateRangePicker from={from} to={to} onChange={(f, t) =&gt; { setFrom(f); setTo(t); }} /&gt;
+      &lt;/div&gt;
+
+      &lt;Tabs defaultValue="messages"&gt;
+        &lt;TabsList&gt;
+          &lt;TabsTrigger value="messages"&gt;Messages&lt;/TabsTrigger&gt;
+          &lt;TabsTrigger value="campaigns"&gt;Campaigns&lt;/TabsTrigger&gt;
+          &lt;TabsTrigger value="costs"&gt;Costs&lt;/TabsTrigger&gt;
+        &lt;/TabsList&gt;
+
+        &lt;TabsContent value="messages" className="space-y-4 pt-4"&gt;
+          &lt;MessageStatsCards from={from} to={to} /&gt;
+          &lt;MessageMetricsChart from={from} to={to} /&gt;
+        &lt;/TabsContent&gt;
+
+        &lt;TabsContent value="campaigns" className="pt-4"&gt;
+          &lt;CampaignPerformanceTable from={from} to={to} /&gt;
+        &lt;/TabsContent&gt;
+
+        &lt;TabsContent value="costs" className="space-y-4 pt-4"&gt;
+          &lt;CostBreakdownChart from={from} to={to} /&gt;
+        &lt;/TabsContent&gt;
+      &lt;/Tabs&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+      <div class="callout">
+        The <code>DateRangePicker</code> state lives at the page level and flows down as props to
+        all three sections so a single filter controls all tabs.
+      </div>
+
+      <h3>MessageMetricsChart — Recharts bar chart</h3>
+      <pre><code>import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useMessageMetrics } from "@/features/analytics/hooks/use-message-metrics";
+import { Skeleton } from "@/components/ui/skeleton";
+
+export function MessageMetricsChart({ from, to }: { from?: string; to?: string }) {
+  const { data, isLoading } = useMessageMetrics(from, to);
+
+  if (isLoading) return &lt;Skeleton className="h-72 w-full rounded-xl" /&gt;;
+
+  return (
+    &lt;div className="rounded-xl border bg-card p-6"&gt;
+      &lt;h3 className="text-sm font-semibold mb-4 text-muted-foreground"&gt;Daily message volume&lt;/h3&gt;
+      &lt;ResponsiveContainer width="100%" height={280}&gt;
+        &lt;BarChart data={data?.daily}&gt;
+          &lt;XAxis dataKey="date" tick={{ fontSize: 11 }} /&gt;
+          &lt;YAxis tick={{ fontSize: 11 }} /&gt;
+          &lt;Tooltip /&gt;
+          &lt;Legend /&gt;
+          &lt;Bar dataKey="sent"      fill="#4f6ef7" name="Sent"      stackId="a" /&gt;
+          &lt;Bar dataKey="delivered" fill="#16a34a" name="Delivered" stackId="a" /&gt;
+          &lt;Bar dataKey="read"      fill="#0891b2" name="Read"      stackId="a" /&gt;
+          &lt;Bar dataKey="failed"    fill="#dc2626" name="Failed"    stackId="a" /&gt;
+        &lt;/BarChart&gt;
+      &lt;/ResponsiveContainer&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+      <h3>CampaignPerformanceTable — delivery rate column</h3>
+      <pre><code>// Columns definition (excerpt)
+{
+  id: "deliveryRate",
+  header: "Delivery rate",
+  cell: ({ row }) =&gt; {
+    const { delivered, totalRecipients } = row.original;
+    const rate = totalRecipients &gt; 0
+      ? Math.round((delivered / totalRecipients) * 100)
+      : 0;
+    const color = rate &gt;= 80 ? "text-green-600"
+                : rate &gt;= 50 ? "text-yellow-600"
+                : "text-red-600";
+    return &lt;span className={`font-semibold ${color}`}&gt;{rate}%&lt;/span&gt;;
+  }
+}</code></pre>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step" id="sidebar">
+      <div class="step-label">Step 5 · Web</div>
+      <div class="step-title">Add Analytics to the sidebar navigation</div>
+
+      <div class="files-grid">
+        <div class="file-row">
+          <span class="badge badge-edit">EDIT</span>
+          <span class="file-path">components/nav-main.tsx</span>
+          <span class="file-note">Add Analytics nav item, guarded by <code>hasPermission("Analytics")</code></span>
+        </div>
+      </div>
+
+      <p>Find the nav items array (where Inbox, Campaigns, Templates etc. are listed) and add:</p>
+      <pre><code>...(hasPermission("Analytics") ? [{
+  title: "Analytics",
+  url: "/analytics",
+  icon: BarChart2,   // import from lucide-react
+}] : []),</code></pre>
+
+      <div class="callout">
+        Use the same <code>hasPermission()</code> / <code>usePermissions()</code> pattern already in
+        place for other gated nav items (e.g. the Team entry is already guarded this way).
+        Check <code>lib/auth/use-permissions.ts</code> for the exact hook signature.
+      </div>
+    </div>
+
+    <!-- STEP 6 -->
+    <div class="step" id="my-sub">
+      <div class="step-label">Step 6 · Web · Bonus</div>
+      <div class="step-title">Fix the missing /my-subscription route</div>
+
+      <p>
+        The <code>features/my-subscription/</code> module (actions, hooks, components) is complete,
+        and <code>CurrentPlanCard</code> is already embedded on the dashboard — but there is
+        <strong>no dedicated page route</strong>. Company users have no way to navigate to a full
+        subscription view.
+      </p>
+
+      <div class="files-grid">
+        <div class="file-row">
+          <span class="badge badge-new">NEW</span>
+          <span class="file-path">app/(protected)/my-subscription/page.tsx</span>
+          <span class="file-note">Full subscription page — plan details, quota usage bar, period reset date</span>
+        </div>
+        <div class="file-row">
+          <span class="badge badge-edit">EDIT</span>
+          <span class="file-path">components/nav-main.tsx</span>
+          <span class="file-note">Add "Subscription" nav item linking to <code>/my-subscription</code> for company-scoped users (not super-admin)</span>
+        </div>
+      </div>
+
+      <pre><code>// app/(protected)/my-subscription/page.tsx
+import { CurrentPlanCard }  from "@/features/my-subscription/components/current-plan-card";
+import { QuotaUsageCard }   from "@/features/my-subscription/components/quota-usage-card";
+
+export default function MySubscriptionPage() {
+  return (
+    &lt;div className="flex flex-1 flex-col gap-6 p-6"&gt;
+      &lt;div&gt;
+        &lt;h1 className="text-2xl font-bold"&gt;Subscription&lt;/h1&gt;
+        &lt;p className="text-sm text-muted-foreground"&gt;Your current plan and usage.&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div className="grid gap-4 lg:grid-cols-2"&gt;
+        &lt;CurrentPlanCard /&gt;
+        &lt;QuotaUsageCard /&gt;   {/* create if not already in features/my-subscription/components */}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- FILE MAP -->
+  <section>
+    <h2>All Files at a Glance</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>File</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_api/.../Features/Analytics/AnalyticsController.cs</code></td>
+            <td>3 GET endpoints</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_api/.../Features/Analytics/AnalyticsService.cs</code></td>
+            <td>EF Core projections for all three queries</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_api/.../Features/Analytics/DTOs/MessageMetricsResponse.cs</code></td>
+            <td>9.1 response shape</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_api/.../Features/Analytics/DTOs/CampaignPerformanceResponse.cs</code></td>
+            <td>9.2 response shape</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_api/.../Features/Analytics/DTOs/CostAnalyticsResponse.cs</code></td>
+            <td>9.3 response shape</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-edit">EDIT</span></td>
+            <td><code>wa_api/.../Program.cs</code></td>
+            <td>Register <code>AnalyticsService</code></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/types.ts</code></td>
+            <td>TS interfaces</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/actions/analytics-actions.ts</code></td>
+            <td>Server actions (3)</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/hooks/use-message-metrics.ts</code></td>
+            <td>TanStack Query hook</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/hooks/use-campaign-performance.ts</code></td>
+            <td>TanStack Query hook (paginated)</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/hooks/use-cost-analytics.ts</code></td>
+            <td>TanStack Query hook</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/components/message-stats-cards.tsx</code></td>
+            <td>4 stat cards</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/components/message-metrics-chart.tsx</code></td>
+            <td>Recharts stacked bar chart</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/components/campaign-performance-table.tsx</code></td>
+            <td>DataTable with delivery rate %</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/components/cost-breakdown-chart.tsx</code></td>
+            <td>Recharts pie chart</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/features/analytics/components/date-range-picker.tsx</code></td>
+            <td>Shared date range filter</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/app/(protected)/analytics/page.tsx</code></td>
+            <td>Route with 3 tabs</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-new">NEW</span></td>
+            <td><code>wa_web/app/(protected)/my-subscription/page.tsx</code></td>
+            <td>Fix missing subscription route</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-edit">EDIT</span></td>
+            <td><code>wa_web/lib/hooks/query-keys.ts</code></td>
+            <td>Add <code>analytics.*</code> keys</td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-edit">EDIT</span></td>
+            <td><code>wa_web/components/nav-main.tsx</code></td>
+            <td>Add Analytics + Subscription nav items</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- DONE -->
+  <section id="done">
+    <h2>Definition of Done</h2>
+    <ul>
+      <li><code>GET /api/v1/analytics/messages</code> returns status totals + daily array; filtered by optional date range; blocked for users without <code>Analytics</code> permission.</li>
+      <li><code>GET /api/v1/analytics/campaigns</code> returns paginated campaign rows with delivered/read/failed counts; delivery rate computable client-side.</li>
+      <li><code>GET /api/v1/analytics/costs</code> returns billable + free counts broken down by Meta pricing category.</li>
+      <li><code>/analytics</code> page renders three tabs — Messages (bar chart + stat cards), Campaigns (sortable table with delivery rate %), Costs (pie chart by category).</li>
+      <li>Date range picker on the page controls all three tabs simultaneously.</li>
+      <li>Analytics nav entry is visible only to users with the <code>Analytics</code> permission (Company Admins see it by default).</li>
+      <li><code>/my-subscription</code> page route exists and is reachable from the sidebar.</li>
+      <li>Super-admin can view any company's analytics via the existing <code>?companyId=</code> bypass pattern if needed (optional for v1 — can be added later).</li>
+    </ul>
+  </section>
+
+  <footer class="plan-footer">
+    <span>PAS-14 · Reporting &amp; Analytics · Phase 9 (9.1 · 9.2 · 9.3)</span>
+    <span>PRD dependency: Phases 6 + 8 complete · No new migrations required</span>
+  </footer>
+
+</div>
+</body>
+</html>

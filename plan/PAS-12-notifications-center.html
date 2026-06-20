@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAS-12 — Notifications Center</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f8fa; --surface: #ffffff; --surface-alt: #f0f2f6;
+      --border: #e2e6ee; --text: #1a1d23; --text-muted: #6b7280;
+      --accent: #4f6ef7; --accent-soft: #eef0fd;
+      --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --tag-bg: #e8ebf5; --tag-text: #3b4a80;
+      --radius: 10px; --font: 'Jost', system-ui, sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    }
+    body { font-family: var(--font); font-size: 15px; line-height: 1.7; color: var(--text); background: var(--bg); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .page { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    /* header */
+    .plan-header { margin-bottom: 40px; }
+    .plan-tag { display: inline-block; background: var(--tag-bg); color: var(--tag-text); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; margin-bottom: 14px; }
+    .plan-title { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .plan-subtitle { margin-top: 10px; color: var(--text-muted); font-size: 15px; }
+    .plan-meta { display: flex; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+    .plan-meta-item { font-size: 13px; color: var(--text-muted); }
+    .plan-meta-item strong { color: var(--text); font-weight: 600; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+    h2 { font-size: 18px; font-weight: 700; color: var(--text); margin: 36px 0 14px; }
+    h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 24px 0 10px; }
+    p { margin-bottom: 12px; }
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; }
+    li::marker { color: var(--accent); }
+    strong { font-weight: 600; }
+    em { font-style: italic; }
+
+    /* step cards */
+    .step { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 28px; margin-bottom: 18px; }
+    .step-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+    .step-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+    .step-file { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 12px; font-family: var(--mono); color: var(--text-muted); margin-bottom: 14px; margin-right: 6px; }
+
+    /* code */
+    pre { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--text); margin: 14px 0; }
+    code { font-family: var(--mono); font-size: 13px; background: var(--surface-alt); padding: 2px 5px; border-radius: 4px; }
+    pre code { background: none; padding: 0; }
+
+    /* tables */
+    .table-wrap { overflow-x: auto; margin: 16px 0; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th { background: var(--surface-alt); font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-alt); }
+
+    /* callouts */
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 14px; }
+    .callout.warning { border-color: var(--warning); background: #fef9ec; }
+    .callout.danger  { border-color: var(--danger);  background: #fef2f2; }
+    .callout.success { border-color: var(--success);  background: #f0fdf4; }
+
+    /* notification type pills */
+    .notif-types { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+    .notif-pill { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+    .notif-pill .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .dot-warn3 { background: #60a5fa; }
+    .dot-warn2 { background: #fbbf24; }
+    .dot-warn1 { background: #f97316; }
+    .dot-warnD { background: var(--danger); }
+    .dot-fail  { background: #9333ea; }
+    .notif-pill-label { font-weight: 600; color: var(--text); }
+    .notif-pill-desc { color: var(--text-muted); }
+
+    /* order list */
+    .order-list { list-style: none; padding: 0; margin: 0; }
+    .order-item { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .order-item:last-child { border-bottom: none; }
+    .order-num { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+    .order-body { flex: 1; }
+    .order-title { font-weight: 600; margin-bottom: 2px; }
+    .order-desc  { font-size: 13px; color: var(--text-muted); }
+
+    /* files */
+    .files-grid { display: grid; gap: 8px; margin-top: 12px; }
+    .file-row { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+    .file-new { background: #f0fdf4; border-color: #bbf7d0; }
+    .file-path { font-family: var(--mono); font-size: 12px; color: var(--accent); font-weight: 500; flex-shrink: 0; word-break: break-all; }
+    .file-change { font-size: 13px; color: var(--text-muted); }
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; vertical-align: middle; margin-left: 6px; text-transform: uppercase; letter-spacing: .04em; }
+    .badge-new  { background: #dcfce7; color: #15803d; }
+    .badge-mod  { background: var(--accent-soft); color: var(--accent); }
+
+    /* footer */
+    .plan-footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header class="plan-header">
+    <div class="plan-tag">PAS-12 · Implementation Plan</div>
+    <h1 class="plan-title">Notifications Center</h1>
+    <p class="plan-subtitle">
+      Warn users when a scheduled campaign won't have enough quota to send — at 3 days, 2 days,
+      1 day, and on the day itself — and notify immediately when a campaign fails.
+    </p>
+    <div class="plan-meta">
+      <div class="plan-meta-item"><strong>Status</strong> Draft</div>
+      <div class="plan-meta-item"><strong>Steps</strong> 6</div>
+      <div class="plan-meta-item"><strong>Scope</strong> API + Hangfire + SignalR + Frontend</div>
+      <div class="plan-meta-item"><strong>Related</strong> PAS-13 (quota guard)</div>
+    </div>
+  </header>
+
+  <hr>
+
+  <!-- BACKGROUND -->
+  <section>
+    <h2>Background &amp; Problem</h2>
+    <p>
+      Scheduled campaigns fire at a future time via <code>CampaignSchedulerJob</code> (runs every minute). If a
+      company's <code>MessagesUsedThisPeriod</code> grows between now and the scheduled fire time, the campaign may
+      land on <code>INSUFFICIENT_QUOTA_AT_FIRE_TIME</code> and silently fail (PAS-13 adds that failure path).
+      Users currently have no way to know this is about to happen.
+    </p>
+    <p>
+      Additionally, campaigns can fail for other reasons (poison handler, Meta API errors). There is no
+      persistent notification system — only ephemeral SignalR chat events and Sonner toasts. We need:
+    </p>
+    <ul>
+      <li>A persisted <code>Notification</code> entity so messages survive page refreshes</li>
+      <li>A daily Hangfire job that scans upcoming scheduled campaigns and checks if quota will be sufficient</li>
+      <li>Hooks in the campaign failure path to emit a notification on failure</li>
+      <li>A frontend bell icon with unread count + notification panel</li>
+    </ul>
+  </section>
+
+  <hr>
+
+  <!-- NOTIFICATION TYPES -->
+  <section>
+    <h2>Notification Types</h2>
+    <div class="notif-types">
+      <div class="notif-pill">
+        <span class="dot dot-warn3"></span>
+        <div>
+          <div class="notif-pill-label">QUOTA_WARNING_3D</div>
+          <div class="notif-pill-desc">Scheduled campaign fires in ≤ 72 h, quota insufficient</div>
+        </div>
+      </div>
+      <div class="notif-pill">
+        <span class="dot dot-warn2"></span>
+        <div>
+          <div class="notif-pill-label">QUOTA_WARNING_2D</div>
+          <div class="notif-pill-desc">Fires in ≤ 48 h, quota insufficient</div>
+        </div>
+      </div>
+      <div class="notif-pill">
+        <span class="dot dot-warn1"></span>
+        <div>
+          <div class="notif-pill-label">QUOTA_WARNING_1D</div>
+          <div class="notif-pill-desc">Fires in ≤ 24 h, quota insufficient</div>
+        </div>
+      </div>
+      <div class="notif-pill">
+        <span class="dot dot-warnD"></span>
+        <div>
+          <div class="notif-pill-label">QUOTA_WARNING_TODAY</div>
+          <div class="notif-pill-desc">Fires today (≤ 6 h), quota insufficient</div>
+        </div>
+      </div>
+      <div class="notif-pill">
+        <span class="dot dot-fail"></span>
+        <div>
+          <div class="notif-pill-label">CAMPAIGN_FAILED</div>
+          <div class="notif-pill-desc">Campaign hit a terminal failure (poison handler or fire-time quota fail)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      Each warning type is issued <strong>at most once per campaign</strong> — idempotent via a unique DB index on
+      <code>(CampaignId, NotificationType)</code>. Later warnings supersede earlier ones in the UI (e.g., showing
+      the most recent warning per campaign).
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- DECISIONS -->
+  <section>
+    <h2>Decisions</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Topic</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>Persistence</td><td>New <code>Notification</code> entity in DB — ephemeral SignalR-only is insufficient for a notification center</td></tr>
+          <tr><td>Delivery</td><td>Persist first, then push a <code>notification</code> SignalR event on the existing <code>company:{companyId}</code> group</td></tr>
+          <tr><td>Checker job schedule</td><td>Runs daily at <strong>06:00 UTC</strong> via Hangfire cron (<code>"0 6 * * *"</code>)</td></tr>
+          <tr><td>Warning thresholds</td><td>3 d / 2 d / 1 d / 6 h (same-day) — each emits a distinct type; once per campaign per type</td></tr>
+          <tr><td>Recipient count for check</td><td>Use <code>TotalRecipients</code> on the Campaign if already set; otherwise count distinct contacts server-side (same helper as PAS-13)</td></tr>
+          <tr><td>Failure hook location</td><td><code>CampaignPoisonHandlerJob</code> (already marks campaigns Failed) + fire-time quota fail branch in <code>CampaignLaunchJob</code> (PAS-13)</td></tr>
+          <tr><td>API design</td><td>REST: GET list, PATCH mark-read, PATCH mark-all-read. No delete — notifications are audit trail.</td></tr>
+          <tr><td>Frontend placement</td><td>Bell icon in the top nav bar. Unread badge count. Click opens a slide-over panel (no page change).</td></tr>
+          <tr><td>Recurring campaigns</td><td>Skip quota-warning checks for <code>Recurring</code> schedule type — fire time is unknown; only <code>OneTime</code> scheduled campaigns are checked.</td></tr>
+          <tr><td>SuperAdmin</td><td>Notifications scoped per company; SuperAdmin impersonation not in scope.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- STEPS -->
+  <section>
+    <h2>Implementation Steps</h2>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-label">Step 1 — Data Layer</div>
+      <div class="step-title">Create <code>Notification</code> entity + migration</div>
+      <span class="step-file">📄 wa_api/wa_api/Features/Notifications/Entities/Notification.cs <span class="badge badge-new">new</span></span>
+      <span class="step-file">📄 wa_api/wa_api/Data/AppDbContext.cs <span class="badge badge-mod">mod</span></span>
+      <span class="step-file">📄 wa_api/wa_api/Data/Migrations/ <span class="badge badge-new">new migration</span></span>
+
+      <pre><code>public class Notification
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }          // tenant scope
+    public Guid? CampaignId { get; set; }        // null for non-campaign notifications
+    public NotificationType Type { get; set; }
+    public string Title { get; set; } = "";
+    public string Body { get; set; } = "";
+    public bool IsRead { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+    public Campaign? Campaign { get; set; }
+}
+
+public enum NotificationType
+{
+    QuotaWarning3Days,
+    QuotaWarning2Days,
+    QuotaWarning1Day,
+    QuotaWarningToday,
+    CampaignFailed,
+}</code></pre>
+
+      <p>In <code>AppDbContext</code> add <code>DbSet&lt;Notification&gt; Notifications</code> and configure:</p>
+      <pre><code>modelBuilder.Entity&lt;Notification&gt;(b =>
+{
+    b.HasIndex(n => new { n.CampaignId, n.Type }).IsUnique()
+     .HasFilter("[CampaignId] IS NOT NULL");    // one warning per type per campaign
+    b.HasIndex(n => new { n.CompanyId, n.IsRead, n.CreatedAt });
+    b.HasQueryFilter(n => n.CompanyId == _tenantId);  // multi-tenant filter
+});</code></pre>
+
+      <div class="callout">
+        The unique index on <code>(CampaignId, Type)</code> makes the checker job idempotent — re-running it
+        for the same campaign on the same day won't create duplicate warnings.
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step">
+      <div class="step-label">Step 2 — Service</div>
+      <div class="step-title">Create <code>INotificationService</code> + <code>NotificationService</code></div>
+      <span class="step-file">📄 wa_api/wa_api/Features/Notifications/INotificationService.cs <span class="badge badge-new">new</span></span>
+      <span class="step-file">📄 wa_api/wa_api/Features/Notifications/NotificationService.cs <span class="badge badge-new">new</span></span>
+
+      <pre><code>public interface INotificationService
+{
+    Task CreateAsync(Guid companyId, Guid? campaignId, NotificationType type,
+                     string title, string body, CancellationToken ct = default);
+    Task MarkReadAsync(Guid notificationId, CancellationToken ct = default);
+    Task MarkAllReadAsync(Guid companyId, CancellationToken ct = default);
+}
+
+// NotificationService implementation:
+// 1. INSERT into Notifications (ignore duplicate key on unique index)
+// 2. Push SignalR event to company:{companyId} group:
+//    await _hub.Clients.Group($"company:{companyId}")
+//              .SendAsync("notification", new { id, type, title, body, createdAt });
+// 3. Return — no exception if duplicate (ON CONFLICT DO NOTHING equivalent via try/catch UniqueConstraintException)</code></pre>
+
+      <p>
+        The SignalR push reuses the existing <code>ChatHub</code> — no new hub needed. Extend
+        <code>IChatNotifier</code> or inject <code>IHubContext&lt;ChatHub&gt;</code> directly into
+        <code>NotificationService</code>.
+      </p>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-label">Step 3 — Background Job</div>
+      <div class="step-title">Create <code>QuotaWarningCheckerJob</code></div>
+      <span class="step-file">📄 wa_api/wa_api/Features/Campaigns/Jobs/QuotaWarningCheckerJob.cs <span class="badge badge-new">new</span></span>
+      <span class="step-file">📄 wa_api/wa_api/Program.cs <span class="badge badge-mod">mod</span></span>
+
+      <p>Runs daily at 06:00 UTC. Scans all <strong>OneTime Scheduled</strong> campaigns across all companies:</p>
+
+      <pre><code>public async Task RunAsync(CancellationToken ct)
+{
+    var now = DateTime.UtcNow;
+
+    // Load all OneTime Scheduled campaigns that fire within the next 72 hours
+    var upcoming = await _db.Campaigns
+        .IgnoreQueryFilters()
+        .Include(c => c.Company).ThenInclude(co => co.Subscription).ThenInclude(s => s.Plan)
+        .Where(c => c.ScheduleType == ScheduleType.OneTime
+                 && c.Status == CampaignStatus.Scheduled
+                 && c.ScheduledAt > now
+                 && c.ScheduledAt <= now.AddHours(72))
+        .ToListAsync(ct);
+
+    foreach (var campaign in upcoming)
+    {
+        var sub = campaign.Company.Subscription;
+        if (sub is null || sub.Plan is null) continue;
+
+        int remaining = sub.Plan.MonthlyMessageQuota - sub.MessagesUsedThisPeriod;
+        int recipients = campaign.TotalRecipients > 0
+            ? campaign.TotalRecipients
+            : await ResolveDistinctRecipientCountAsync(campaign, ct);
+
+        if (recipients <= remaining) continue;  // quota is fine — no warning needed
+
+        var hoursUntil = (campaign.ScheduledAt!.Value - now).TotalHours;
+        var type = hoursUntil switch
+        {
+            <= 6  => NotificationType.QuotaWarningToday,
+            <= 24 => NotificationType.QuotaWarning1Day,
+            <= 48 => NotificationType.QuotaWarning2Days,
+            _     => NotificationType.QuotaWarning3Days,
+        };
+
+        var title = type == NotificationType.QuotaWarningToday
+            ? $"Campaign \"{campaign.Name}\" sends today — quota insufficient"
+            : $"Campaign \"{campaign.Name}\" scheduled in {(int)Math.Ceiling(hoursUntil / 24)} day(s) — quota low";
+
+        var body = $"Needs {recipients:N0} messages, only {remaining:N0} remaining. " +
+                   $"Upgrade your plan or reduce recipients before {campaign.ScheduledAt:d MMM HH:mm} UTC.";
+
+        await _notificationService.CreateAsync(
+            campaign.CompanyId, campaign.Id, type, title, body, ct);
+    }
+}</code></pre>
+
+      <p>Register in <code>Program.cs</code>:</p>
+      <pre><code>RecurringJob.AddOrUpdate&lt;QuotaWarningCheckerJob&gt;(
+    "quota-warning-checker",
+    j => j.RunAsync(CancellationToken.None),
+    "0 6 * * *");   // daily at 06:00 UTC</code></pre>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step">
+      <div class="step-label">Step 4 — Failure Hooks</div>
+      <div class="step-title">Emit <code>CAMPAIGN_FAILED</code> notification on terminal failure</div>
+      <span class="step-file">📄 wa_api/wa_api/Features/Campaigns/Jobs/CampaignPoisonHandlerJob.cs <span class="badge badge-mod">mod</span></span>
+      <span class="step-file">📄 wa_api/wa_api/Features/Campaigns/Jobs/CampaignLaunchJob.cs <span class="badge badge-mod">mod</span></span>
+
+      <p><strong>In <code>CampaignPoisonHandlerJob</code></strong> (already marks campaign as Failed) — add after <code>SaveChangesAsync</code>:</p>
+      <pre><code>await _notificationService.CreateAsync(
+    campaign.CompanyId,
+    campaign.Id,
+    NotificationType.CampaignFailed,
+    $"Campaign \"{campaign.Name}\" failed",
+    "Maximum retries exceeded. Check the campaign logs for details.",
+    ct);</code></pre>
+
+      <p><strong>In <code>CampaignLaunchJob</code></strong> (PAS-13 fire-time quota branch) — add after setting <code>FailureReason</code>:</p>
+      <pre><code>await _notificationService.CreateAsync(
+    campaign.CompanyId,
+    campaign.Id,
+    NotificationType.CampaignFailed,
+    $"Campaign \"{campaign.Name}\" couldn't launch — quota exhausted",
+    $"Had {recipientIds.Count:N0} recipients but only {remaining:N0} messages left at fire time.",
+    ct);</code></pre>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step">
+      <div class="step-label">Step 5 — API</div>
+      <div class="step-title">Notifications REST endpoints</div>
+      <span class="step-file">📄 wa_api/wa_api/Features/Notifications/NotificationsController.cs <span class="badge badge-new">new</span></span>
+
+      <pre><code>// GET /api/v1/notifications?page=1&pageSize=20
+// Returns: { items: Notification[], unreadCount: int, totalCount: int }
+
+// PATCH /api/v1/notifications/{id}/read
+// Marks a single notification as read
+
+// PATCH /api/v1/notifications/read-all
+// Marks all notifications for the current company as read</code></pre>
+
+      <p>All endpoints require <code>[Authorize(Roles = "CompanyAdmin")]</code> and use the existing tenant filter via <code>AppDbContext</code> query filter — no manual <code>CompanyId</code> scoping needed.</p>
+
+      <div class="callout">
+        The <code>GET</code> response includes <code>unreadCount</code> so the frontend bell badge can be seeded
+        on initial load without a second request.
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step">
+      <div class="step-label">Step 6 — Frontend</div>
+      <div class="step-title">Notification bell + panel in the top nav</div>
+      <span class="step-file">📄 wa_web/components/notifications/NotificationBell.tsx <span class="badge badge-new">new</span></span>
+      <span class="step-file">📄 wa_web/components/notifications/NotificationPanel.tsx <span class="badge badge-new">new</span></span>
+      <span class="step-file">📄 wa_web/hooks/use-notifications.ts <span class="badge badge-new">new</span></span>
+      <span class="step-file">📄 wa_web/components/layout/TopNav.tsx <span class="badge badge-mod">mod</span></span>
+
+      <h3>Bell icon</h3>
+      <pre><code>// NotificationBell.tsx
+// - Renders a bell icon button in the nav bar
+// - Shows a red badge with unreadCount (capped at "99+")
+// - onClick → toggles NotificationPanel open/closed</code></pre>
+
+      <h3>Notification panel (slide-over)</h3>
+      <pre><code>// NotificationPanel.tsx
+// - Slide-over from the right, no route change
+// - Header: "Notifications" + "Mark all read" button
+// - List: notification cards sorted by createdAt desc
+//   Each card: icon by type (⚠️ warning, ❌ failed), title, body, relative time
+//   Unread cards have a subtle left accent border
+// - On card click → mark as read via PATCH /notifications/{id}/read
+// - Infinite scroll or "Load more" for pagination</code></pre>
+
+      <h3>Hook</h3>
+      <pre><code>// use-notifications.ts
+// - Initial fetch: GET /api/v1/notifications on mount → seeds unreadCount
+// - SignalR: listen for "notification" events on the existing connection
+//   → prepend new notification to list, increment unreadCount
+// - Mutations: markRead(id), markAllRead()
+// - Use React Query for caching + optimistic unread count updates</code></pre>
+
+      <h3>SignalR wiring</h3>
+      <p>
+        The frontend already connects to ChatHub for real-time conversation events. Extend the existing
+        connection handler to also listen for <code>"notification"</code> events:
+      </p>
+      <pre><code>connection.on("notification", (payload) => {
+  queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  // or optimistically prepend: notificationsStore.prepend(payload)
+  toast.warning(payload.title, { description: payload.body });
+});</code></pre>
+    </div>
+
+  </section>
+
+  <hr>
+
+  <!-- IMPLEMENTATION ORDER -->
+  <section>
+    <h2>Implementation Order</h2>
+    <ul class="order-list">
+      <li class="order-item">
+        <div class="order-num">1</div>
+        <div class="order-body">
+          <div class="order-title">Entity + migration (Step 1)</div>
+          <div class="order-desc">Foundation — all other steps depend on the <code>Notification</code> table existing</div>
+        </div>
+      </li>
+      <li class="order-item">
+        <div class="order-num">2</div>
+        <div class="order-body">
+          <div class="order-title">NotificationService (Step 2)</div>
+          <div class="order-desc">Service layer used by both the checker job and the failure hooks</div>
+        </div>
+      </li>
+      <li class="order-item">
+        <div class="order-num">3</div>
+        <div class="order-body">
+          <div class="order-title">Failure hooks (Step 4)</div>
+          <div class="order-desc">Wire CampaignPoisonHandlerJob + CampaignLaunchJob early — these are the highest-value signals</div>
+        </div>
+      </li>
+      <li class="order-item">
+        <div class="order-num">4</div>
+        <div class="order-body">
+          <div class="order-title">REST API (Step 5)</div>
+          <div class="order-desc">Unblocks frontend development; can be tested independently with Swagger</div>
+        </div>
+      </li>
+      <li class="order-item">
+        <div class="order-num">5</div>
+        <div class="order-body">
+          <div class="order-title">Quota checker job (Step 3)</div>
+          <div class="order-desc">Depends on NotificationService; schedule registration goes in Program.cs after service is proven working</div>
+        </div>
+      </li>
+      <li class="order-item">
+        <div class="order-num">6</div>
+        <div class="order-body">
+          <div class="order-title">Frontend bell + panel (Step 6)</div>
+          <div class="order-desc">Requires the API and SignalR events to be live; implement last for a clean integration test</div>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <hr>
+
+  <!-- FILES TOUCHED -->
+  <section>
+    <h2>Files Touched</h2>
+    <div class="files-grid">
+      <div class="file-row file-new">
+        <span class="file-path">wa_api/.../Notifications/Entities/Notification.cs</span>
+        <span class="file-change">New entity — <code>Notification</code> with <code>NotificationType</code> enum <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">wa_api/.../Data/AppDbContext.cs</span>
+        <span class="file-change">Add <code>DbSet&lt;Notification&gt;</code>, configure unique index + query filter <span class="badge badge-mod">mod</span></span>
+      </div>
+      <div class="file-row file-new">
+        <span class="file-path">wa_api/.../Data/Migrations/</span>
+        <span class="file-change">New migration for <code>Notifications</code> table <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row file-new">
+        <span class="file-path">wa_api/.../Notifications/INotificationService.cs</span>
+        <span class="file-change">Interface for CreateAsync / MarkReadAsync / MarkAllReadAsync <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row file-new">
+        <span class="file-path">wa_api/.../Notifications/NotificationService.cs</span>
+        <span class="file-change">Persists + pushes SignalR event to <code>company:{id}</code> group <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row file-new">
+        <span class="file-path">wa_api/.../Campaigns/Jobs/QuotaWarningCheckerJob.cs</span>
+        <span class="file-change">Daily Hangfire job — scans OneTime Scheduled campaigns, emits quota warnings <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">wa_api/.../Campaigns/Jobs/CampaignPoisonHandlerJob.cs</span>
+        <span class="file-change">Add <code>CAMPAIGN_FAILED</code> notification after marking campaign Failed <span class="badge badge-mod">mod</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">wa_api/.../Campaigns/Jobs/CampaignLaunchJob.cs</span>
+        <span class="file-change">Add <code>CAMPAIGN_FAILED</code> notification in fire-time quota-fail branch (PAS-13) <span class="badge badge-mod">mod</span></span>
+      </div>
+      <div class="file-row file-new">
+        <span class="file-path">wa_api/.../Notifications/NotificationsController.cs</span>
+        <span class="file-change">GET list, PATCH read, PATCH read-all REST endpoints <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">wa_api/wa_api/Program.cs</span>
+        <span class="file-change">Register <code>QuotaWarningCheckerJob</code> recurring job + DI for <code>INotificationService</code> <span class="badge badge-mod">mod</span></span>
+      </div>
+      <div class="file-row file-new">
+        <span class="file-path">wa_web/hooks/use-notifications.ts</span>
+        <span class="file-change">React Query hook — fetch, SignalR listener, markRead, markAllRead mutations <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row file-new">
+        <span class="file-path">wa_web/components/notifications/NotificationBell.tsx</span>
+        <span class="file-change">Bell icon + unread badge count button <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row file-new">
+        <span class="file-path">wa_web/components/notifications/NotificationPanel.tsx</span>
+        <span class="file-change">Slide-over panel — notification list, mark-all-read, card click to mark read <span class="badge badge-new">new</span></span>
+      </div>
+      <div class="file-row">
+        <span class="file-path">wa_web/components/layout/TopNav.tsx</span>
+        <span class="file-change">Mount <code>&lt;NotificationBell /&gt;</code> in the nav bar <span class="badge badge-mod">mod</span></span>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <!-- OUT OF SCOPE -->
+  <section>
+    <h2>Out of Scope</h2>
+    <ul>
+      <li>Email / SMS delivery of notifications — in-app + SignalR only for this ticket</li>
+      <li>Quota warning for <code>Recurring</code> campaigns — fire times are unknown (infinite recurrence)</li>
+      <li>User-configurable notification preferences (mute, thresholds) — not requested</li>
+      <li>SuperAdmin cross-company notification view</li>
+      <li>Notification deletion — notifications are kept as audit trail</li>
+      <li>Marking individual recipients as warning-acknowledged</li>
+    </ul>
+  </section>
+
+  <footer class="plan-footer">
+    <span>Generated 19 Jun 2025</span>
+    <span>bitlabs-whatsapp-crm-v1-2026</span>
+  </footer>
+
+</div>
+</body>
+</html>

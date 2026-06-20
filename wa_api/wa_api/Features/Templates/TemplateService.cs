@@ -3,6 +3,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Errors;
+using wa_api.Features.Notifications;
+using wa_api.Features.Notifications.Entities;
 using wa_api.Features.Templates.Dtos;
 using wa_api.Features.Templates.Entities;
 using wa_api.Features.WhatsApp.Entities;
@@ -10,7 +12,7 @@ using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.Templates;
 
-public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta) : ITemplateService
+public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, INotificationService notifications) : ITemplateService
 {
     public async Task<(IReadOnlyList<TemplateResponse> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, string? status, string? sortBy, string? sortOrder,
@@ -195,8 +197,17 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta) 
         var status = await meta.GetStatusAsync(template.MetaTemplateId, template.WabaConnection.EncryptedAccessToken, ct);
         if (status is not null)
         {
+            var prevStatus = template.Status;
             TemplateStatusMapper.Apply(template, status, DateTime.UtcNow);
             await db.SaveChangesAsync(ct);
+
+            if (prevStatus != TemplateStatus.Approved && template.Status == TemplateStatus.Approved)
+                await notifications.CreateAsync(
+                    template.CompanyId, null, template.Id,
+                    NotificationType.TemplateApproved,
+                    $"Template \"{template.Name}\" has been approved",
+                    "Your WhatsApp template is ready to use in campaigns.",
+                    ct);
         }
 
         return Map(template, template.WabaConnection.DisplayPhoneNumber);

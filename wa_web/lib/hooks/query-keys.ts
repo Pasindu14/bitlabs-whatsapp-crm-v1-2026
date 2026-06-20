@@ -140,6 +140,13 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.campaigns.details(), id] as const,
   },
 
+  // Notifications (CompanyAdmin — in-app notification feed)
+  notifications: {
+    all: ['notifications'] as const,
+    lists: () => [...queryKeys.notifications.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.notifications.lists(), filters] as const,
+  },
+
   // Stats/Analytics
   stats: {
     all: ['stats'] as const,

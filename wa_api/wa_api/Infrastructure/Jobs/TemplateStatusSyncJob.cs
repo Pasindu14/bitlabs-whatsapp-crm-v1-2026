@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using wa_api.Features.Notifications;
+using wa_api.Features.Notifications.Entities;
 using wa_api.Features.Templates;
 using wa_api.Features.Templates.Entities;
 using wa_api.Infrastructure.Persistence;
@@ -17,6 +19,7 @@ public class TemplateStatusSyncJob(IServiceScopeFactory scopeFactory, ILogger<Te
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var meta = scope.ServiceProvider.GetRequiredService<IMetaTemplateClient>();
+        var notifier = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
         // Only non-terminal templates need polling; include the connection for its access token.
         var pending = await db.Templates
@@ -33,6 +36,7 @@ public class TemplateStatusSyncJob(IServiceScopeFactory scopeFactory, ILogger<Te
 
         logger.LogInformation("TemplateStatusSync: polling {Count} pending template(s).", pending.Count);
         var now = DateTime.UtcNow;
+        var newlyApproved = new List<Template>();
 
         foreach (var t in pending)
         {
@@ -43,12 +47,23 @@ public class TemplateStatusSyncJob(IServiceScopeFactory scopeFactory, ILogger<Te
             if (status is null)
                 continue;   // transient/auth error — retry next cycle
 
+            var prevStatus = t.Status;
             TemplateStatusMapper.Apply(t, status, now);
             if (t.Status != TemplateStatus.Pending)
                 logger.LogInformation("TemplateStatusSync: {Name} ({Lang}) → {Status}", t.Name, t.Language, t.Status);
+            if (prevStatus != TemplateStatus.Approved && t.Status == TemplateStatus.Approved)
+                newlyApproved.Add(t);
         }
 
         await db.SaveChangesAsync();
+
+        foreach (var t in newlyApproved)
+            await notifier.CreateAsync(
+                t.CompanyId, null, t.Id,
+                NotificationType.TemplateApproved,
+                $"Template \"{t.Name}\" has been approved",
+                "Your WhatsApp template is ready to use in campaigns.");
+
         logger.LogInformation("TemplateStatusSync: finished at {Time:o}.", now);
     }
 }

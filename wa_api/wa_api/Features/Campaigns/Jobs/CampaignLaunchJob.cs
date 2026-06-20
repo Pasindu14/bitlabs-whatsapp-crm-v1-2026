@@ -1,6 +1,8 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Campaigns.Entities;
+using wa_api.Features.Notifications;
+using wa_api.Features.Notifications.Entities;
 using wa_api.Features.Templates.Entities;
 using wa_api.Infrastructure.Persistence;
 
@@ -22,6 +24,7 @@ public class CampaignLaunchJob(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var notifier = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
         var campaign = await db.Campaigns
             .IgnoreQueryFilters()
@@ -47,6 +50,14 @@ public class CampaignLaunchJob(
                 campaignId, campaign.TemplateId, campaign.Template.Status);
             campaign.Status = CampaignStatus.Failed;
             await db.SaveChangesAsync(ct);
+            await notifier.CreateAsync(
+                campaign.CompanyId,
+                campaign.Id,
+                null,
+                NotificationType.CampaignFailed,
+                $"Campaign \"{campaign.Name}\" failed to launch",
+                $"Template is not approved (status: {campaign.Template.Status}). Update the template and re-launch.",
+                ct);
             return;
         }
 

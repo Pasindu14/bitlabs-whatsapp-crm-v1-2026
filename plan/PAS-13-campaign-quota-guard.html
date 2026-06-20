@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAS-13 — Campaign Quota Guard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f8fa; --surface: #ffffff; --surface-alt: #f0f2f6;
+      --border: #e2e6ee; --text: #1a1d23; --text-muted: #6b7280;
+      --accent: #4f6ef7; --accent-soft: #eef0fd;
+      --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --tag-bg: #e8ebf5; --tag-text: #3b4a80;
+      --radius: 10px; --font: 'Jost', system-ui, sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    }
+    body { font-family: var(--font); font-size: 15px; line-height: 1.7;
+           color: var(--text); background: var(--bg); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .page { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    .plan-header { margin-bottom: 40px; }
+    .plan-tag { display: inline-block; background: var(--tag-bg); color: var(--tag-text);
+                font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+                padding: 4px 10px; border-radius: 20px; margin-bottom: 14px; }
+    .plan-title { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .plan-subtitle { margin-top: 10px; color: var(--text-muted); font-size: 15px; }
+    .plan-meta { display: flex; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+    .plan-meta-item { font-size: 13px; color: var(--text-muted); }
+    .plan-meta-item strong { color: var(--text); font-weight: 600; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+    h2 { font-size: 18px; font-weight: 700; color: var(--text); margin: 36px 0 14px; }
+    h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 24px 0 10px; }
+
+    p { margin-bottom: 12px; }
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; }
+    li::marker { color: var(--accent); }
+
+    .step { background: var(--surface); border: 1px solid var(--border);
+             border-radius: var(--radius); padding: 24px 28px; margin-bottom: 18px; }
+    .step-label { font-size: 11px; font-weight: 700; letter-spacing: .08em;
+                  text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+    .step-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+    .step-file { display: inline-flex; align-items: center; gap: 6px;
+                 background: var(--surface-alt); border: 1px solid var(--border);
+                 border-radius: 6px; padding: 4px 10px; font-size: 12px; font-family: var(--mono);
+                 color: var(--text-muted); margin-bottom: 14px; }
+
+    pre { background: var(--surface-alt); border: 1px solid var(--border);
+          border-radius: 8px; padding: 16px 18px; overflow-x: auto;
+          font-family: var(--mono); font-size: 13px; line-height: 1.6;
+          color: var(--text); margin: 14px 0; }
+    code { font-family: var(--mono); font-size: 13px;
+           background: var(--surface-alt); padding: 2px 5px; border-radius: 4px; }
+    pre code { background: none; padding: 0; }
+
+    .table-wrap { overflow-x: auto; margin: 16px 0; border-radius: var(--radius);
+                   border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th { background: var(--surface-alt); font-weight: 600; text-align: left;
+               padding: 10px 14px; border-bottom: 1px solid var(--border);
+               color: var(--text-muted); font-size: 12px; letter-spacing: .04em;
+               text-transform: uppercase; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-alt); }
+
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-soft);
+               border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 14px; }
+    .callout.warning { border-color: var(--warning); background: #fef9ec; }
+    .callout.danger  { border-color: var(--danger);  background: #fef2f2; }
+
+    .order-list { list-style: none; padding: 0; margin: 0; }
+    .order-item { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0;
+                  border-bottom: 1px solid var(--border); }
+    .order-item:last-child { border-bottom: none; }
+    .order-num { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+                 background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+                 display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+    .order-body { flex: 1; }
+    .order-title { font-weight: 600; margin-bottom: 2px; }
+    .order-desc  { font-size: 13px; color: var(--text-muted); }
+
+    .files-grid { display: grid; gap: 8px; margin-top: 12px; }
+    .file-row { display: flex; gap: 12px; align-items: flex-start; background: var(--surface);
+                border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+    .file-path { font-family: var(--mono); font-size: 12px; color: var(--accent);
+                 font-weight: 500; flex-shrink: 0; min-width: 0; word-break: break-all; }
+    .file-change { font-size: 13px; color: var(--text-muted); }
+
+    .gap-table { display: grid; grid-template-columns: auto 1fr 1fr 1fr; gap: 0;
+                 border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; margin: 16px 0; }
+
+    .plan-footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border);
+                   font-size: 12px; color: var(--text-muted); display: flex;
+                   justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+    strong { font-weight: 600; }
+    em { font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- HEADER -->
+    <header class="plan-header">
+      <div class="plan-tag">PAS-13 · Implementation Plan</div>
+      <h1 class="plan-title">Campaign Quota Guard</h1>
+      <p class="plan-subtitle">
+        Block a campaign launch when the company's remaining message quota is less than
+        the total recipient count. Fix usage tracking so the counter actually increments.
+      </p>
+      <div class="plan-meta">
+        <div class="plan-meta-item"><strong>Status</strong> Draft</div>
+        <div class="plan-meta-item"><strong>Steps</strong> 5</div>
+        <div class="plan-meta-item"><strong>Priority</strong> High</div>
+        <div class="plan-meta-item"><strong>Scope</strong> API + Hangfire + Frontend</div>
+      </div>
+    </header>
+
+    <hr>
+
+    <!-- BACKGROUND -->
+    <section>
+      <h2>Background &amp; Root Cause</h2>
+      <p>
+        The <code>POST /api/v1/campaigns/{id}/launch</code> endpoint carries
+        <code>[RequireActiveSubscription]</code>, which checks that an active subscription
+        exists and that <code>MessagesUsedThisPeriod &lt; MonthlyMessageQuota</code> — but it
+        only checks whether <em>at least one</em> message can be sent. It does <strong>not</strong>
+        compare the full recipient count against the remaining quota.
+      </p>
+      <p>There are two gaps:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Gap</th><th>Location</th><th>Effect</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>A</strong></td>
+              <td>No pre-flight quota check at launch</td>
+              <td><code>CampaignService.LaunchAsync</code></td>
+              <td>A 5,000-recipient campaign launches even with 100 messages left</td>
+            </tr>
+            <tr>
+              <td><strong>B</strong></td>
+              <td>Campaign sends never increment usage</td>
+              <td><code>CampaignBatchSendJob</code></td>
+              <td>Quota counter stays at zero for all campaign traffic</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout warning">
+        Gap B must be fixed first because it is a data-correctness issue that also powers Gap A's check.
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- DECISIONS -->
+    <section>
+      <h2>Decisions</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Topic</th><th>Decision</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>When to check</td><td>At <code>LaunchAsync</code>, <strong>before</strong> any Hangfire job is enqueued — both Immediate and Scheduled/Recurring</td></tr>
+            <tr><td>What to count</td><td>Distinct recipients: union of all targeted contact-list members + individually selected contacts, deduped (same logic as <code>CampaignLaunchJob</code>)</td></tr>
+            <tr><td>Quota formula</td><td><code>remaining = Plan.MonthlyMessageQuota − MessagesUsedThisPeriod</code></td></tr>
+            <tr><td>Block condition</td><td><code>totalRecipients &gt; remaining</code> → throw <code>BusinessRuleException("INSUFFICIENT_QUOTA", ...)</code></td></tr>
+            <tr><td>Scheduled campaigns (fire-time)</td><td>Re-check inside <code>CampaignLaunchJob</code> at fire time; if quota now insufficient → mark campaign <code>Failed</code> with <code>FailureReason = "INSUFFICIENT_QUOTA_AT_FIRE_TIME"</code></td></tr>
+            <tr><td>Usage tracking</td><td>Batch-increment <code>MessagesUsedThisPeriod</code> once per 50-record batch (not per message) for performance</td></tr>
+            <tr><td>Resume guard</td><td>Check remaining Queued recipients vs quota on resume — optional but low-risk</td></tr>
+            <tr><td>SuperAdmin</td><td>Inherits existing bypass in <code>SubscriptionGate</code> — no changes needed</td></tr>
+            <tr><td>Error code</td><td>Reuse <code>INSUFFICIENT_QUOTA</code> (already used by <code>SubscriptionGate</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- STEPS -->
+    <section>
+      <h2>Implementation Steps</h2>
+
+      <!-- Step 1 -->
+      <div class="step">
+        <div class="step-label">Step 1 — Fix First</div>
+        <div class="step-title">Track usage inside <code>CampaignBatchSendJob</code></div>
+        <div class="step-file">📄 wa_api/wa_api/Features/Campaigns/Jobs/CampaignBatchSendJob.cs</div>
+        <p>After the per-batch loop completes, add a <strong>single batch increment</strong> to the company's subscription:</p>
+        <pre><code>// after processing each batch of 50:
+int successCount = batchResults.Count(r => r.Status == RecipientStatus.Sent);
+if (successCount > 0)
+    await IncrementSubscriptionUsageAsync(campaign.CompanyId, successCount, ct);</code></pre>
+        <p>Implement <code>IncrementSubscriptionUsageAsync</code> following the same pattern as <code>WhatsAppMessageSender.cs</code> lines 64–75:</p>
+        <ol>
+          <li>Load the active subscription for <code>companyId</code> (ignore query filters — job has no tenant context).</li>
+          <li><code>sub.MessagesUsedThisPeriod += delta</code></li>
+          <li><code>await db.SaveChangesAsync(ct)</code></li>
+        </ol>
+        <p>Inject the same <code>AppDbContext</code> already in scope. No new service needed.</p>
+        <div class="callout">
+          <strong>Why batch, not per-message:</strong> one DB round-trip per 50 messages instead of 50 — reduces lock contention at high volume without sacrificing correctness (worst-case drift = 49 unrecorded messages if the process crashes mid-batch, which is acceptable).
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step">
+        <div class="step-label">Step 2 — Core Requirement</div>
+        <div class="step-title">Pre-flight quota check in <code>LaunchAsync</code></div>
+        <div class="step-file">📄 wa_api/wa_api/Features/Campaigns/CampaignService.cs</div>
+        <p>In <code>LaunchAsync</code> (~line 150, after "has at least one recipient" validation):</p>
+        <pre><code>// 1. Count distinct recipients (same dedup logic as CampaignLaunchJob)
+var recipientIds = await ResolveDistinctRecipientIdsAsync(campaign, ct);
+int totalRecipients = recipientIds.Count;
+
+// 2. Load subscription + plan
+var sub = await db.Subscriptions
+    .Include(s => s.Plan)
+    .IgnoreQueryFilters()
+    .FirstOrDefaultAsync(s => s.CompanyId == campaign.CompanyId && s.IsActive, ct)
+    ?? throw new BusinessRuleException("NO_ACTIVE_SUBSCRIPTION", "No active subscription found.");
+
+// 3. Check remaining quota
+int remaining = sub.Plan.MonthlyMessageQuota - sub.MessagesUsedThisPeriod;
+if (totalRecipients > remaining)
+    throw new BusinessRuleException(
+        "INSUFFICIENT_QUOTA",
+        $"Campaign requires {totalRecipients} messages but only {remaining} remain in your quota.");</code></pre>
+        <p>Extract the recipient-resolution logic into a private <code>ResolveDistinctRecipientIdsAsync</code> helper (reused by both <code>LaunchAsync</code> and later by <code>CampaignLaunchJob</code>). This blocks <strong>all</strong> schedule types before any job is enqueued.</p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step">
+        <div class="step-label">Step 3 — Safety Net</div>
+        <div class="step-title">Re-check quota at Hangfire fire time</div>
+        <div class="step-file">📄 wa_api/wa_api/Features/Campaigns/Jobs/CampaignLaunchJob.cs</div>
+        <p>In <code>RunAsync</code> (start of method, before snapshotting contacts) — a OneTime campaign scheduled for tomorrow may fire when quota has changed:</p>
+        <pre><code>var sub = await db.Subscriptions
+    .Include(s => s.Plan)
+    .IgnoreQueryFilters()
+    .FirstOrDefaultAsync(s => s.CompanyId == campaign.CompanyId && s.IsActive, ct);
+
+int remaining = sub?.Plan.MonthlyMessageQuota - sub?.MessagesUsedThisPeriod ?? 0;
+
+var recipientIds = await ResolveDistinctRecipientIdsAsync(campaign, ct);
+if (recipientIds.Count > remaining)
+{
+    campaign.Status = CampaignStatus.Failed;
+    campaign.FailureReason = "INSUFFICIENT_QUOTA_AT_FIRE_TIME";
+    campaign.CompletedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync(ct);
+    return; // abort — do not enqueue CampaignBatchSendJob
+}</code></pre>
+        <div class="callout warning">
+          The <code>FailureReason</code> column needs a new migration if not already present on the <code>Campaign</code> entity.
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step">
+        <div class="step-label">Step 4 — UX Polish</div>
+        <div class="step-title">Frontend error surface</div>
+        <div class="step-file">📄 wa_web/features/campaigns/hooks/use-campaigns.ts</div>
+        <p>In <code>useLaunchCampaign</code> (~line 164), map <code>INSUFFICIENT_QUOTA</code> to a human-readable toast:</p>
+        <pre><code>onError: (error) => {
+  if (error.code === "INSUFFICIENT_QUOTA") {
+    toast.error(error.message); // backend message already includes the numbers
+  } else {
+    toast.error("Failed to launch campaign.");
+  }
+}</code></pre>
+        <div class="step-file" style="margin-top:16px;">📄 wa_web/features/campaigns/components/campaign-dialogs.tsx</div>
+        <p>In the launch confirmation dialog, optionally surface a quota preview: <em>"This campaign will send to {n} contacts. You have {remaining} messages remaining."</em> (data comes from <code>GET /api/v1/subscriptions/me</code> or existing quota endpoint.)</p>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="step">
+        <div class="step-label">Step 5 — Optional</div>
+        <div class="step-title">Resume guard</div>
+        <div class="step-file">📄 wa_api/wa_api/Features/Campaigns/CampaignService.cs</div>
+        <p>In <code>ResumeAsync</code> (~line 210, before setting status back to <code>Running</code>):</p>
+        <pre><code>int queuedCount = await db.CampaignRecipients
+    .Where(r => r.CampaignId == campaign.Id && r.Status == RecipientStatus.Queued)
+    .CountAsync(ct);
+
+if (queuedCount > remaining)
+    throw new BusinessRuleException(
+        "INSUFFICIENT_QUOTA",
+        $"Campaign has {queuedCount} messages left to send but only {remaining} remain in quota.");</code></pre>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- IMPLEMENTATION ORDER -->
+    <section>
+      <h2>Implementation Order</h2>
+      <ul class="order-list">
+        <li class="order-item">
+          <div class="order-num">1</div>
+          <div class="order-body">
+            <div class="order-title">Usage tracking in <code>CampaignBatchSendJob</code></div>
+            <div class="order-desc">Fixes data integrity first; unblocks Steps 2 &amp; 3 which depend on an accurate counter</div>
+          </div>
+        </li>
+        <li class="order-item">
+          <div class="order-num">2</div>
+          <div class="order-body">
+            <div class="order-title">Pre-flight check in <code>LaunchAsync</code></div>
+            <div class="order-desc">Core ticket requirement — blocks over-quota launches before jobs are enqueued</div>
+          </div>
+        </li>
+        <li class="order-item">
+          <div class="order-num">3</div>
+          <div class="order-body">
+            <div class="order-title">Fire-time check in <code>CampaignLaunchJob</code></div>
+            <div class="order-desc">Safety net for scheduled campaigns that may fire after quota changes</div>
+          </div>
+        </li>
+        <li class="order-item">
+          <div class="order-num">4</div>
+          <div class="order-body">
+            <div class="order-title">Frontend error mapping</div>
+            <div class="order-desc">UX polish — surfaces the quota error as a readable toast message</div>
+          </div>
+        </li>
+        <li class="order-item">
+          <div class="order-num">5</div>
+          <div class="order-body">
+            <div class="order-title">Resume guard <em>(optional)</em></div>
+            <div class="order-desc">Low-risk extra check on campaign resume; implement if time permits</div>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <hr>
+
+    <!-- FILES TOUCHED -->
+    <section>
+      <h2>Files Touched</h2>
+      <div class="files-grid">
+        <div class="file-row">
+          <span class="file-path">wa_api/.../Campaigns/Jobs/CampaignBatchSendJob.cs</span>
+          <span class="file-change">Add batch usage increment</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">wa_api/.../Campaigns/CampaignService.cs</span>
+          <span class="file-change">Add pre-flight check + resume guard + shared recipient helper</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">wa_api/.../Campaigns/Jobs/CampaignLaunchJob.cs</span>
+          <span class="file-change">Add fire-time re-check</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">wa_api/.../Campaigns/Entities/Campaign.cs</span>
+          <span class="file-change">Add <code>FailureReason</code> string property</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">wa_api/.../Migrations/</span>
+          <span class="file-change">New migration for <code>FailureReason</code> column</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">wa_web/.../campaigns/hooks/use-campaigns.ts</span>
+          <span class="file-change">Map <code>INSUFFICIENT_QUOTA</code> error to toast</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">wa_web/.../campaigns/components/campaign-dialogs.tsx</span>
+          <span class="file-change">Optional quota preview in launch confirmation dialog</span>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- OUT OF SCOPE -->
+    <section>
+      <h2>Out of Scope</h2>
+      <ul>
+        <li>Quota reservation / pre-deduction at launch time (overkill — check-then-fire is sufficient)</li>
+        <li>Partial-send logic ("send as many as quota allows") — not requested, adds complexity</li>
+        <li>Recurring campaign per-recurrence quota check beyond the fire-time check in Step 3</li>
+      </ul>
+    </section>
+
+    <footer class="plan-footer">
+      <span>Generated 19 Jun 2025</span>
+      <span>bitlabs-whatsapp-crm-v1-2026</span>
+    </footer>
+  </div>
+</body>
+</html>
