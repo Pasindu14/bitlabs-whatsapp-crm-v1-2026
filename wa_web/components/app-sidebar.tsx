@@ -1,5 +1,6 @@
 "use client";
 import {
+  BarChart3,
   Building2,
   LayoutDashboard,
   MessageCircle,
@@ -58,6 +59,7 @@ const navConfig: NavGroup[] = [
       { title: "Plans", url: "/superadmin/plans" },
       { title: "Subscriptions", url: "/superadmin/subscriptions" },
       { title: "Users", url: "/superadmin/users" },
+      { title: "Monitoring", url: "/superadmin/monitoring" },
     ],
   },
   // ── Company workspace (CompanyAdmin / Agent) ───────────────────
@@ -77,6 +79,16 @@ const navConfig: NavGroup[] = [
     ],
   },
   {
+    title: "Analytics",
+    url: "#",
+    icon: BarChart3,
+    isActive: false,
+    roles: ["CompanyAdmin"],
+    items: [
+      { title: "Reports", url: "/analytics" },
+    ],
+  },
+  {
     title: "Company Settings",
     url: "#",
     icon: Users,
@@ -85,6 +97,7 @@ const navConfig: NavGroup[] = [
     items: [
       { title: "Team", url: "/team" },
       { title: "Connections", url: "/connections" },
+      { title: "Subscription", url: "/my-subscription" },
     ],
   },
 ];

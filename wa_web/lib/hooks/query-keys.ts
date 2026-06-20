@@ -153,4 +153,18 @@ export const queryKeys = {
     dashboard: () => [...queryKeys.stats.all, 'dashboard'] as const,
     inventory: () => [...queryKeys.stats.all, 'inventory'] as const,
   },
+
+  // Monitoring (Phase 10.2 — SuperAdmin cross-tenant health dashboard)
+  monitoring: {
+    all: ['monitoring'] as const,
+    companyHealth: () => [...queryKeys.monitoring.all, 'company-health'] as const,
+  },
+
+  // Analytics (Phase 9 — message metrics, campaign performance, cost analytics)
+  analytics: {
+    all: ['analytics'] as const,
+    messages: (from?: string, to?: string) => [...queryKeys.analytics.all, 'messages', { from, to }] as const,
+    campaigns: (from?: string, to?: string) => [...queryKeys.analytics.all, 'campaigns', { from, to }] as const,
+    costs: (from?: string, to?: string) => [...queryKeys.analytics.all, 'costs', { from, to }] as const,
+  },
 } as const

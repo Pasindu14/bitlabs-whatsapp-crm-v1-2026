@@ -125,6 +125,8 @@ try
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignPoisonHandlerJob>();
     builder.Services.AddScoped<wa_api.Features.Notifications.INotificationService, wa_api.Features.Notifications.NotificationService>();
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>();
+    builder.Services.AddScoped<wa_api.Features.Analytics.AnalyticsService>();
+    builder.Services.AddScoped<wa_api.Features.Monitoring.MonitoringService>();
 
     // ── Webhooks (Meta inbound: template status 5.2 + delivery status 6.4; inbound stub → Phase 7) ──
     builder.Services.AddScoped<wa_api.Features.Webhooks.Signature.IMetaSignatureVerifier, wa_api.Features.Webhooks.Signature.MetaSignatureVerifier>();
