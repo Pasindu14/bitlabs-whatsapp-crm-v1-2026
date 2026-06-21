@@ -139,7 +139,7 @@ public class CampaignService(
     public async Task<CampaignResponse> LaunchAsync(Guid id, CancellationToken ct = default)
     {
         var campaign = await db.Campaigns
-            .Include(c => c.Template)
+            .Include(c => c.Template).ThenInclude(t => t.WabaConnection)
             .FirstOrDefaultAsync(c => c.Id == id, ct)
             ?? throw new NotFoundException("Campaign", id);
 
@@ -150,6 +150,11 @@ public class CampaignService(
         if (campaign.Template.Status != TemplateStatus.Approved)
             throw new BusinessRuleException("TEMPLATE_NOT_APPROVED",
                 "The campaign template must be Approved before launching.");
+
+        if (campaign.Template.WabaConnection.QualityRating == "RED")
+            throw new BusinessRuleException("WABA_QUALITY_RED",
+                "Cannot launch campaign — your WhatsApp number has a RED quality rating. "
+                + "Resolve the account quality issues in Meta Business Suite before sending.");
 
         var hasTargets = await db.CampaignContactLists.AnyAsync(x => x.CampaignId == id, ct)
             || await db.CampaignContacts.AnyAsync(x => x.CampaignId == id, ct);

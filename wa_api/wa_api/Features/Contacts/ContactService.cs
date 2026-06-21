@@ -42,7 +42,8 @@ public class ContactService(AppDbContext db) : IContactService
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(c => new ContactResponse(c.Id, c.Phone, c.Name, c.IsActive, c.CreatedAt))
+            .Select(c => new ContactResponse(c.Id, c.Phone, c.Name, c.IsActive,
+                c.IsOptedOut, c.OptedOutAt, c.HasOptedIn, c.OptedInAt, c.CreatedAt))
             .ToListAsync(ct);
 
         return (items, total);
@@ -69,6 +70,8 @@ public class ContactService(AppDbContext db) : IContactService
         {
             Phone = phone,
             Name = request.Name.Trim(),
+            HasOptedIn = request.HasOptedIn,
+            OptedInAt = request.HasOptedIn ? DateTime.UtcNow : null,
             // CompanyId is auto-stamped from tenant context by AuditInterceptor on insert.
         };
         db.Contacts.Add(contact);
@@ -91,6 +94,20 @@ public class ContactService(AppDbContext db) : IContactService
 
         contact.Phone = phone;
         contact.Name = request.Name.Trim();
+
+        if (request.HasOptedIn.HasValue)
+        {
+            if (request.HasOptedIn.Value && !contact.HasOptedIn)
+            {
+                contact.HasOptedIn = true;
+                contact.OptedInAt = DateTime.UtcNow;
+            }
+            else if (!request.HasOptedIn.Value)
+            {
+                contact.HasOptedIn = false;
+            }
+        }
+
         await db.SaveChangesAsync(ct);
 
         return Map(contact);
@@ -116,5 +133,5 @@ public class ContactService(AppDbContext db) : IContactService
         => new(phone.Where(char.IsDigit).ToArray());
 
     private static ContactResponse Map(Contact c)
-        => new(c.Id, c.Phone, c.Name, c.IsActive, c.CreatedAt);
+        => new(c.Id, c.Phone, c.Name, c.IsActive, c.IsOptedOut, c.OptedOutAt, c.HasOptedIn, c.OptedInAt, c.CreatedAt);
 }

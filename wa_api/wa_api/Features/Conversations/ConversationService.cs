@@ -113,6 +113,10 @@ public class ConversationService(
             throw new BusinessRuleException("WABA_INACTIVE",
                 "The WhatsApp connection for this conversation is inactive.");
 
+        // Opted-out contacts: warn only — the UI surfaces IsOptedOut from ContactResponse so
+        // agents can proceed deliberately (e.g. support replies after a marketing STOP).
+        // Only campaign / business-initiated sends are hard-blocked.
+
         // 24-hour customer-service window pre-check. Meta's 131047 is the authoritative backstop, but
         // pre-checking gives a clean error + a disabled composer instead of a wasted API round-trip.
         if (conversation.WindowExpiresAt is null || conversation.WindowExpiresAt <= DateTime.UtcNow)

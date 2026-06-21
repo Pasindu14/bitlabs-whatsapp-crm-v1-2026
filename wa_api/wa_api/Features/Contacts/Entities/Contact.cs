@@ -27,4 +27,23 @@ public class Contact : BaseEntity, ITenantEntity
 
     /// <summary>Display name.</summary>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// True when the contact opted out (replied STOP / unsubscribe). Suppresses all outbound sends.
+    /// Set automatically by InboundMessageWebhookHandler on stop-intent keywords.
+    /// </summary>
+    public bool IsOptedOut { get; set; } = false;
+
+    /// <summary>UTC timestamp of the most recent opt-out request.</summary>
+    public DateTime? OptedOutAt { get; set; }
+
+    /// <summary>
+    /// True when the contact has given explicit opt-in consent to receive business-initiated messages
+    /// (campaigns/templates). Required by Meta policy. Defaults to false — must be explicitly set.
+    /// Reset to false automatically when IsOptedOut is set.
+    /// </summary>
+    public bool HasOptedIn { get; set; } = false;
+
+    /// <summary>UTC timestamp of the most recent opt-in consent grant.</summary>
+    public DateTime? OptedInAt { get; set; }
 }

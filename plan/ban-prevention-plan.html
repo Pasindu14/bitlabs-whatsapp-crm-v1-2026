@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Account Ban Prevention — Implementation Plan</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f8fa; --surface: #ffffff; --surface-alt: #f0f2f6;
+      --border: #e2e6ee; --text: #1a1d23; --text-muted: #6b7280;
+      --accent: #4f6ef7; --accent-soft: #eef0fd;
+      --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --tag-bg: #e8ebf5; --tag-text: #3b4a80;
+      --radius: 10px; --font: 'Jost', system-ui, sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    }
+    body { font-family: var(--font); font-size: 15px; line-height: 1.7;
+           color: var(--text); background: var(--bg); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .page { max-width: 860px; margin: 0 auto; padding: 48px 24px 80px; }
+    .plan-header { margin-bottom: 40px; }
+    .plan-tag { display: inline-block; background: var(--tag-bg); color: var(--tag-text);
+                font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+                padding: 4px 10px; border-radius: 20px; margin-bottom: 14px; }
+    .plan-title { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .plan-subtitle { margin-top: 10px; color: var(--text-muted); font-size: 15px; }
+    .plan-meta { display: flex; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+    .plan-meta-item { font-size: 13px; color: var(--text-muted); }
+    .plan-meta-item strong { color: var(--text); font-weight: 600; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+    h2 { font-size: 18px; font-weight: 700; color: var(--text); margin: 36px 0 14px; }
+    h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 24px 0 10px; }
+    p { margin-bottom: 12px; }
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; }
+    li::marker { color: var(--accent); }
+    .phase { margin-bottom: 40px; }
+    .phase-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+                     padding: 14px 20px; background: var(--surface);
+                     border: 1px solid var(--border); border-radius: var(--radius); }
+    .phase-num { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+                 background: var(--accent); color: #fff; font-size: 14px; font-weight: 700;
+                 display: flex; align-items: center; justify-content: center; }
+    .phase-info { flex: 1; }
+    .phase-title { font-size: 16px; font-weight: 700; }
+    .phase-desc { font-size: 13px; color: var(--text-muted); }
+    .step { background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 24px 28px; margin-bottom: 14px; }
+    .step-label { font-size: 11px; font-weight: 700; letter-spacing: .08em;
+                  text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+    .step-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+    .step-file { display: inline-flex; align-items: center; gap: 6px;
+                 background: var(--surface-alt); border: 1px solid var(--border);
+                 border-radius: 6px; padding: 4px 10px; font-size: 12px; font-family: var(--mono);
+                 color: var(--text-muted); margin-bottom: 14px; margin-right: 6px; }
+    pre { background: var(--surface-alt); border: 1px solid var(--border);
+          border-radius: 8px; padding: 16px 18px; overflow-x: auto;
+          font-family: var(--mono); font-size: 13px; line-height: 1.6;
+          color: var(--text); margin: 14px 0; }
+    code { font-family: var(--mono); font-size: 13px;
+           background: var(--surface-alt); padding: 2px 5px; border-radius: 4px; }
+    pre code { background: none; padding: 0; }
+    .table-wrap { overflow-x: auto; margin: 16px 0; border-radius: var(--radius);
+                   border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th { background: var(--surface-alt); font-weight: 600; text-align: left;
+               padding: 10px 14px; border-bottom: 1px solid var(--border);
+               color: var(--text-muted); font-size: 12px; letter-spacing: .04em;
+               text-transform: uppercase; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-alt); }
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-soft);
+               border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0;
+               font-size: 14px; }
+    .callout.warning { border-color: var(--warning); background: #fef9ec; }
+    .callout.danger  { border-color: var(--danger);  background: #fef2f2; }
+    .callout.success { border-color: var(--success);  background: #f0fdf4; }
+    .order-list { list-style: none; padding: 0; margin: 0; }
+    .order-item { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0;
+                  border-bottom: 1px solid var(--border); }
+    .order-item:last-child { border-bottom: none; }
+    .order-num { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+                 background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+                 display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+    .order-body { flex: 1; }
+    .order-title { font-weight: 600; margin-bottom: 2px; }
+    .order-desc  { font-size: 13px; color: var(--text-muted); }
+    .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+             border-radius: 12px; }
+    .badge-blue   { background: var(--accent-soft); color: var(--accent); }
+    .badge-green  { background: #f0fdf4; color: var(--success); }
+    .badge-orange { background: #fef9ec; color: var(--warning); }
+    .badge-red    { background: #fef2f2; color: var(--danger); }
+    .files-grid { display: grid; gap: 8px; margin-top: 12px; }
+    .file-row { display: flex; gap: 12px; align-items: flex-start; background: var(--surface);
+                border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+    .file-path { font-family: var(--mono); font-size: 12px; color: var(--accent);
+                 font-weight: 500; flex-shrink: 0; min-width: 0; word-break: break-all; }
+    .file-change { font-size: 13px; color: var(--text-muted); }
+    .plan-footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border);
+                   font-size: 12px; color: var(--text-muted); display: flex;
+                   justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .gap-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
+    .gap-card { background: var(--surface); border: 1px solid var(--border);
+                border-radius: var(--radius); padding: 16px 18px; }
+    .gap-card.covered { border-left: 3px solid var(--success); }
+    .gap-card.missing { border-left: 3px solid var(--danger); }
+    .gap-card-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+    .gap-card-sub { font-size: 12px; color: var(--text-muted); }
+    @media (max-width: 600px) { .gap-summary { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- HEADER -->
+    <header class="plan-header">
+      <div class="plan-tag">Ban Prevention · Security</div>
+      <h1 class="plan-title">WhatsApp Account Ban Prevention</h1>
+      <p class="plan-subtitle">
+        Four targeted fixes covering opt-out enforcement, policy error halting, quality rating reactions,
+        and opt-in consent — the complete set of vectors that actually restrict a Meta Cloud API account.
+      </p>
+      <div class="plan-meta">
+        <div class="plan-meta-item"><strong>Date</strong> 21 Jun 2026</div>
+        <div class="plan-meta-item"><strong>Phases</strong> 4</div>
+        <div class="plan-meta-item"><strong>Total Steps</strong> 14</div>
+        <div class="plan-meta-item"><strong>Project</strong> bitlabs-whatsapp-crm-v1-2026</div>
+      </div>
+    </header>
+
+    <hr>
+
+    <!-- BACKGROUND -->
+    <section>
+      <h2>Background &amp; Threat Model</h2>
+      <p>
+        This project uses the <strong>official Meta Cloud API</strong> — not Baileys or whatsapp-web.js.
+        That flips the threat model entirely: Meta won't ban for pacing or automation detection.
+        Restriction comes from <strong>policy violations</strong>: user reports, ignored opt-outs,
+        and continued sending after Meta signals account health degradation.
+      </p>
+      <div class="callout warning">
+        <strong>Key insight:</strong> Rate limiting (already implemented) prevents throttles but cannot prevent bans.
+        The actual ban vectors are all about <em>consent and quality signals</em>, not send speed.
+      </div>
+
+      <h3>Current Coverage Audit</h3>
+      <div class="gap-summary">
+        <div class="gap-card covered">
+          <div class="gap-card-title">✅ 24-hour service window</div>
+          <div class="gap-card-sub">Pre-checked in ConversationService; 131047 backstop in sender</div>
+        </div>
+        <div class="gap-card covered">
+          <div class="gap-card-title">✅ Template approval gate</div>
+          <div class="gap-card-sub">CampaignService.LaunchAsync blocks non-Approved templates</div>
+        </div>
+        <div class="gap-card covered">
+          <div class="gap-card-title">✅ Rate limiting / tier caps</div>
+          <div class="gap-card-sub">Dual Redis token bucket — per-second + daily unique recipients</div>
+        </div>
+        <div class="gap-card covered">
+          <div class="gap-card-title">✅ Idempotency / no double-send</div>
+          <div class="gap-card-sub">IdempotencyKey table + RecipientStatus FSM</div>
+        </div>
+        <div class="gap-card missing">
+          <div class="gap-card-title">❌ Opt-out / STOP handling</div>
+          <div class="gap-card-sub">InboundMessageWebhookHandler never detects stop intent</div>
+        </div>
+        <div class="gap-card missing">
+          <div class="gap-card-title">❌ Policy error code halting</div>
+          <div class="gap-card-sub">131048 / 368 / 131031 logged but campaign continues sending</div>
+        </div>
+        <div class="gap-card missing">
+          <div class="gap-card-title">❌ Quality rating reaction</div>
+          <div class="gap-card-sub">QualityRating stored and displayed, never read in send paths</div>
+        </div>
+        <div class="gap-card missing">
+          <div class="gap-card-title">❌ Opt-in consent enforcement</div>
+          <div class="gap-card-sub">Contact entity has no consent field; campaigns skip all contacts</div>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- IMPLEMENTATION ORDER -->
+    <section>
+      <h2>Implementation Order &amp; Rationale</h2>
+      <ul class="order-list">
+        <li class="order-item">
+          <div class="order-num">1</div>
+          <div class="order-body">
+            <div class="order-title">Phase 1 — Opt-out / STOP Detection <span class="badge badge-red">Highest Risk</span></div>
+            <div class="order-desc">
+              Continuing to message a user after they say STOP is a direct policy violation and the #1 trigger
+              for user reports. Pure backend change — no migration dependency. Must land first.
+            </div>
+          </div>
+        </li>
+        <li class="order-item">
+          <div class="order-num">2</div>
+          <div class="order-body">
+            <div class="order-title">Phase 2 — Policy Error Code Halting <span class="badge badge-red">High Risk</span></div>
+            <div class="order-desc">
+              Blind retrying on 131048 (spam rate) or 368 (restricted) worsens account standing.
+              No data model changes needed — this is logic-only in the batch job.
+            </div>
+          </div>
+        </li>
+        <li class="order-item">
+          <div class="order-num">3</div>
+          <div class="order-body">
+            <div class="order-title">Phase 3 — Quality Rating Reaction <span class="badge badge-orange">Medium Risk</span></div>
+            <div class="order-desc">
+              QualityRating is already being fetched — it just needs to be read in the send path.
+              YELLOW throttles throughput; RED blocks business-initiated sends entirely.
+            </div>
+          </div>
+        </li>
+        <li class="order-item">
+          <div class="order-num">4</div>
+          <div class="order-body">
+            <div class="order-title">Phase 4 — Opt-in Consent Enforcement <span class="badge badge-orange">Compliance</span></div>
+            <div class="order-desc">
+              Structural change — adds Contact.HasOptedIn, migration, DTO updates, and campaign enforcement.
+              Done last because it requires the widest surface change and has existing data implications.
+            </div>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <hr>
+
+    <!-- PHASE 1 -->
+    <section class="phase">
+      <div class="phase-heading">
+        <div class="phase-num">1</div>
+        <div class="phase-info">
+          <div class="phase-title">Phase 1 — Opt-out / STOP Detection</div>
+          <div class="phase-desc">Detect stop intent from inbound messages; suppress opted-out contacts in all outbound paths</div>
+        </div>
+        <span class="badge badge-red">Highest Risk</span>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 1.1</div>
+        <div class="step-title">Add IsOptedOut + OptedOutAt to Contact entity</div>
+        <div class="step-file">📄 Features/Contacts/Entities/Contact.cs</div>
+        <p>Add two new fields. <code>IsOptedOut</code> gates all future outbound sends. <code>OptedOutAt</code> records when the user requested suppression for audit purposes.</p>
+        <pre><code>public bool IsOptedOut { get; set; } = false;
+public DateTime? OptedOutAt { get; set; }</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 1.2</div>
+        <div class="step-title">Add EF Core migration for opt-out columns</div>
+        <div class="step-file">📄 Migrations/</div>
+        <p>Run <code>dotnet ef migrations add AddContactOptOut</code> to generate the migration. The columns are nullable / defaulted so existing contacts are unaffected.</p>
+        <pre><code>migrationBuilder.AddColumn&lt;bool&gt;(
+    name: "IsOptedOut",
+    table: "Contacts",
+    nullable: false,
+    defaultValue: false);
+
+migrationBuilder.AddColumn&lt;DateTime&gt;(
+    name: "OptedOutAt",
+    table: "Contacts",
+    nullable: true);</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 1.3</div>
+        <div class="step-title">Update ContactResponse DTO + mapper</div>
+        <div class="step-file">📄 Features/Contacts/Dtos/ContactResponse.cs</div>
+        <div class="step-file">📄 Features/Contacts/ContactService.cs</div>
+        <p>Expose <code>IsOptedOut</code> and <code>OptedOutAt</code> in the API response so the frontend can display a suppression badge. Update all <code>Map(contact)</code> calls.</p>
+        <pre><code>public record ContactResponse(
+    Guid Id,
+    string Phone,
+    string Name,
+    bool IsActive,
+    bool IsOptedOut,
+    DateTime? OptedOutAt,
+    DateTime CreatedAt
+);</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 1.4</div>
+        <div class="step-title">Detect STOP keywords in InboundMessageWebhookHandler</div>
+        <div class="step-file">📄 Features/Webhooks/Handlers/InboundMessageWebhookHandler.cs</div>
+        <p>
+          After building the inbound <code>Message</code>, check the body against a stop-intent keyword list.
+          If matched, set <code>contact.IsOptedOut = true</code> and <code>contact.OptedOutAt = now</code>.
+          This runs inside the existing foreach loop — no extra DB round-trip needed.
+        </p>
+        <pre><code>private static readonly HashSet&lt;string&gt; StopKeywords = new(StringComparer.OrdinalIgnoreCase)
+{
+    "stop", "unsubscribe", "cancel", "quit", "end", "opt out", "optout",
+    "remove me", "no more", "don't contact", "do not contact"
+};
+
+private static bool IsStopIntent(string body)
+{
+    var trimmed = body.Trim();
+    // Exact match or starts-with for short commands like "STOP please"
+    return StopKeywords.Contains(trimmed)
+        || StopKeywords.Any(k => trimmed.StartsWith(k, StringComparison.OrdinalIgnoreCase));
+}
+
+// Inside the foreach (var m in value.Messages!) loop, after building `contact`:
+if (IsStopIntent(body) && !contact.IsOptedOut)
+{
+    contact.IsOptedOut = true;
+    contact.OptedOutAt = now;
+    logger.LogInformation(
+        "Contact {Phone} sent opt-out intent — suppressed from future outbound sends.", phone);
+}</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 1.5</div>
+        <div class="step-title">Skip opted-out contacts in CampaignBatchSendJob</div>
+        <div class="step-file">📄 Features/Campaigns/Jobs/CampaignBatchSendJob.cs</div>
+        <p>
+          Before acquiring a rate-limit permit, check <code>recipient.Contact.IsOptedOut</code>.
+          Mark as <code>RecipientStatus.Skipped</code> with error code <code>OPT_OUT</code> and move to the next recipient.
+          No API call is made — zero cost, zero risk.
+        </p>
+        <pre><code>// At the top of the foreach (var recipient in batch) loop:
+if (recipient.Contact.IsOptedOut)
+{
+    recipient.Status = RecipientStatus.Skipped;
+    recipient.ErrorCode = "OPT_OUT";
+    logger.LogInformation(
+        "Skipping contact {ContactId} — opted out.", recipient.ContactId);
+    continue;
+}</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 1.6</div>
+        <div class="step-title">Block opted-out contacts in ConversationService (live inbox)</div>
+        <div class="step-file">📄 Features/Conversations/ConversationService.cs</div>
+        <p>
+          The live inbox also allows agents to send free-form replies. Check <code>contact.IsOptedOut</code>
+          alongside the existing 24h window check and throw a clean business error if suppressed.
+        </p>
+        <pre><code>if (contact.IsOptedOut)
+    throw new BusinessRuleException("CONTACT_OPTED_OUT",
+        "This contact has opted out of messages. Remove the suppression manually before replying.");</code></pre>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- PHASE 2 -->
+    <section class="phase">
+      <div class="phase-heading">
+        <div class="phase-num">2</div>
+        <div class="phase-info">
+          <div class="phase-title">Phase 2 — Policy Error Code Halting</div>
+          <div class="phase-desc">Detect Meta's account-level restriction codes and stop campaigns before they worsen account standing</div>
+        </div>
+        <span class="badge badge-red">High Risk</span>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 2.1</div>
+        <div class="step-title">Create MetaPolicyErrorCodes constant class</div>
+        <div class="step-file">📄 Features/Messages/MetaPolicyErrorCodes.cs</div>
+        <p>Centralise the error codes so both the campaign job and any future senders can share the same classification logic.</p>
+        <pre><code>namespace wa_api.Features.Messages;
+
+public static class MetaPolicyErrorCodes
+{
+    /// <summary>Spam rate limit — message rejected due to spam signals. Pause campaign.</summary>
+    public const string SpamRateLimit = "131048";
+
+    /// <summary>Healthy-ecosystem limit — sending harming broader ecosystem. Pause campaign.</summary>
+    public const string HealthyEcosystemLimit = "131049";
+
+    /// <summary>Account restricted — stop ALL sends for this WABA until resolved.</summary>
+    public const string AccountRestricted = "368";
+
+    /// <summary>Account suspended — stop ALL sends immediately.</summary>
+    public const string AccountSuspended = "131031";
+
+    /// <summary>Returns true if this code represents a per-campaign pause signal.</summary>
+    public static bool IsCampaignPause(string? code) =>
+        code is SpamRateLimit or HealthyEcosystemLimit;
+
+    /// <summary>Returns true if this code represents an account-level restriction (all sends must stop).</summary>
+    public static bool IsAccountRestriction(string? code) =>
+        code is AccountRestricted or AccountSuspended;
+}</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 2.2</div>
+        <div class="step-title">Halt campaign on policy error codes in CampaignBatchSendJob</div>
+        <div class="step-file">📄 Features/Campaigns/Jobs/CampaignBatchSendJob.cs</div>
+        <p>
+          After calling <code>SendTemplateMessageAsync</code>, inspect the returned <code>errorCode</code>.
+          If it's a campaign-pause code, set <code>campaign.Status = CampaignStatus.Paused</code> and notify the tenant.
+          If it's an account-restriction code, mark the WABA connection as inactive and notify.
+          Do <strong>not</strong> continue the loop — return immediately to avoid sending more messages.
+        </p>
+        <pre><code>if (externalId is null)
+{
+    // Check for policy violation codes before marking recipient and continuing.
+    if (MetaPolicyErrorCodes.IsAccountRestriction(errorCode))
+    {
+        logger.LogError(
+            "Meta returned account restriction code {Code} for WABA {WabaId} — halting all campaigns.",
+            errorCode, waba.Id);
+
+        // Deactivate the WABA connection so no further sends can happen.
+        waba.IsActive = false;
+        campaign.Status = CampaignStatus.Paused;
+        await db.SaveChangesAsync(ct);
+
+        await notifier.CreateAsync(
+            campaign.CompanyId, campaignId, null,
+            Notifications.Entities.NotificationType.CampaignFailed,
+            "WhatsApp account restricted",
+            $"Meta has restricted your WhatsApp number. All campaigns paused. Error: {errorCode}. " +
+            "Please review your account in Meta Business Suite.",
+            ct);
+        return;
+    }
+
+    if (MetaPolicyErrorCodes.IsCampaignPause(errorCode))
+    {
+        logger.LogWarning(
+            "Meta returned spam/ecosystem code {Code} — pausing campaign {CampaignId}.",
+            errorCode, campaignId);
+
+        campaign.Status = CampaignStatus.Paused;
+        await db.SaveChangesAsync(ct);
+
+        await notifier.CreateAsync(
+            campaign.CompanyId, campaignId, null,
+            Notifications.Entities.NotificationType.CampaignFailed,
+            "Campaign paused — spam signal detected",
+            $"Meta flagged this campaign for spam signals (code {errorCode}). " +
+            "Campaign paused. Review your template and contact list quality before resuming.",
+            ct);
+        return;
+    }
+
+    // Non-policy failure — mark recipient and continue.
+    recipient.Status = RecipientStatus.Failed;
+    recipient.ErrorCode = errorCode ?? "SEND_FAILED";
+    logger.LogWarning(...);
+}</code></pre>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- PHASE 3 -->
+    <section class="phase">
+      <div class="phase-heading">
+        <div class="phase-num">3</div>
+        <div class="phase-info">
+          <div class="phase-title">Phase 3 — Quality Rating Reaction</div>
+          <div class="phase-desc">Read the already-stored QualityRating in the send path; throttle on YELLOW, block on RED</div>
+        </div>
+        <span class="badge badge-orange">Medium Risk</span>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 3.1</div>
+        <div class="step-title">Gate campaign batch on QualityRating</div>
+        <div class="step-file">📄 Features/Campaigns/Jobs/CampaignBatchSendJob.cs</div>
+        <p>
+          After loading the campaign and WABA connection, check <code>waba.QualityRating</code> before entering the
+          recipient loop. RED blocks the entire batch and notifies the tenant. YELLOW halves the effective batch size
+          to reduce throughput without stopping completely.
+        </p>
+        <pre><code>// After loading `waba`, before the recipient loop:
+if (waba.QualityRating == "RED")
+{
+    logger.LogWarning(
+        "WABA {WabaId} quality rating is RED — pausing campaign {CampaignId} to protect account.",
+        waba.Id, campaignId);
+
+    campaign.Status = CampaignStatus.Paused;
+    await db.SaveChangesAsync(ct);
+
+    await notifier.CreateAsync(
+        campaign.CompanyId, campaignId, null,
+        Notifications.Entities.NotificationType.CampaignThrottled,
+        "Campaign paused — low WhatsApp quality rating",
+        "Your WhatsApp number has a RED quality rating. Campaign paused to prevent account restriction. " +
+        "Improve message quality and opt-in practices, then resume.",
+        ct);
+    return;
+}
+
+// Reduce throughput on YELLOW to let quality recover.
+var effectiveBatchSize = waba.QualityRating == "YELLOW" ? BatchSize / 2 : BatchSize;</code></pre>
+        <p>Then replace the hard-coded <code>Take(BatchSize)</code> in the query with <code>Take(effectiveBatchSize)</code>.</p>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 3.2</div>
+        <div class="step-title">Block campaign launch on RED quality rating</div>
+        <div class="step-file">📄 Features/Campaigns/CampaignService.cs</div>
+        <p>
+          Add a pre-launch check in <code>LaunchAsync</code> so tenants can't start new campaigns while
+          the WABA is at RED quality. This is a UX safety net — the batch job already halts if RED is detected
+          mid-run, but blocking at launch gives immediate feedback.
+        </p>
+        <pre><code>// In LaunchAsync, after loading the campaign + template + waba:
+var waba = campaign.Template.WabaConnection;
+if (waba.QualityRating == "RED")
+    throw new BusinessRuleException("WABA_QUALITY_RED",
+        "Cannot launch campaign — your WhatsApp number has a RED quality rating. " +
+        "Resolve account quality issues before sending.");</code></pre>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- PHASE 4 -->
+    <section class="phase">
+      <div class="phase-heading">
+        <div class="phase-num">4</div>
+        <div class="phase-info">
+          <div class="phase-title">Phase 4 — Opt-in Consent Enforcement</div>
+          <div class="phase-desc">Add a consent field to Contact; enforce it at campaign send time; expose in API + frontend</div>
+        </div>
+        <span class="badge badge-orange">Compliance</span>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 4.1</div>
+        <div class="step-title">Add HasOptedIn + OptedInAt to Contact entity</div>
+        <div class="step-file">📄 Features/Contacts/Entities/Contact.cs</div>
+        <p>
+          <code>HasOptedIn</code> defaults to <code>false</code> so existing contacts are not silently
+          approved. Tenants must explicitly mark consent. <code>OptedInAt</code> provides the audit timestamp.
+        </p>
+        <pre><code>/// &lt;summary&gt;
+/// True when the contact has given explicit opt-in consent to receive business-initiated
+/// messages. Required by Meta policy before sending campaigns. Defaults to false.
+/// &lt;/summary&gt;
+public bool HasOptedIn { get; set; } = false;
+
+/// &lt;summary&gt;UTC timestamp of the most recent opt-in consent grant.&lt;/summary&gt;
+public DateTime? OptedInAt { get; set; }</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 4.2</div>
+        <div class="step-title">Add EF Core migration for opt-in columns</div>
+        <div class="step-file">📄 Migrations/</div>
+        <p>Run <code>dotnet ef migrations add AddContactOptIn</code>. Existing contacts default to <code>false</code> — intentional, they must be explicitly opted in.</p>
+        <pre><code>migrationBuilder.AddColumn&lt;bool&gt;(
+    name: "HasOptedIn",
+    table: "Contacts",
+    nullable: false,
+    defaultValue: false);
+
+migrationBuilder.AddColumn&lt;DateTime&gt;(
+    name: "OptedInAt",
+    table: "Contacts",
+    nullable: true);</code></pre>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 4.3</div>
+        <div class="step-title">Expose consent in ContactResponse + Update/Create DTOs</div>
+        <div class="step-file">📄 Features/Contacts/Dtos/ContactResponse.cs</div>
+        <div class="step-file">📄 Features/Contacts/Dtos/CreateContactRequest.cs</div>
+        <div class="step-file">📄 Features/Contacts/Dtos/UpdateContactRequest.cs</div>
+        <div class="step-file">📄 Features/Contacts/ContactService.cs</div>
+        <p>
+          Add <code>HasOptedIn</code> and <code>OptedInAt</code> to the response record.
+          Accept <code>HasOptedIn</code> in create/update requests so tenants can set it at import time.
+          When <code>HasOptedIn</code> flips to <code>true</code> on an update, stamp <code>OptedInAt = UtcNow</code>.
+          When <code>IsOptedOut</code> is detected (Phase 1), automatically set <code>HasOptedIn = false</code>.
+        </p>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Step 4.4</div>
+        <div class="step-title">Enforce HasOptedIn in CampaignBatchSendJob</div>
+        <div class="step-file">📄 Features/Campaigns/Jobs/CampaignBatchSendJob.cs</div>
+        <p>
+          Before the opt-out check (Phase 1, Step 1.5), add a consent check.
+          Skip non-consented contacts with <code>RecipientStatus.Skipped</code> + <code>NO_CONSENT</code> error code.
+        </p>
+        <pre><code>// Consent check — must come before opt-out check (opt-out overrides consent anyway).
+if (!recipient.Contact.HasOptedIn)
+{
+    recipient.Status = RecipientStatus.Skipped;
+    recipient.ErrorCode = "NO_CONSENT";
+    logger.LogDebug(
+        "Skipping contact {ContactId} — no opt-in consent recorded.", recipient.ContactId);
+    continue;
+}
+
+// Opt-out check (Phase 1)
+if (recipient.Contact.IsOptedOut)
+{
+    recipient.Status = RecipientStatus.Skipped;
+    recipient.ErrorCode = "OPT_OUT";
+    continue;
+}</code></pre>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- FILES TOUCHED -->
+    <section>
+      <h2>All Files Touched</h2>
+      <div class="files-grid">
+        <div class="file-row">
+          <span class="file-path">Features/Contacts/Entities/Contact.cs</span>
+          <span class="file-change">Add IsOptedOut, OptedOutAt, HasOptedIn, OptedInAt fields</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Contacts/Dtos/ContactResponse.cs</span>
+          <span class="file-change">Expose all 4 new fields in the API response record</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Contacts/Dtos/CreateContactRequest.cs</span>
+          <span class="file-change">Accept HasOptedIn on create (for bulk import with consent)</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Contacts/Dtos/UpdateContactRequest.cs</span>
+          <span class="file-change">Accept HasOptedIn on update; auto-stamp OptedInAt when flipped</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Contacts/ContactService.cs</span>
+          <span class="file-change">Update Map() + CreateAsync() + UpdateAsync() for new fields</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Webhooks/Handlers/InboundMessageWebhookHandler.cs</span>
+          <span class="file-change">Add STOP keyword detection → set IsOptedOut + OptedOutAt on contact</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Campaigns/Jobs/CampaignBatchSendJob.cs</span>
+          <span class="file-change">Add opt-out skip, consent skip, policy error halting, quality rating gate</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Campaigns/CampaignService.cs</span>
+          <span class="file-change">Block LaunchAsync when WABA quality rating is RED</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Conversations/ConversationService.cs</span>
+          <span class="file-change">Block live inbox reply to opted-out contacts</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Features/Messages/MetaPolicyErrorCodes.cs</span>
+          <span class="file-change">New file — centralised Meta policy error code constants + classifiers</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Migrations/&lt;timestamp&gt;_AddContactOptOut.cs</span>
+          <span class="file-change">New migration — IsOptedOut (bool, default false), OptedOutAt (nullable DateTime)</span>
+        </div>
+        <div class="file-row">
+          <span class="file-path">Migrations/&lt;timestamp&gt;_AddContactOptIn.cs</span>
+          <span class="file-change">New migration — HasOptedIn (bool, default false), OptedInAt (nullable DateTime)</span>
+        </div>
+      </div>
+    </section>
+
+    <hr>
+
+    <!-- OUT OF SCOPE -->
+    <section>
+      <h2>Out of Scope (v1)</h2>
+      <ul>
+        <li><strong>Frontend UI changes</strong> — consent badges, opt-out indicators, and the contact import consent flow are frontend work tracked separately.</li>
+        <li><strong>Account rotation / IP proxying / fingerprinting</strong> — irrelevant for the official Cloud API; Meta restricts on policy, not automation detection.</li>
+        <li><strong>Webhooks for quality rating changes</strong> — Meta does send <code>phone_number_quality_update</code> webhooks. Wiring those up to auto-react is a future improvement; for now the health-check poll (already implemented) is sufficient.</li>
+        <li><strong>Opt-in collection flows</strong> — how tenants <em>collect</em> consent (forms, confirmation messages) is a product feature, not a system safety control.</li>
+        <li><strong>GDPR / data deletion</strong> — separate compliance work; opt-out is not the same as data erasure.</li>
+      </ul>
+    </section>
+
+    <footer class="plan-footer">
+      <span>Generated 21 Jun 2026</span>
+      <span>bitlabs-whatsapp-crm-v1-2026</span>
+    </footer>
+  </div>
+</body>
+</html>

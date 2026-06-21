@@ -32,6 +32,17 @@ public sealed class InboundMessageWebhookHandler(
 {
     private const int PreviewLength = 200;
 
+    // Exact-match only — broad verbs like "cancel", "end", "remove" fire on normal conversation
+    // ("cancel my order", "end of month works") and would silently suppress active customers.
+    // WhatsApp's convention is STOP / UNSUBSCRIBE; stick to that minimal, unambiguous set.
+    private static readonly HashSet<string> StopKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "stop", "stopall", "stop all", "unsubscribe", "optout", "opt out"
+    };
+
+    private static bool IsStopIntent(string body) =>
+        StopKeywords.Contains(body.Trim());
+
     public bool CanHandle(string field, WebhookChange change)
         => field == "messages" && change.Value?.Messages is { Count: > 0 };
 
@@ -75,6 +86,17 @@ public sealed class InboundMessageWebhookHandler(
             var body = !string.IsNullOrWhiteSpace(m.Text?.Body) ? m.Text!.Body! : $"[{m.Type ?? "message"}]";
             if (body.Length > 4096) body = body[..4096];
 
+            // Opt-out detection: if the contact sends a stop-intent keyword, suppress all future sends.
+            if (!string.IsNullOrWhiteSpace(m.Text?.Body) && IsStopIntent(m.Text.Body) && !contact.IsOptedOut)
+            {
+                contact.IsOptedOut = true;
+                contact.OptedOutAt = now;
+                contact.HasOptedIn = false;
+                logger.LogInformation(
+                    "Contact {Phone} sent opt-out intent (\"{Body}\") — suppressed from future outbound sends.",
+                    phone, m.Text.Body.Trim());
+            }
+
             var message = new Message
             {
                 CompanyId = companyId,            // stamped explicitly — no tenant context in the job
@@ -109,11 +131,14 @@ public sealed class InboundMessageWebhookHandler(
 
         if (contact is null)
         {
+            // A customer messaging us first IS the opt-in event under Meta's policy.
             contact = new Contact
             {
                 CompanyId = companyId,
                 Phone = phone,
                 Name = string.IsNullOrWhiteSpace(profileName) ? phone : profileName!,
+                HasOptedIn = true,
+                OptedInAt = DateTime.UtcNow,
             };
             db.Contacts.Add(contact);
         }

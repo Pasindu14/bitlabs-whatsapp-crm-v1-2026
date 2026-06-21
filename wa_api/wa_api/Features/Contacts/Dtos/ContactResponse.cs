@@ -6,5 +6,9 @@ public record ContactResponse(
     string Phone,
     string Name,
     bool IsActive,
+    bool IsOptedOut,
+    DateTime? OptedOutAt,
+    bool HasOptedIn,
+    DateTime? OptedInAt,
     DateTime CreatedAt
 );

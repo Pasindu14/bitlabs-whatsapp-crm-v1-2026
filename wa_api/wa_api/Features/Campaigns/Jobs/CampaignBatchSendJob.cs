@@ -5,7 +5,9 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using wa_api.Features.Campaigns.Entities;
+using wa_api.Features.Messages;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Notifications.Entities;
 using wa_api.Infrastructure.Persistence;
 using wa_api.Infrastructure.RateLimiting;
 
@@ -64,6 +66,29 @@ public class CampaignBatchSendJob(
 
         var waba = campaign.Template.WabaConnection;
 
+        // Quality rating gate: RED = stop all business-initiated sends; YELLOW = halve throughput.
+        if (waba.QualityRating == "RED")
+        {
+            logger.LogWarning(
+                "WABA {WabaId} quality rating is RED — pausing campaign {CampaignId} to protect account standing.",
+                waba.Id, campaignId);
+
+            campaign.Status = CampaignStatus.Paused;
+            await db.SaveChangesAsync(ct);
+
+            await notifier.CreateAsync(
+                campaign.CompanyId, campaignId, null,
+                NotificationType.CampaignThrottled,
+                "Campaign paused — low WhatsApp quality rating",
+                "Your WhatsApp number has a RED quality rating. Campaign paused to prevent account restriction. " +
+                "Improve message quality and opt-in practices in Meta Business Suite, then resume the campaign.",
+                ct);
+            return;
+        }
+
+        // YELLOW: halve batch size to reduce send pressure while quality recovers.
+        var effectiveBatchSize = waba.QualityRating == "YELLOW" ? BatchSize / 2 : BatchSize;
+
         // The number's 24-hour unique-recipient tier cap (campaign sends are business-initiated).
         var tierLimit = (int)waba.MessagingTier;
 
@@ -73,7 +98,7 @@ public class CampaignBatchSendJob(
             .Include(r => r.Contact)
             .Where(r => r.CampaignId == campaignId && r.Status == RecipientStatus.Queued)
             .OrderBy(r => r.CreatedAt)
-            .Take(BatchSize)
+            .Take(effectiveBatchSize)
             .ToListAsync(ct);
 
         if (batch.Count == 0)
@@ -103,6 +128,27 @@ public class CampaignBatchSendJob(
             // Re-check campaign status inside loop — pause/cancel can arrive mid-batch.
             if (campaign.Status is CampaignStatus.Paused or CampaignStatus.Cancelled)
                 break;
+
+            // Consent gate: skip contacts with no opt-in consent or who have opted out.
+            if (!recipient.Contact.HasOptedIn)
+            {
+                recipient.Status = RecipientStatus.Skipped;
+                recipient.ErrorCode = "NO_CONSENT";
+                logger.LogDebug(
+                    "Skipping contact {ContactId} in campaign {CampaignId} — no opt-in consent.",
+                    recipient.ContactId, campaignId);
+                continue;
+            }
+
+            if (recipient.Contact.IsOptedOut)
+            {
+                recipient.Status = RecipientStatus.Skipped;
+                recipient.ErrorCode = "OPT_OUT";
+                logger.LogInformation(
+                    "Skipping contact {ContactId} in campaign {CampaignId} — opted out.",
+                    recipient.ContactId, campaignId);
+                continue;
+            }
 
             // ── Acquire a send permit (graceful: brief wait, else reschedule the whole batch) ──
             // Per-second pacing + the number's daily unique-recipient tier cap.
@@ -156,6 +202,49 @@ public class CampaignBatchSendJob(
                 }
                 else
                 {
+                    // Account-level restriction: deactivate the WABA and halt immediately.
+                    if (MetaPolicyErrorCodes.IsAccountRestriction(errorCode))
+                    {
+                        logger.LogError(
+                            "Meta returned account restriction code {Code} for WABA {WabaId} — " +
+                            "deactivating connection and halting campaign {CampaignId}.",
+                            errorCode, waba.Id, campaignId);
+
+                        waba.IsActive = false;
+                        campaign.Status = CampaignStatus.Paused;
+                        await db.SaveChangesAsync(ct);
+
+                        await notifier.CreateAsync(
+                            campaign.CompanyId, campaignId, null,
+                            NotificationType.CampaignFailed,
+                            "WhatsApp account restricted",
+                            $"Meta has restricted your WhatsApp number (code {errorCode}). All campaigns paused. " +
+                            "Please review your account in Meta Business Suite before resuming.",
+                            ct);
+                        return;
+                    }
+
+                    // Campaign-level spam/ecosystem signal: pause this campaign and alert.
+                    if (MetaPolicyErrorCodes.IsCampaignPause(errorCode))
+                    {
+                        logger.LogWarning(
+                            "Meta returned policy code {Code} for campaign {CampaignId} — pausing campaign.",
+                            errorCode, campaignId);
+
+                        campaign.Status = CampaignStatus.Paused;
+                        await db.SaveChangesAsync(ct);
+
+                        await notifier.CreateAsync(
+                            campaign.CompanyId, campaignId, null,
+                            NotificationType.CampaignFailed,
+                            "Campaign paused — spam signal detected",
+                            $"Meta flagged this campaign for policy violations (code {errorCode}). " +
+                            "Campaign paused. Review your template content and contact list quality before resuming.",
+                            ct);
+                        return;
+                    }
+
+                    // Non-policy failure — mark recipient failed and continue the batch.
                     recipient.Status = RecipientStatus.Failed;
                     recipient.ErrorCode = errorCode ?? "SEND_FAILED";
                     logger.LogWarning(

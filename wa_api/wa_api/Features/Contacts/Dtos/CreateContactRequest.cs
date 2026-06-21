@@ -8,5 +8,6 @@ namespace wa_api.Features.Contacts.Dtos;
 /// </summary>
 public record CreateContactRequest(
     [Required, StringLength(20, MinimumLength = 5)] string Phone,
-    [Required, StringLength(200, MinimumLength = 1)] string Name
+    [Required, StringLength(200, MinimumLength = 1)] string Name,
+    bool HasOptedIn = false
 );
