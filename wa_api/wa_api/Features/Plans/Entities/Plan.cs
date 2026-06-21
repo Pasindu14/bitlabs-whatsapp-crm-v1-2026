@@ -35,4 +35,10 @@ public class Plan : BaseEntity
     /// catalog lets the subscription gate map plan → allowed capabilities with no new vocabulary.
     /// </summary>
     public List<string> FeatureFlags { get; set; } = [];
+
+    /// <summary>
+    /// Stripe Price ID (e.g. <c>price_xxx</c>) for self-service checkout. Null for manual-only
+    /// plans (assigned by SuperAdmin without Stripe). Required for <c>POST /my-subscription/checkout</c>.
+    /// </summary>
+    public string? StripePriceId { get; set; }
 }

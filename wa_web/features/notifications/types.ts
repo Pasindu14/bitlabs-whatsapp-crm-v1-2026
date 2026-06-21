@@ -4,7 +4,8 @@ export type NotificationType =
   | "QuotaWarning1Day"
   | "QuotaWarningToday"
   | "CampaignFailed"
-  | "TemplateApproved";
+  | "TemplateApproved"
+  | "CampaignThrottled";
 
 export interface Notification {
   id: string;

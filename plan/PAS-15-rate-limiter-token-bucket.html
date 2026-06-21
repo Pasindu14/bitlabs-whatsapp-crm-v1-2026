@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAS-15 — Send-Throttle Hardening: Token-Bucket Rate Limiter (Phase 6.1)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f8fa; --surface: #ffffff; --surface-alt: #f0f2f6;
+      --border: #e2e6ee; --text: #1a1d23; --text-muted: #6b7280;
+      --accent: #4f6ef7; --accent-soft: #eef0fd;
+      --green: #16a34a; --green-soft: #f0fdf4;
+      --success: #16a34a; --warning: #d97706; --danger: #dc2626;
+      --tag-bg: #e8ebf5; --tag-text: #3b4a80;
+      --radius: 10px; --font: 'Jost', system-ui, sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    }
+    body { font-family: var(--font); font-size: 15px; line-height: 1.7;
+           color: var(--text); background: var(--bg); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .page { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    .plan-header { margin-bottom: 40px; }
+    .plan-tag { display: inline-block; background: var(--tag-bg); color: var(--tag-text);
+                font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+                padding: 4px 10px; border-radius: 20px; margin-bottom: 14px; }
+    .plan-title { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1.3; }
+    .plan-subtitle { margin-top: 10px; color: var(--text-muted); font-size: 15px; max-width: 700px; }
+    .plan-meta { display: flex; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+    .plan-meta-item { font-size: 13px; color: var(--text-muted); }
+    .plan-meta-item strong { color: var(--text); font-weight: 600; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+    h2 { font-size: 18px; font-weight: 700; color: var(--text); margin: 36px 0 14px; }
+    h3 { font-size: 15px; font-weight: 600; color: var(--text); margin: 24px 0 10px; }
+
+    p { margin-bottom: 12px; }
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { margin-bottom: 6px; }
+    li::marker { color: var(--accent); }
+
+    .step { background: var(--surface); border: 1px solid var(--border);
+             border-radius: var(--radius); padding: 24px 28px; margin-bottom: 18px; }
+    .step-label { font-size: 11px; font-weight: 700; letter-spacing: .08em;
+                  text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+    .step-title { font-size: 17px; font-weight: 700; margin-bottom: 12px; }
+    .step-file { display: inline-flex; align-items: center; gap: 6px;
+                 background: var(--surface-alt); border: 1px solid var(--border);
+                 border-radius: 6px; padding: 3px 9px; font-size: 12px; font-family: var(--mono);
+                 color: var(--text-muted); margin: 3px 4px 3px 0; }
+    .step-file.new { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+    .step-file.edit { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+
+    pre { background: #0f1729; border: 1px solid #1e293b;
+          border-radius: 8px; padding: 16px 18px; overflow-x: auto;
+          font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+          color: #e2e8f0; margin: 14px 0; }
+    code { font-family: var(--mono); font-size: 13px;
+           background: var(--surface-alt); padding: 2px 5px; border-radius: 4px; }
+    pre code { background: none; padding: 0; color: inherit; }
+
+    .table-wrap { overflow-x: auto; margin: 16px 0; border-radius: var(--radius);
+                   border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    thead th { background: var(--surface-alt); font-weight: 600; text-align: left;
+               padding: 10px 14px; border-bottom: 1px solid var(--border);
+               color: var(--text-muted); font-size: 12px; letter-spacing: .04em;
+               text-transform: uppercase; }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--surface-alt); }
+
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-soft);
+               border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; font-size: 14px; }
+    .callout.warning { border-color: var(--warning); background: #fef9ec; }
+    .callout.danger  { border-color: var(--danger);  background: #fef2f2; }
+    .callout.success { border-color: var(--green);   background: var(--green-soft); }
+    .callout strong { font-weight: 700; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px;
+             font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+    .badge-new     { background: #dcfce7; color: #15803d; }
+    .badge-edit    { background: #fef9c3; color: #854d0e; }
+    .badge-api     { background: #ede9fe; color: #5b21b6; }
+    .badge-db      { background: #fce7f3; color: #9d174d; }
+    .badge-job     { background: #ffedd5; color: #c2410c; }
+    .badge-p1      { background: #dcfce7; color: #15803d; }
+    .badge-p2      { background: #dbeafe; color: #1e40af; }
+    .badge-p3      { background: #f3e8ff; color: #6b21a8; }
+
+    .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+           padding: 20px 24px; margin: 24px 0; }
+    .toc-title { font-size: 13px; font-weight: 700; text-transform: uppercase;
+                 letter-spacing: .06em; color: var(--text-muted); margin-bottom: 12px; }
+    .toc ol { margin: 0; padding-left: 18px; }
+    .toc li { font-size: 14px; margin-bottom: 4px; }
+
+    .plan-footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border);
+                   font-size: 12px; color: var(--text-muted); display: flex;
+                   justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    strong { font-weight: 600; }
+    .kicker { color: #93c5fd; }
+    .cmt { color: #64748b; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header class="plan-header">
+    <div class="plan-tag">PAS-15 · Implementation Plan</div>
+    <h1 class="plan-title">Send-Throttle Hardening — Token-Bucket Rate Limiter (Phase 6.1)</h1>
+    <p class="plan-subtitle">
+      Replace the fixed-window WABA send limiter with a Redis token bucket that is atomic across worker
+      replicas, tier-aware, and degrades safely. The goal is singular: <strong>a tenant's WhatsApp number
+      must never be throttled or blocked by Meta because of how <em>we</em> pace sends.</strong>
+    </p>
+    <div class="plan-meta">
+      <div class="plan-meta-item"><strong>PRD ref</strong> § 6.1 (+ 4.3, 10.2)</div>
+      <div class="plan-meta-item"><strong>Status</strong> Draft</div>
+      <div class="plan-meta-item"><strong>Phases</strong> 3 (ship independently)</div>
+      <div class="plan-meta-item"><strong>Scope</strong> API + Infra + DB</div>
+      <div class="plan-meta-item"><strong>Web</strong> none</div>
+    </div>
+  </header>
+
+  <hr>
+
+  <!-- TOC -->
+  <nav class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#why">Why this matters — the two halves of "don't get blocked"</a></li>
+      <li><a href="#today">What is actually wrong today (honest audit)</a></li>
+      <li><a href="#decisions">Design decisions</a></li>
+      <li><a href="#p1">Phase 1 — Token bucket + graceful consumption</a> <span class="badge badge-p1">core safety</span></li>
+      <li><a href="#p2">Phase 2 — Daily tier cap + MessagingTier column</a> <span class="badge badge-p2">tier</span></li>
+      <li><a href="#p3">Phase 3 — Auto-sync tier &amp; quality from health check</a> <span class="badge badge-p3">optional</span></li>
+      <li><a href="#config">Configuration knobs</a></li>
+      <li><a href="#verify">Verification strategy (non-negotiable)</a></li>
+      <li><a href="#matrix">Failure-mode matrix — before vs after</a></li>
+      <li><a href="#done">Definition of Done</a></li>
+    </ol>
+  </nav>
+
+  <!-- ─────────────────────────────  WHY  ───────────────────────────── -->
+  <h2 id="why">1 · Why this matters — the two halves of "don't get blocked"</h2>
+  <p>
+    A WhatsApp number gets restricted by Meta through <strong>two independent mechanisms</strong>, and the
+    platform needs a guard on each. They are easy to conflate:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Mechanism</th><th>What trips it</th><th>Guard</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Throughput / pacing</strong></td>
+          <td>API calls arriving faster than the number's messages-per-second ceiling, or exceeding the
+              rolling 24-hour business-initiated tier cap (1K / 10K / 100K unique recipients).</td>
+          <td><strong>This plan (6.1).</strong> Token bucket + daily tier counter.</td>
+        </tr>
+        <tr>
+          <td><strong>Quality / reputation</strong></td>
+          <td>Recipients tapping <em>Block</em> / <em>Report</em>. Quality rating drops Green → Yellow → Red;
+              Red disables messaging.</td>
+          <td><strong>Already built (10.2 monitoring)</strong> — surfaces per-company block/failure rates so
+              an abuser is paused <em>before</em> Meta reacts.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    Treat 6.1 and 10.2 as a pair. This plan covers the <strong>pacing</strong> half. The reputation half is
+    the monitoring dashboard already shipped. Neither alone is sufficient; together they are the
+    "number never gets blocked" story.
+  </div>
+
+  <!-- ─────────────────────────────  TODAY  ───────────────────────────── -->
+  <h2 id="today">2 · What is actually wrong today (honest audit)</h2>
+  <p>
+    Current limiter: <code>FixedWindowWabaRateLimiter</code> — an atomic Redis <code>INCR</code> on key
+    <code>rl:waba:{phoneNumberId}:{epochMinute}</code>, default <strong>80 per minute</strong>, throwing
+    <code>RateLimitException</code> over the limit. Three distinct problems, in priority order:
+  </p>
+
+  <h3>① Permanent campaign stall <span class="badge badge-job">the real bug</span></h3>
+  <p>
+    <code>CampaignBatchSendJob</code> has <strong>no <code>[AutomaticRetry]</code> attribute</strong>, so it
+    inherits Hangfire's default of 10 attempts. The batch-chaining call
+    (<code>jobClient.Enqueue&lt;CampaignBatchSendJob&gt;</code>) is only reached on a <em>successful</em> run —
+    never on the <code>throw</code> path. So when rate-limit throws exhaust the 10 retries, the campaign is
+    wedged: <code>Status = Running</code>, recipients stuck <code>Queued</code>, <code>HangfireJobId</code>
+    pointing at a dead job, and <strong>nothing alive to resume it</strong>. This is concrete, reproducible,
+    and the strongest reason to act.
+  </p>
+
+  <h3>② Wasted work &amp; thundering herd</h3>
+  <p>
+    Every throw discards the in-flight batch loop and schedules a retry. Multiple concurrent campaigns hit the
+    shared counter, all throw, all back off on Hangfire's synchronized schedule, all wake and rush the limiter
+    together — re-colliding in lockstep. Throughput collapses to a fraction of capacity.
+  </p>
+
+  <h3>③ Boundary burst + no tier awareness <span class="badge badge-p1">safety</span></h3>
+  <p>
+    The fixed window resets instantly at each minute rollover: up to 80 sends at <code>:59</code> and 80 more at
+    <code>:00</code> = ~160 calls in ~1–2 s. At the current 80/min config the <em>sustained</em> rate is a tame
+    ~1.3/s, but that rollover spike can momentarily approach Meta's per-second ceiling. Separately, the limiter
+    is blind to the number's <strong>24-hour tier</strong> (a fresh number is capped at ~1K unique recipients/day;
+    the limiter would happily wave through far more).
+  </p>
+
+  <div class="callout success">
+    <strong>Correction worth stating plainly:</strong> the abort path does <em>not</em> double-send. Each
+    successful send commits its <code>Message</code> + <code>Sent</code> status immediately, and the catch block
+    calls <code>SaveChangesAsync</code> before re-throwing, so a retried batch re-queries only
+    <code>Status == Queued</code> rows. No recipient is messaged twice. The problems above are real; duplicate
+    delivery is not one of them.
+  </div>
+
+  <!-- ─────────────────────────────  DECISIONS  ───────────────────────────── -->
+  <h2 id="decisions">3 · Design decisions</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Decision</th><th>Choice</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Algorithm</td><td>Redis <strong>token bucket</strong> via a single Lua script</td>
+            <td>Atomic (Redis is single-threaded per script), time-based (no window edge), works across all
+                replicas. Smooth sustained rate <em>and</em> bounded burst.</td></tr>
+        <tr><td>Clock source</td><td><code>redis.call('TIME')</code> inside the script</td>
+            <td>One clock for all replicas — immune to per-host clock skew.</td></tr>
+        <tr><td>Consumption contract</td><td><strong>Non-throwing</strong> <code>TryAcquireAsync</code> returning
+                <code>{ Allowed, RetryAfter, Reason }</code></td>
+            <td>Each caller picks its own waiting policy; no exception-as-control-flow.</td></tr>
+        <tr><td>Interactive path</td><td>Wait a <em>short</em> bounded time, else 429</td>
+            <td>A human is on the HTTP request; single sends almost always get an instant token.</td></tr>
+        <tr><td>Campaign path</td><td>Sub-second wait → send same recipient; otherwise <strong>reschedule</strong>
+                the batch (Hangfire <code>Schedule</code> + jitter), never throw</td>
+            <td>Guarantees forward progress, kills the stall + herd, frees the worker. Safe because the send has
+                <em>not</em> happened when we wait/reschedule.</td></tr>
+        <tr><td>Daily tier cap</td><td>Redis <strong>Set</strong> of contact-ids per number per UTC day
+                (<code>SADD</code>/<code>SCARD</code>)</td>
+            <td>Exact unique-recipient count = Meta's actual model. Memory bounded by tier, auto-expires in 25 h.</td></tr>
+        <tr><td>Tier storage</td><td>New <code>MessagingTier</code> column on <code>WabaConnection</code> (+ migration)</td>
+            <td>Limiter must know the cap. SuperAdmin-settable; later auto-synced (Phase 3).</td></tr>
+        <tr><td>Redis outage</td><td><strong>Fail-safe, not fail-open</strong>: per-process in-memory bucket at a
+                low fallback rate; log loudly</td>
+            <td>Today's <code>IncrementAsync</code> returns 0 (allow) on cache error — that removes the guard
+                exactly when a burst is most dangerous. Never fully open.</td></tr>
+        <tr><td>Values</td><td>All rates/caps are <strong>config</strong> with conservative defaults</td>
+            <td>Design must not depend on a hardcoded Meta number; tune without redeploying logic.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <strong>The headline win:</strong> a token bucket lets us be <em>both faster and safer</em> than today —
+    raise sustained throughput (campaigns finish quicker) <em>while</em> eliminating the rollover burst.
+  </div>
+
+  <!-- ─────────────────────────────  PHASE 1  ───────────────────────────── -->
+  <h2 id="p1">4 · Phase 1 — Token bucket + graceful consumption <span class="badge badge-p1">ships first, materially safer</span></h2>
+  <p>
+    Phase 1 alone fixes the stall, the herd, and the burst. No DB migration; tier cap arrives in Phase 2.
+  </p>
+
+  <div class="step">
+    <div class="step-label">Step 1.1 · The contract</div>
+    <div class="step-title">Non-throwing limiter interface</div>
+    <span class="step-file edit">Infrastructure/RateLimiting/IWabaRateLimiter.cs</span>
+    <span class="badge badge-edit">EDIT</span>
+<pre><code><span class="cmt">// recipientContactId: pass the contact for business-initiated sends (campaigns) so they count</span>
+<span class="cmt">// toward the 24h unique-recipient tier cap. Pass null for session/service replies (inbox within</span>
+<span class="cmt">// the 24h window) — those do NOT consume the tier, only the per-second bucket.</span>
+public interface IWabaRateLimiter
+{
+    Task&lt;RateLimitResult&gt; TryAcquireAsync(
+        string phoneNumberId,
+        Guid? recipientContactId,
+        int dailyTierLimit,
+        CancellationToken ct = default);
+}
+
+public enum RateLimitReason { Ok, PerSecondThrottle, DailyTierExceeded }
+
+public readonly record struct RateLimitResult(bool Allowed, TimeSpan RetryAfter, RateLimitReason Reason)
+{
+    public static readonly RateLimitResult Allow = new(true, TimeSpan.Zero, RateLimitReason.Ok);
+}</code></pre>
+    <p style="margin-top:10px">
+      In Phase 1, <code>dailyTierLimit</code> is accepted but the daily check is a no-op (returns
+      <code>PerSecondThrottle</code> only). Phase 2 activates it. This keeps call sites stable across phases.
+    </p>
+  </div>
+
+  <div class="step">
+    <div class="step-label">Step 1.2 · The algorithm</div>
+    <div class="step-title">Token-bucket Lua script (atomic, cross-replica)</div>
+    <span class="step-file new">Infrastructure/RateLimiting/RedisTokenBucketRateLimiter.cs</span>
+    <span class="badge badge-new">NEW</span>
+    <span class="badge badge-api">infra</span>
+<pre><code><span class="cmt">-- KEYS[1] = bucket hash key  rl:tb:{phoneNumberId}</span>
+<span class="cmt">-- ARGV[1] capacity  ARGV[2] refill/sec  ARGV[3] want  ARGV[4] ttlSeconds</span>
+<span class="cmt">-- returns { allowed(1/0), retryAfterMs }</span>
+local cap    = tonumber(ARGV[1])
+local refill = tonumber(ARGV[2])
+local want   = tonumber(ARGV[3])
+local ttl    = tonumber(ARGV[4])
+
+local t   = redis.call('TIME')                      <span class="cmt">-- single clock for all replicas</span>
+local now = tonumber(t[1]) + tonumber(t[2]) / 1000000.0
+
+local d      = redis.call('HMGET', KEYS[1], 'tokens', 'ts')
+local tokens = tonumber(d[1])
+local ts     = tonumber(d[2])
+if tokens == nil then tokens = cap; ts = now end
+
+tokens = math.min(cap, tokens + math.max(0, now - ts) * refill)  <span class="cmt">-- refill by elapsed</span>
+
+local allowed, retry = 0, 0
+if tokens &gt;= want then
+  tokens  = tokens - want
+  allowed = 1
+else
+  retry = math.ceil(((want - tokens) / refill) * 1000)
+end
+
+redis.call('HSET', KEYS[1], 'tokens', tokens, 'ts', now)
+redis.call('PEXPIRE', KEYS[1], ttl * 1000)          <span class="cmt">-- sliding TTL: idle keys self-clean</span>
+return { allowed, retry }</code></pre>
+    <p style="margin-top:10px">
+      Loaded once and invoked with <code>IDatabase.ScriptEvaluateAsync</code> (mirrors the existing
+      <code>RedisDistributedLockService</code> Lua pattern). <code>capacity</code> = burst ceiling,
+      <code>refill</code> = sustained mps — both from config (Step 1.5).
+    </p>
+  </div>
+
+  <div class="step">
+    <div class="step-label">Step 1.3 · Fail-safe fallback</div>
+    <div class="step-title">In-process bucket when Redis is absent or erroring</div>
+    <span class="step-file new">Infrastructure/RateLimiting/InProcessTokenBucket.cs</span>
+    <span class="badge badge-new">NEW</span>
+    <ul>
+      <li>Same token-bucket math, guarded by a <code>SemaphoreSlim</code> per phone-number id (mirrors the
+          existing in-memory <code>IncrementAsync</code> fallback).</li>
+      <li>Used when <code>REDIS_CONNECTION</code> is unset (dev) <strong>and</strong> as the catch-path when a
+          live Redis call throws — the limiter degrades to local pacing instead of failing open.</li>
+      <li>Fallback <code>refill</code> is a <em>low</em> config value: across <em>R</em> replicas the worst case
+          is <em>R×</em> that rate, so it must stay comfortably under Meta's ceiling. Every fallback hit logs at
+          <code>Warning</code>.</li>
+    </ul>
+    <div class="callout warning">
+      The one behaviour we never restore: <strong>fail-open</strong>. A rate limiter that allows everything when
+      its backing store is down is worse than no limiter, because it bursts precisely during infra trouble.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-label">Step 1.4 · Caller policies</div>
+    <div class="step-title">Two waiting strategies over the same primitive</div>
+    <span class="step-file new">Infrastructure/RateLimiting/WabaRateLimiterExtensions.cs</span>
+    <span class="badge badge-new">NEW</span>
+    <span class="step-file edit">Features/Messages/WhatsAppMessageSender.cs</span>
+    <span class="badge badge-edit">EDIT</span>
+    <span class="step-file edit">Features/Campaigns/Jobs/CampaignBatchSendJob.cs</span>
+    <span class="badge badge-edit">EDIT</span>
+
+    <h3>Interactive (sender) — short wait, else 429</h3>
+<pre><code><span class="cmt">// WhatsAppMessageSender.SendAsync — session reply, so recipientContactId = null (skips tier cap)</span>
+await rateLimiter.AcquireOrThrowAsync(
+    waba.PhoneNumberId, recipientContactId: null, dailyTierLimit: 0,
+    maxWait: TimeSpan.FromSeconds(2), ct);                <span class="cmt">// extension: loops Task.Delay up to maxWait</span>
+<span class="cmt">// on timeout → throw RateLimitException → existing 429 envelope. Single sends almost never wait.</span></code></pre>
+
+    <h3>Campaign (background) — sub-second wait, else reschedule</h3>
+<pre><code>const int WaitCapMs = 750;   <span class="cmt">// only ever block a Hangfire worker for sub-second pauses</span>
+
+var r = await rateLimiter.TryAcquireAsync(
+    waba.PhoneNumberId, recipient.ContactId, tierLimit, ct);
+
+if (!r.Allowed &amp;&amp; r.Reason == RateLimitReason.PerSecondThrottle
+              &amp;&amp; r.RetryAfter.TotalMilliseconds &lt;= WaitCapMs)
+{
+    await Task.Delay(r.RetryAfter, ct);                   <span class="cmt">// send hasn't happened yet → safe</span>
+    r = await rateLimiter.TryAcquireAsync(waba.PhoneNumberId, recipient.ContactId, tierLimit, ct);
+}
+
+if (!r.Allowed)
+{
+    await db.SaveChangesAsync(ct);                        <span class="cmt">// persist progress; recipient stays Queued</span>
+    var delay = r.Reason == RateLimitReason.DailyTierExceeded
+        ? DelayUntilNextUtcDay()                          <span class="cmt">// tier resets at the 24h boundary</span>
+        : TimeSpan.FromSeconds(5 + Random.Shared.Next(0, 10));  <span class="cmt">// jitter breaks the herd</span>
+    campaign.HangfireJobId = jobClient.Schedule&lt;CampaignBatchSendJob&gt;(
+        j =&gt; j.RunAsync(campaignId, CancellationToken.None), delay);
+    await db.SaveChangesAsync(ct);
+    return;                                               <span class="cmt">// clean exit — NO throw, NO stall</span>
+}
+<span class="cmt">// ... proceed to send this recipient exactly as today ...</span></code></pre>
+    <ul>
+      <li><strong>Worker starvation guard:</strong> <code>WorkerCount = max(4, cores×2)</code> is shared with the
+          <code>default</code> queue, so a campaign may only block a worker for sub-second waits. Anything longer
+          is a <code>Schedule</code>, which releases the worker immediately.</li>
+      <li><strong>Jitter is mandatory.</strong> Without the random offset, every throttled campaign reschedules to
+          the same instant and rebuilds the herd at wake-up.</li>
+      <li><strong>On daily-tier exceed:</strong> emit a <code>Notification</code> ("Campaign throttled — daily
+          limit reached, resuming after reset") via the existing Notifications feature.</li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <div class="step-label">Step 1.5 · Fixing the stall directly</div>
+    <div class="step-title">Bound retries so a crash can never wedge a campaign</div>
+    <span class="step-file edit">Features/Campaigns/Jobs/CampaignBatchSendJob.cs</span>
+    <span class="badge badge-edit">EDIT</span>
+    <ul>
+      <li>Add an explicit <code>[AutomaticRetry(Attempts = N, OnAttemptsExceeded = AttemptsExceededAction.Delete)]</code>
+          so a genuinely failing batch (not rate-limit — that path no longer throws) dead-letters predictably
+          instead of silently exhausting the default 10.</li>
+      <li>Add a lightweight <strong>campaign-sweeper</strong> recurring job (or extend an existing recurring job):
+          find campaigns <code>Running</code> with <code>Queued</code> recipients but no live Hangfire job, and
+          re-enqueue. A belt-and-braces backstop so no campaign can ever be permanently stranded.</li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <div class="step-label">Step 1.6 · Wiring</div>
+    <div class="step-title">Registration</div>
+    <span class="step-file edit">Program.cs</span>
+    <span class="badge badge-edit">EDIT</span>
+<pre><code><span class="cmt">// Redis present → token bucket; else in-process fallback. Mirrors the cache/lock branch already there.</span>
+if (!string.IsNullOrWhiteSpace(redisConnection))
+    builder.Services.AddScoped&lt;IWabaRateLimiter, RedisTokenBucketRateLimiter&gt;();
+else
+    builder.Services.AddSingleton&lt;IWabaRateLimiter, InProcessTokenBucket&gt;();</code></pre>
+    <p style="margin-top:8px">Replaces the current <code>FixedWindowWabaRateLimiter</code> registration. Keep the
+       old file until Phase 1 is verified, then delete.</p>
+  </div>
+
+  <!-- ─────────────────────────────  PHASE 2  ───────────────────────────── -->
+  <h2 id="p2">5 · Phase 2 — Daily tier cap + <code>MessagingTier</code> column <span class="badge badge-p2">tier-aware</span></h2>
+
+  <div class="step">
+    <div class="step-label">Step 2.1 · Schema</div>
+    <div class="step-title">Store each number's tier</div>
+    <span class="step-file edit">Features/WhatsApp/Entities/WabaConnection.cs</span>
+    <span class="badge badge-edit">EDIT</span>
+    <span class="step-file new">Migrations/…_AddMessagingTier.cs</span>
+    <span class="badge badge-db">MIGRATION</span>
+<pre><code>public enum MessagingTier { Tier250 = 250, Tier1K = 1000, Tier10K = 10000,
+                            Tier100K = 100000, Unlimited = int.MaxValue }
+
+<span class="cmt">// new column; default Tier1K — the conservative assumption for a freshly connected number</span>
+public MessagingTier MessagingTier { get; set; } = MessagingTier.Tier1K;</code></pre>
+    <p style="margin-top:8px">SuperAdmin can edit it on the WABA-connections screen (small form addition, optional in
+       this phase). The campaign job reads <code>(int)waba.MessagingTier</code> for <code>dailyTierLimit</code>.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-label">Step 2.2 · The counter</div>
+    <div class="step-title">Exact unique-recipient daily cap (Lua + Redis Set)</div>
+    <span class="step-file edit">Infrastructure/RateLimiting/RedisTokenBucketRateLimiter.cs</span>
+    <span class="badge badge-edit">EDIT</span>
+<pre><code><span class="cmt">-- KEYS[1] = rl:day:{phoneNumberId}:{yyyyMMdd-UTC}    ARGV[1]=contactId  ARGV[2]=limit  ARGV[3]=ttl</span>
+if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 1 then return 1 end  <span class="cmt">-- already counted today</span>
+if redis.call('SCARD', KEYS[1]) &gt;= tonumber(ARGV[2]) then return 0 end <span class="cmt">-- would exceed tier</span>
+redis.call('SADD', KEYS[1], ARGV[1])
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3]))                     <span class="cmt">-- ~25h, rolls off next day</span>
+return 1</code></pre>
+    <p style="margin-top:10px">
+      Order of operations in <code>TryAcquireAsync</code>: <strong>token bucket first</strong> (per-second), then
+      the daily Set check only when <code>recipientContactId != null</code>. A <code>0</code> from the daily
+      script returns <code>{ Allowed=false, Reason=DailyTierExceeded }</code>, which the campaign job maps to the
+      "reschedule to next UTC day" branch already written in Step 1.4.
+    </p>
+    <div class="callout">
+      <strong>Counting model — chosen, with the tradeoff stated:</strong> a Redis Set gives an <em>exact</em>
+      unique-recipient count, matching Meta's tier definition. Cost: up to <code>tierLimit</code> contact-ids per
+      number per day (~3–4 MB at the 100K tier), auto-expiring in 25 h — acceptable. The rejected alternative, a
+      plain message <code>INCR</code>, is simpler but <em>under-delivers</em>: it counts repeat messages to the
+      same person against the cap, silently choking legitimate campaigns. Given the safety priority, exact-unique
+      is the right call.
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────  PHASE 3  ───────────────────────────── -->
+  <h2 id="p3">6 · Phase 3 — Auto-sync tier &amp; quality from the health check <span class="badge badge-p3">optional, low-cost</span></h2>
+  <div class="step">
+    <div class="step-label">Step 3.1 · Use data we already fetch</div>
+    <div class="step-title">Persist Meta's reported tier &amp; quality</div>
+    <span class="step-file edit">Infrastructure/Jobs/WabaHealthCheckJob.cs</span>
+    <span class="badge badge-edit">EDIT</span>
+    <ul>
+      <li><code>WabaHealthCheckJob</code> <strong>already requests <code>quality_rating</code></strong> in its
+          fields list and then discards it. Add <code>messaging_limit_tier</code> to the same request and persist
+          both.</li>
+      <li>Map Meta's <code>messaging_limit_tier</code> (<code>TIER_1K</code> / <code>TIER_10K</code> /
+          <code>TIER_100K</code> / <code>TIER_UNLIMITED</code>) → the <code>MessagingTier</code> enum, and store
+          <code>quality_rating</code> (GREEN/YELLOW/RED) on the connection.</li>
+      <li>The limiter then becomes <strong>self-tuning</strong>: as Meta upgrades a number, its daily cap rises
+          automatically — no manual SuperAdmin edit.</li>
+      <li>Bonus: storing quality rating feeds the 10.2 monitoring dashboard (the reputation half), closing the
+          loop between both guards.</li>
+    </ul>
+    <div class="callout">
+      Phase 3 is independent and safe to defer. A sane default tier (<code>Tier1K</code>) + SuperAdmin override
+      from Phase 2 is already safe; auto-sync just removes the manual step and adds quality telemetry.
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────  CONFIG  ───────────────────────────── -->
+  <h2 id="config">7 · Configuration knobs</h2>
+  <span class="step-file edit">appsettings.json → "RateLimit"</span> <span class="badge badge-edit">EDIT</span>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Key</th><th>Meaning</th><th>Suggested default</th></tr></thead>
+      <tbody>
+        <tr><td><code>PerSecondCapacity</code></td><td>Burst ceiling (max tokens in the bucket)</td><td>20</td></tr>
+        <tr><td><code>PerSecondRefill</code></td><td>Sustained sends/sec (refill rate)</td><td>20</td></tr>
+        <tr><td><code>FallbackRefill</code></td><td>In-process rate when Redis is down (per replica)</td><td>5</td></tr>
+        <tr><td><code>BucketTtlSeconds</code></td><td>Sliding TTL on the bucket hash</td><td>120</td></tr>
+        <tr><td><code>DailySetTtlSeconds</code></td><td>TTL on the per-day recipient Set</td><td>90000 (25 h)</td></tr>
+        <tr><td><code>InteractiveMaxWaitMs</code></td><td>Interactive wait budget before 429</td><td>2000</td></tr>
+        <tr><td><code>CampaignWaitCapMs</code></td><td>Max in-worker wait before reschedule</td><td>750</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warning">
+    Defaults are deliberately conservative — well under Meta's ~80&nbsp;mps Cloud-API ceiling. <strong>Confirm the
+    exact current per-second and per-tier limits against Meta's live documentation before raising them</strong>;
+    they change, and the design intentionally does not hardcode them. 20&nbsp;mps sustained is already ~15× the
+    current effective rate while removing the burst.
+  </div>
+
+  <!-- ─────────────────────────────  VERIFY  ───────────────────────────── -->
+  <h2 id="verify">8 · Verification strategy <span class="badge badge-p1">non-negotiable</span></h2>
+  <p>"Perfect" is meaningless if unverified. The plan ships with tests, not just code.</p>
+  <ol>
+    <li><strong>Concurrency test (the critical one).</strong> Fire <em>N</em> = 500 parallel
+        <code>TryAcquireAsync</code> calls for one phone-number id against a real/embedded Redis. Assert: tokens
+        <em>granted</em> in any rolling 1-second slice never exceed <code>PerSecondCapacity + refill</code>, and
+        total grants over <em>T</em> seconds ≈ <code>refill × T</code> (within one bucket). This is the proof the
+        Lua bucket actually bounds the rate under contention — the section most safety plans omit.</li>
+    <li><strong>Boundary test.</strong> Drive sends across a wall-clock minute rollover; assert no spike above the
+        bucket ceiling (the bug the fixed window has).</li>
+    <li><strong>Daily-cap test.</strong> Same contact twice → counts once; <code>(limit+1)</code> distinct
+        contacts → the last returns <code>DailyTierExceeded</code>.</li>
+    <li><strong>Fail-safe test.</strong> Point at a dead Redis; assert calls fall back to the in-process bucket
+        (bounded, logged) and never return unconditional-allow.</li>
+    <li><strong>Stall regression test.</strong> Force sustained throttling mid-campaign; assert the job
+        <em>reschedules</em> (Hangfire <code>Schedule</code>) rather than throwing, recipients remain
+        <code>Queued</code>, and a later run drains them to <code>Sent</code> with zero duplicates.</li>
+  </ol>
+
+  <!-- ─────────────────────────────  MATRIX  ───────────────────────────── -->
+  <h2 id="matrix">9 · Failure-mode matrix — before vs after</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Scenario</th><th>Today (fixed window)</th><th>After (token bucket)</th></tr></thead>
+      <tbody>
+        <tr><td>Minute-boundary burst</td><td>~160 calls in ~2 s</td><td>Bounded by bucket capacity — no spike</td></tr>
+        <tr><td>Sustained over-rate</td><td>Throws → batch aborts</td><td>Sub-second wait, then send — no abort</td></tr>
+        <tr><td>Heavy sustained throttle</td><td>Retries exhaust → <strong>campaign stalls forever</strong></td>
+            <td>Reschedules with jitter → resumes; sweeper backstop</td></tr>
+        <tr><td>Many concurrent campaigns</td><td>Thundering herd, throughput collapse</td>
+            <td>Shared bucket + jittered reschedule → smooth</td></tr>
+        <tr><td>New number, big campaign</td><td>No tier guard — can blow the 24h cap</td>
+            <td>Daily unique-recipient cap holds; resumes next day</td></tr>
+        <tr><td>Redis outage</td><td><strong>Fails open</strong> — unthrottled burst</td>
+            <td>In-process bucket (bounded), loud logs — never open</td></tr>
+        <tr><td>Duplicate delivery</td><td>None (already safe)</td><td>None — wait/reschedule precede the send</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ─────────────────────────────  DONE  ───────────────────────────── -->
+  <h2 id="done">10 · Definition of Done</h2>
+  <ul>
+    <li><strong>Phase 1:</strong> Total throughput to one number never exceeds its configured per-second bucket
+        regardless of worker/replica count (proven by the concurrency test); rate-limited campaigns reschedule and
+        always finish; Redis outage degrades to a bounded local bucket, never fail-open; the old
+        <code>FixedWindowWabaRateLimiter</code> is deleted.</li>
+    <li><strong>Phase 2:</strong> A number never exceeds its <code>MessagingTier</code> unique-recipient cap in a
+        rolling day; over-cap campaigns pause and resume after reset with a tenant notification.</li>
+    <li><strong>Phase 3:</strong> Tier &amp; quality auto-sync from Meta via the existing health-check poll; the
+        limiter self-tunes and the monitoring dashboard shows live quality ratings.</li>
+    <li>All five verification tests pass in CI.</li>
+  </ul>
+
+  <div class="callout success">
+    <strong>Net:</strong> Phase 1 is the safety-critical core and is shippable on its own — it removes the burst,
+    the stall, the herd, and the fail-open hole in one change. Phases 2–3 add the tier dimension and make it
+    self-tuning. Combined with the 10.2 monitoring already built, both mechanisms by which Meta blocks a number
+    are now guarded.
+  </div>
+
+  <footer class="plan-footer">
+    <span>PAS-15 · Token-Bucket Rate Limiter</span>
+    <span>PRD § 6.1 · 4.3 · 10.2 — wa_api (API + Infra + DB), no web changes</span>
+  </footer>
+
+</div>
+</body>
+</html>

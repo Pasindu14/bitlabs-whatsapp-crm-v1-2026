@@ -8,6 +8,21 @@ namespace wa_api.Features.WhatsApp.Entities;
 public enum WabaConnectionStatus { Connected, Disconnected, Invalid }
 
 /// <summary>
+/// Meta's messaging limit tier — the number of <strong>unique recipients</strong> the number may start
+/// business-initiated conversations with in a rolling 24-hour window. The enum's numeric value IS the cap
+/// (so <c>(int)tier</c> yields the limit), while it is persisted by name to match the codebase's
+/// string-enum convention. A freshly connected number starts at <see cref="Tier1K"/>.
+/// </summary>
+public enum MessagingTier
+{
+    Tier250 = 250,
+    Tier1K = 1000,
+    Tier10K = 10000,
+    Tier100K = 100000,
+    Unlimited = int.MaxValue,
+}
+
+/// <summary>
 /// A WhatsApp Business Account (WABA) phone-number connection owned by a tenant
 /// <see cref="Company"/>. Managed ONLY by SuperAdmin in this phase.
 /// <para>
@@ -37,6 +52,18 @@ public class WabaConnection : BaseEntity, ITenantEntity
 
     /// <summary>Connection status as reported / set by the platform.</summary>
     public WabaConnectionStatus Status { get; set; } = WabaConnectionStatus.Connected;
+
+    /// <summary>
+    /// Meta messaging limit tier (24-hour unique-recipient cap) enforced by the WABA rate limiter.
+    /// Defaults to <see cref="MessagingTier.Tier1K"/> for a new number; auto-synced from Meta in Phase 3.
+    /// </summary>
+    public MessagingTier MessagingTier { get; set; } = MessagingTier.Tier1K;
+
+    /// <summary>
+    /// Latest Meta quality rating (GREEN / YELLOW / RED) from the health-check poll. Null until first
+    /// synced. Surfaced on the SuperAdmin monitoring dashboard (10.2).
+    /// </summary>
+    public string? QualityRating { get; set; }
 
     /// <summary>UTC timestamp of the last Hangfire health-check poll against Meta's API.</summary>
     public DateTime? LastHealthCheckAt { get; set; }

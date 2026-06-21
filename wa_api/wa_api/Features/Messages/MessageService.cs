@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -16,11 +17,13 @@ public class MessageService(
     AppDbContext db,
     IHttpClientFactory httpClientFactory,
     IWabaRateLimiter rateLimiter,
+    IOptions<RateLimitOptions> rateOptions,
     ISubscriptionGate subscriptionGate,
     ILogger<MessageService> logger)
     : IMessageService
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private readonly RateLimitOptions _rateOptions = rateOptions.Value;
 
     public async Task<(IReadOnlyList<MessageResponse> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, string? sortBy, string? sortOrder,
@@ -82,7 +85,10 @@ public class MessageService(
             throw new BusinessRuleException("WABA_INACTIVE",
                 "The selected WhatsApp connection is inactive.");
 
-        await rateLimiter.CheckAsync(waba.PhoneNumberId, ct);
+        // Standalone send is a session message (free-form text): per-second pacing only, no tier consumption.
+        await rateLimiter.AcquireOrThrowAsync(
+            waba.PhoneNumberId, recipientContactId: null, dailyTierLimit: 0,
+            maxWait: TimeSpan.FromMilliseconds(_rateOptions.InteractiveMaxWaitMs), ct);
 
         var (externalId, errorMessage) = await CallMetaApiAsync(waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, request.Body, ct);
 

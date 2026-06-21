@@ -50,7 +50,7 @@ public class WabaHealthCheckJob(
 
     private async Task CheckConnectionAsync(HttpClient client, WabaConnection conn, DateTime checkedAt)
     {
-        var url = $"{MetaApiVersion}/{conn.PhoneNumberId}?fields=display_phone_number,verified_name,quality_rating,code_verification_status";
+        var url = $"{MetaApiVersion}/{conn.PhoneNumberId}?fields=display_phone_number,verified_name,quality_rating,messaging_limit_tier,code_verification_status";
 
         try
         {
@@ -64,6 +64,21 @@ public class WabaHealthCheckJob(
             {
                 conn.Status = WabaConnectionStatus.Connected;
                 conn.HealthCheckErrorMessage = null;
+
+                // Persist Meta's quality rating (surfaced on the 10.2 monitoring dashboard).
+                conn.QualityRating = ParseStringField(body, "quality_rating") ?? conn.QualityRating;
+
+                // Auto-sync the messaging tier so the rate limiter self-tunes as Meta upgrades the number.
+                // Conservative: only a recognized tier string updates the cap; unknown values are left as-is
+                // (we never raise a number's cap based on an unrecognized response).
+                var mappedTier = MapMessagingTier(ParseStringField(body, "messaging_limit_tier"));
+                if (mappedTier is { } tier && tier != conn.MessagingTier)
+                {
+                    logger.LogInformation(
+                        "WabaHealthCheck: connection {Id} ({Phone}) messaging tier {Old} → {New} (Meta sync).",
+                        conn.Id, conn.DisplayPhoneNumber, conn.MessagingTier, tier);
+                    conn.MessagingTier = tier;
+                }
             }
             else
             {
@@ -115,6 +130,39 @@ public class WabaHealthCheckJob(
                 return msg.GetString();
         }
         catch { /* not JSON or unexpected shape */ }
+        return null;
+    }
+
+    /// <summary>Read a top-level string field (e.g. quality_rating, messaging_limit_tier) from Meta's response.</summary>
+    private static string? ParseStringField(string body, string field)
+    {
+        try
+        {
+            var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty(field, out var prop) && prop.ValueKind == JsonValueKind.String)
+                return prop.GetString();
+        }
+        catch { /* not JSON or unexpected shape */ }
+        return null;
+    }
+
+    /// <summary>
+    /// Map Meta's <c>messaging_limit_tier</c> string (e.g. <c>TIER_1K</c>, <c>TIER_100K</c>,
+    /// <c>TIER_UNLIMITED</c>) to <see cref="MessagingTier"/>. Tokens are matched most-specific-first.
+    /// Returns null for unrecognized values (<c>TIER_NOT_SET</c>, future tiers, etc.) so the caller leaves
+    /// the existing tier untouched — we never raise a number's cap on an unrecognized response.
+    /// </summary>
+    private static MessagingTier? MapMessagingTier(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var t = raw.ToUpperInvariant();
+
+        if (t.Contains("UNLIMITED")) return MessagingTier.Unlimited;
+        if (t.Contains("100K")) return MessagingTier.Tier100K;
+        if (t.Contains("10K")) return MessagingTier.Tier10K;
+        if (t.Contains("1K")) return MessagingTier.Tier1K;
+        // TIER_250 and the lower TIER_50 both floor to our smallest modelled tier.
+        if (t.Contains("250") || t.Contains("50")) return MessagingTier.Tier250;
         return null;
     }
 }

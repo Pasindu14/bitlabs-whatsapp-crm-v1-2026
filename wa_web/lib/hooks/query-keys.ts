@@ -85,6 +85,8 @@ export const queryKeys = {
   mySubscription: {
     all: ['my-subscription'] as const,
     current: () => [...queryKeys.mySubscription.all, 'current'] as const,
+    invoices: () => [...queryKeys.mySubscription.all, 'invoices'] as const,
+    availablePlans: () => [...queryKeys.mySubscription.all, 'available-plans'] as const,
   },
 
   // Contacts (CompanyAdmin — the caller's own company)
@@ -138,6 +140,12 @@ export const queryKeys = {
     list: (filters?: any) => [...queryKeys.campaigns.lists(), filters] as const,
     details: () => [...queryKeys.campaigns.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.campaigns.details(), id] as const,
+  },
+
+  // Connections (CompanyAdmin — own WABA phone number connections)
+  connections: {
+    all: ['connections'] as const,
+    list: () => [...queryKeys.connections.all, 'list'] as const,
   },
 
   // Notifications (CompanyAdmin — in-app notification feed)

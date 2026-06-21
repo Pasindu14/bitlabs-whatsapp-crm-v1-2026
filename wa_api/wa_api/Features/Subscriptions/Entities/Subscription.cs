@@ -41,6 +41,12 @@ public class Subscription : BaseEntity, ITenantEntity
     /// <summary>Messages consumed against the plan quota in the current period.</summary>
     public int MessagesUsedThisPeriod { get; set; }
 
+    /// <summary>
+    /// Stripe Subscription ID (<c>sub_xxx</c>). Null for manually-assigned subscriptions.
+    /// Unique among active rows so the webhook job can do an O(1) lookup.
+    /// </summary>
+    public string? StripeSubscriptionId { get; set; }
+
     /// <summary>Owning company navigation.</summary>
     public Company Company { get; set; } = null!;
 

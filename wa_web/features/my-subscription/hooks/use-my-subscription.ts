@@ -2,7 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/hooks/query-keys";
-import { getMySubscriptionAction } from "@/features/my-subscription/actions/my-subscription-actions";
+import {
+  getMySubscriptionAction,
+  getInvoicesAction,
+  getAvailablePlansAction,
+} from "@/features/my-subscription/actions/my-subscription-actions";
 
 /** The caller's own active subscription + usage. `hasSubscription` is false when none. */
 export function useMySubscription() {
@@ -14,5 +18,31 @@ export function useMySubscription() {
       return res.data;
     },
     staleTime: 30_000,
+  });
+}
+
+/** CompanyAdmin — invoice history from Stripe. */
+export function useInvoices() {
+  return useQuery({
+    queryKey: queryKeys.mySubscription.invoices(),
+    queryFn: async () => {
+      const res = await getInvoicesAction();
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    staleTime: 60_000,
+  });
+}
+
+/** CompanyAdmin — plans that have a StripePriceId set (self-service checkout). */
+export function useAvailablePlans() {
+  return useQuery({
+    queryKey: queryKeys.mySubscription.availablePlans(),
+    queryFn: async () => {
+      const res = await getAvailablePlansAction();
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    staleTime: 5 * 60_000,
   });
 }

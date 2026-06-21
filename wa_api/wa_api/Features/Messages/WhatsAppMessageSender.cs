@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Subscriptions.Entities;
@@ -20,16 +21,21 @@ public class WhatsAppMessageSender(
     AppDbContext db,
     IHttpClientFactory httpClientFactory,
     IWabaRateLimiter rateLimiter,
+    IOptions<RateLimitOptions> rateOptions,
     ILogger<WhatsAppMessageSender> logger)
     : IWhatsAppMessageSender
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private readonly RateLimitOptions _rateOptions = rateOptions.Value;
 
     public async Task<Message> SendAsync(
         Contact contact, WabaConnection waba, string body, Guid? conversationId,
         CancellationToken ct = default)
     {
-        await rateLimiter.CheckAsync(waba.PhoneNumberId, ct);
+        // Session/service reply (within the 24h window): per-second pacing only, no tier consumption.
+        await rateLimiter.AcquireOrThrowAsync(
+            waba.PhoneNumberId, recipientContactId: null, dailyTierLimit: 0,
+            maxWait: TimeSpan.FromMilliseconds(_rateOptions.InteractiveMaxWaitMs), ct);
 
         var (externalId, errorMessage) = await CallMetaApiAsync(
             waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, body, ct);

@@ -24,4 +24,11 @@ public class Company : BaseEntity
 
     /// <summary>Primary contact phone for the company.</summary>
     public string? Phone { get; set; }
+
+    /// <summary>
+    /// Stripe Customer ID (<c>cus_xxx</c>). Set on the first self-service checkout; null for
+    /// companies that only ever use the manual SuperAdmin assignment path.
+    /// Indexed for the reverse-lookup on every Stripe webhook: <c>stripeCustomerId → Company</c>.
+    /// </summary>
+    public string? StripeCustomerId { get; set; }
 }

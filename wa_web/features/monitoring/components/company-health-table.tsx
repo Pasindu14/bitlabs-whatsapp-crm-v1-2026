@@ -38,6 +38,25 @@ function HealthBadge({ company }: { company: CompanyHealth }) {
   );
 }
 
+function QualityBadge({ rating }: { rating: string | null }) {
+  if (!rating) return <span className="text-xs text-muted-foreground">—</span>;
+  const r = rating.toUpperCase();
+  const cls =
+    r === "GREEN"
+      ? "bg-primary/10 text-primary"
+      : r === "YELLOW"
+        ? "bg-amber-100 text-amber-700"
+        : r === "RED"
+          ? "bg-destructive/10 text-destructive"
+          : "bg-muted text-muted-foreground";
+  const label = r.charAt(0) + r.slice(1).toLowerCase();
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
 function SummaryCards({ companies }: { companies: CompanyHealth[] }) {
   const total     = companies.length;
   const active    = companies.filter((c) => c.isActive).length;
@@ -102,6 +121,7 @@ export function CompanyHealthTable() {
               <tr className="border-b bg-muted/40">
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Health</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Quality</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sent (30d)</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Failed</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Fail Rate</th>
@@ -130,6 +150,9 @@ export function CompanyHealthTable() {
                   </td>
                   <td className="px-4 py-3">
                     <HealthBadge company={company} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <QualityBadge rating={company.qualityRating} />
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {numFmt.format(company.totalSent30d)}
@@ -163,7 +186,7 @@ export function CompanyHealthTable() {
               ))}
               {sorted.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                     No companies found.
                   </td>
                 </tr>

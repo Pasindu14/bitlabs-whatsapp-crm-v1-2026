@@ -36,6 +36,7 @@ function typeLabel(type: NotificationType): string {
   const map: Record<NotificationType, string> = {
     TemplateApproved: "Template",
     CampaignFailed: "Campaign",
+    CampaignThrottled: "Campaign",
     QuotaWarning3Days: "Quota",
     QuotaWarning2Days: "Quota",
     QuotaWarning1Day: "Quota",

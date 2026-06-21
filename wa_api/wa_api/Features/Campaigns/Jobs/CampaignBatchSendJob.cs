@@ -1,9 +1,9 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using wa_api.Common.Errors;
 using wa_api.Features.Campaigns.Entities;
 using wa_api.Features.Messages.Entities;
 using wa_api.Infrastructure.Persistence;
@@ -17,14 +17,22 @@ namespace wa_api.Features.Campaigns.Jobs;
 ///
 /// Runs cross-tenant (Hangfire has no HttpContext): loads via IgnoreQueryFilters,
 /// stamps CompanyId manually on every Message insert.
+///
+/// Rate-limit handling is graceful: a throttled send is waited out for sub-second pauses, otherwise the
+/// batch is rescheduled (Hangfire Schedule) with jitter — never thrown. So a rate limit can never wedge a
+/// campaign. The [AutomaticRetry] bound covers only genuine job faults; on exhaustion the job is deleted and
+/// the campaign sweeper re-enqueues any campaign left Running with Queued recipients.
 /// </summary>
+[AutomaticRetry(Attempts = 5, OnAttemptsExceeded = AttemptsExceededAction.Delete)]
 public class CampaignBatchSendJob(
     IServiceScopeFactory scopeFactory,
     IBackgroundJobClient jobClient,
     IHttpClientFactory httpClientFactory,
+    IOptions<RateLimitOptions> rateOptions,
     ILogger<CampaignBatchSendJob> logger)
 {
     private const int BatchSize = 50;
+    private readonly RateLimitOptions _rateOptions = rateOptions.Value;
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public async Task RunAsync(Guid campaignId, CancellationToken ct)
@@ -32,6 +40,7 @@ public class CampaignBatchSendJob(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rateLimiter = scope.ServiceProvider.GetRequiredService<IWabaRateLimiter>();
+        var notifier = scope.ServiceProvider.GetRequiredService<Notifications.INotificationService>();
 
         var campaign = await db.Campaigns
             .IgnoreQueryFilters()
@@ -54,6 +63,9 @@ public class CampaignBatchSendJob(
         }
 
         var waba = campaign.Template.WabaConnection;
+
+        // The number's 24-hour unique-recipient tier cap (campaign sends are business-initiated).
+        var tierLimit = (int)waba.MessagingTier;
 
         // Load one batch of Queued recipients with their contacts.
         var batch = await db.CampaignRecipients
@@ -92,10 +104,27 @@ public class CampaignBatchSendJob(
             if (campaign.Status is CampaignStatus.Paused or CampaignStatus.Cancelled)
                 break;
 
+            // ── Acquire a send permit (graceful: brief wait, else reschedule the whole batch) ──
+            // Per-second pacing + the number's daily unique-recipient tier cap.
+            var permit = await rateLimiter.TryAcquireAsync(waba.PhoneNumberId, recipient.ContactId, tierLimit, ct);
+            if (!permit.Allowed
+                && permit.Reason == RateLimitReason.PerSecondThrottle
+                && permit.RetryAfter.TotalMilliseconds <= _rateOptions.CampaignWaitCapMs)
+            {
+                // The send has NOT happened yet, so waiting then retrying the SAME recipient is duplicate-safe.
+                await Task.Delay(permit.RetryAfter, ct);
+                permit = await rateLimiter.TryAcquireAsync(waba.PhoneNumberId, recipient.ContactId, tierLimit, ct);
+            }
+            if (!permit.Allowed)
+            {
+                // Persist progress (recipient stays Queued) and reschedule — never throw, never stall.
+                await db.SaveChangesAsync(ct);
+                await RescheduleBatchAsync(campaign, campaignId, permit, db, notifier, ct);
+                return;
+            }
+
             try
             {
-                await rateLimiter.CheckAsync(waba.PhoneNumberId, ct);
-
                 var resolvedVars = BuildResolvedVariables(resolvedMapping, recipient.Contact);
                 var (externalId, errorCode) = await SendTemplateMessageAsync(
                     waba.PhoneNumberId, waba.EncryptedAccessToken,
@@ -133,12 +162,6 @@ public class CampaignBatchSendJob(
                         "CampaignBatchSendJob: failed sending to contact {ContactId} in campaign {CampaignId}: {Error}",
                         recipient.ContactId, campaignId, errorCode);
                 }
-            }
-            catch (RateLimitException)
-            {
-                // Rate limit hit — abort this batch so Hangfire can retry the job.
-                await db.SaveChangesAsync(ct);
-                throw;
             }
             catch (Exception ex)
             {
@@ -191,6 +214,49 @@ public class CampaignBatchSendJob(
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Throttled mid-batch: persist progress and re-schedule the next batch instead of throwing. A
+    /// per-second throttle backs off a few seconds with jitter (so concurrent campaigns don't wake in
+    /// lockstep); a daily-tier exhaustion waits until the 24-hour window rolls over. Recipients stay Queued,
+    /// so the rescheduled run resumes exactly where this one stopped — no double-send.
+    /// </summary>
+    private async Task RescheduleBatchAsync(
+        Campaign campaign, Guid campaignId, RateLimitResult permit, AppDbContext db,
+        Notifications.INotificationService notifier, CancellationToken ct)
+    {
+        var delay = permit.Reason == RateLimitReason.DailyTierExceeded
+            ? DelayUntilNextUtcDay()
+            : TimeSpan.FromSeconds(5 + Random.Shared.Next(0, 10));
+
+        // A daily-tier pause lasts hours — tell the tenant. Idempotent (unique index on CampaignId+Type),
+        // so repeated reschedules emit at most one notification per campaign.
+        if (permit.Reason == RateLimitReason.DailyTierExceeded)
+        {
+            await notifier.CreateAsync(
+                campaign.CompanyId, campaignId, null,
+                Notifications.Entities.NotificationType.CampaignThrottled,
+                "Campaign paused — daily limit reached",
+                $"\"{campaign.Name}\" reached its WhatsApp number's daily messaging limit and will resume automatically after the daily reset.",
+                ct);
+        }
+
+        var jobId = jobClient.Schedule<CampaignBatchSendJob>(
+            j => j.RunAsync(campaignId, CancellationToken.None), delay);
+        campaign.HangfireJobId = jobId;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "CampaignBatchSendJob: campaign {Id} throttled ({Reason}) — rescheduled in {DelaySeconds}s (job {JobId}).",
+            campaignId, permit.Reason, (int)delay.TotalSeconds, jobId);
+    }
+
+    /// <summary>Delay from now until just after the next UTC midnight (when the daily tier counter resets).</summary>
+    private static TimeSpan DelayUntilNextUtcDay()
+    {
+        var now = DateTime.UtcNow;
+        return now.Date.AddDays(1).AddMinutes(5) - now;
+    }
 
     /// <summary>Parse VariableMapping JSON into a flat dictionary: "body_1" → "Name", etc.</summary>
     private static Dictionary<string, string> ResolveMapping(string variableMappingJson)

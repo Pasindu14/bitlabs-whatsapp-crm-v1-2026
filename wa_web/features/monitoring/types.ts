@@ -10,6 +10,7 @@ export interface CompanyHealth {
   isFlagged: boolean;
   activeCampaigns: number;
   lastMessageAt: string | null;
+  qualityRating: string | null;
 }
 
 export interface MonitoringData {

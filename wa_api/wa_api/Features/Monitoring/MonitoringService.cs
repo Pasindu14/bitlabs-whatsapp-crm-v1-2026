@@ -50,15 +50,25 @@ public class MonitoringService(AppDbContext db)
             .Select(g => new { CompanyId = g.Key, Count = g.Count() })
             .ToListAsync(ct);
 
+        var qualityRows = await db.WabaConnections
+            .IgnoreQueryFilters()
+            .Where(w => w.IsActive && w.QualityRating != null)
+            .Select(w => new { w.CompanyId, w.QualityRating })
+            .ToListAsync(ct);
+
         var sentByCompany     = sentStats.ToDictionary(x => x.CompanyId);
         var lastByCompany     = lastActivity.ToDictionary(x => x.CompanyId, x => x.LastAt);
         var campaignsByCompany= activeCampaigns.ToDictionary(x => x.CompanyId, x => x.Count);
+        var qualityByCompany  = qualityRows
+            .GroupBy(x => x.CompanyId)
+            .ToDictionary(g => g.Key, g => WorstQuality(g.Select(x => x.QualityRating!)));
 
         var dtos = companies.Select(c =>
         {
             sentByCompany.TryGetValue(c.Id, out var stats);
             lastByCompany.TryGetValue(c.Id, out var lastAt);
             campaignsByCompany.TryGetValue(c.Id, out var activeCampaignCount);
+            qualityByCompany.TryGetValue(c.Id, out var quality);
 
             var totalSent   = stats?.TotalSent    ?? 0;
             var failed      = stats?.FailedCount  ?? 0;
@@ -76,10 +86,32 @@ public class MonitoringService(AppDbContext db)
                 Math.Round(failureRate, 4),
                 failureRate >= FlagThreshold,
                 activeCampaignCount,
-                lastAt == default ? null : lastAt
+                lastAt == default ? null : lastAt,
+                quality
             );
         }).ToList();
 
         return new MonitoringResponse(dtos);
+    }
+
+    /// <summary>Pick the most concerning rating across a company's numbers: RED &gt; YELLOW &gt; GREEN.</summary>
+    private static string? WorstQuality(IEnumerable<string> ratings)
+    {
+        static int Rank(string r) => r.ToUpperInvariant() switch
+        {
+            "RED" => 3,
+            "YELLOW" => 2,
+            "GREEN" => 1,
+            _ => 0,
+        };
+
+        string? worst = null;
+        var worstRank = -1;
+        foreach (var r in ratings)
+        {
+            var rank = Rank(r);
+            if (rank > worstRank) { worstRank = rank; worst = r; }
+        }
+        return worst;
     }
 }

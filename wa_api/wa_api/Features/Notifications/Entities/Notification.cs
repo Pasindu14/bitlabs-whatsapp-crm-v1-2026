@@ -13,6 +13,8 @@ public enum NotificationType
     QuotaWarningToday,
     CampaignFailed,
     TemplateApproved,
+    /// <summary>A campaign hit its WABA number's 24-hour messaging tier cap and was paused until reset.</summary>
+    CampaignThrottled,
 }
 
 /// <summary>

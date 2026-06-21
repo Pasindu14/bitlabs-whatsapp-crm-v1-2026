@@ -189,6 +189,71 @@ namespace wa_api.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("wa_api.Features.Billing.Entities.Invoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountPaid")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("HostedInvoiceUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("InvoicePdfUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("StripeInvoiceId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("StripeInvoiceId")
+                        .IsUnique();
+
+                    b.HasIndex("StripeSubscriptionId");
+
+                    b.HasIndex("CompanyId", "PaidAt");
+
+                    b.ToTable("Invoices");
+                });
+
             modelBuilder.Entity("wa_api.Features.Campaigns.Entities.Campaign", b =>
                 {
                     b.Property<Guid>("Id")
@@ -432,6 +497,10 @@ namespace wa_api.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -442,6 +511,10 @@ namespace wa_api.Migrations
 
                     b.HasIndex("Slug")
                         .IsUnique();
+
+                    b.HasIndex("StripeCustomerId")
+                        .IsUnique()
+                        .HasFilter("\"StripeCustomerId\" IS NOT NULL");
 
                     b.ToTable("Companies");
                 });
@@ -799,6 +872,10 @@ namespace wa_api.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<string>("StripePriceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -842,6 +919,10 @@ namespace wa_api.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -854,6 +935,10 @@ namespace wa_api.Migrations
                     b.HasIndex(new[] { "CompanyId" }, "UX_Subscriptions_CompanyId_Active")
                         .IsUnique()
                         .HasFilter("\"Status\" = 'Active'");
+
+                    b.HasIndex(new[] { "StripeSubscriptionId" }, "UX_Subscriptions_StripeSubscriptionId")
+                        .IsUnique()
+                        .HasFilter("\"StripeSubscriptionId\" IS NOT NULL");
 
                     b.ToTable("Subscriptions");
                 });
@@ -1031,10 +1116,19 @@ namespace wa_api.Migrations
                     b.Property<DateTime?>("LastHealthCheckAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("MessagingTier")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("PhoneNumberId")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("QualityRating")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1078,6 +1172,15 @@ namespace wa_api.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Billing.Entities.Invoice", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("wa_api.Features.Campaigns.Entities.Campaign", b =>

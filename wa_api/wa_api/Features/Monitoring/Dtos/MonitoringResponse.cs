@@ -12,7 +12,9 @@ public record CompanyHealthDto(
     double FailureRate,
     bool IsFlagged,
     int ActiveCampaigns,
-    DateTime? LastMessageAt
+    DateTime? LastMessageAt,
+    /// <summary>Worst Meta quality rating (GREEN/YELLOW/RED) across the company's WABA numbers; null if unsynced.</summary>
+    string? QualityRating
 );
 
 public record MonitoringResponse(IReadOnlyList<CompanyHealthDto> Companies);

@@ -19,13 +19,28 @@ public class MyWabaConnectionsController(AppDbContext db) : ControllerBase
 {
     private string? CorrelationId => HttpContext.Items["CorrelationId"]?.ToString();
 
-    /// <summary>GET /api/v1/my-waba-connections — active connections for the caller's company.</summary>
+    /// <summary>GET /api/v1/my-waba-connections — active connected connections (message picker).</summary>
     [HttpGet]
     public async Task<IActionResult> GetActive(CancellationToken ct)
     {
         // Tenant query filter already scopes to the caller's company.
         var items = await db.WabaConnections.AsNoTracking()
             .Where(w => w.IsActive && w.Status == WabaConnectionStatus.Connected)
+            .OrderBy(w => w.DisplayPhoneNumber)
+            .Select(w => new WabaConnectionResponse(
+                w.Id, w.CompanyId, w.Company.Name, w.PhoneNumberId, w.WabaId,
+                w.DisplayPhoneNumber, w.Status, w.EncryptedAccessToken != "", w.IsActive, w.CreatedAt,
+                w.LastHealthCheckAt, w.HealthCheckErrorMessage))
+            .ToListAsync(ct);
+
+        return Ok(ResponseHelper.Ok(items, CorrelationId));
+    }
+
+    /// <summary>GET /api/v1/my-waba-connections/all — all connections regardless of status (connections page).</summary>
+    [HttpGet("all")]
+    public async Task<IActionResult> GetAll(CancellationToken ct)
+    {
+        var items = await db.WabaConnections.AsNoTracking()
             .OrderBy(w => w.DisplayPhoneNumber)
             .Select(w => new WabaConnectionResponse(
                 w.Id, w.CompanyId, w.Company.Name, w.PhoneNumberId, w.WabaId,

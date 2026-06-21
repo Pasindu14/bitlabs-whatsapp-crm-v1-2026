@@ -1,12 +1,16 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { CurrentPlanCard } from "@/features/my-subscription/components/current-plan-card";
+import { BillingActionsCard } from "@/features/my-subscription/components/billing-actions";
+import { InvoicesList } from "@/features/my-subscription/components/invoices-list";
 
 export default async function MySubscriptionPage() {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
   }
+
+  const isAdmin = session.user.role === "CompanyAdmin";
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -17,8 +21,16 @@ export default async function MySubscriptionPage() {
         </p>
       </div>
 
-      <div className="max-w-md">
-        <CurrentPlanCard />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-6">
+          <CurrentPlanCard />
+          {isAdmin && <InvoicesList />}
+        </div>
+        {isAdmin && (
+          <div>
+            <BillingActionsCard />
+          </div>
+        )}
       </div>
     </div>
   );

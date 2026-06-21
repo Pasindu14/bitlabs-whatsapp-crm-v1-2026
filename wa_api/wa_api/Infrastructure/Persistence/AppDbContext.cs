@@ -14,6 +14,7 @@ using wa_api.Features.Messages.Entities;
 using wa_api.Features.Plans.Entities;
 using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.Templates.Entities;
+using wa_api.Features.Billing.Entities;
 using wa_api.Features.Notifications.Entities;
 using wa_api.Features.Webhooks.Entities;
 using wa_api.Features.WhatsApp.Entities;
@@ -47,6 +48,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<CampaignContactList> CampaignContactLists => Set<CampaignContactList>();
@@ -130,6 +132,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.HasIndex(x => x.Slug).IsUnique();         // unique when set (nulls allowed)
             e.Property(x => x.Email).HasMaxLength(256);
             e.Property(x => x.Phone).HasMaxLength(32);
+            // Stripe reverse-lookup: stripeCustomerId → Company. Indexed; null for manual-only companies.
+            e.Property(x => x.StripeCustomerId).HasMaxLength(100);
+            e.HasIndex(x => x.StripeCustomerId).IsUnique().HasFilter("\"StripeCustomerId\" IS NOT NULL");
         });
 
         modelBuilder.Entity<WabaConnection>(e =>
@@ -141,6 +146,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.Property(x => x.DisplayPhoneNumber).HasMaxLength(32);
             e.Property(x => x.EncryptedAccessToken).IsRequired().HasMaxLength(2048);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.MessagingTier).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.QualityRating).HasMaxLength(20);
             e.HasIndex(x => x.CompanyId);
             e.HasOne(x => x.Company)
                 .WithMany()
@@ -299,6 +306,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .HasColumnType("text[]")
                 .IsRequired()
                 .HasDefaultValueSql("'{}'::text[]");
+            // Stripe Price ID — null for manual-only plans; required for self-service checkout.
+            e.Property(x => x.StripePriceId).HasMaxLength(100);
             // Platform catalog — NO tenant query filter (shared across all companies, like Company).
         });
 
@@ -306,6 +315,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            // Stripe Subscription ID — null for manually-assigned rows. Unique when set.
+            e.Property(x => x.StripeSubscriptionId).HasMaxLength(100);
+            e.HasIndex(x => x.StripeSubscriptionId, "UX_Subscriptions_StripeSubscriptionId")
+                .IsUnique()
+                .HasFilter("\"StripeSubscriptionId\" IS NOT NULL");
             e.HasIndex(x => x.CompanyId);
             // One ACTIVE subscription per company — partial unique index. Cancelled/Inactive
             // rows are excluded, so historical subscriptions can coexist. The named overload
@@ -505,6 +519,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .HasForeignKey(x => x.TemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasOne<wa_api.Features.Companies.Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Invoice>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // StripeInvoiceId is the idempotency key — replayed invoice.paid events collide here.
+            e.Property(x => x.StripeInvoiceId).IsRequired().HasMaxLength(100);
+            e.HasIndex(x => x.StripeInvoiceId).IsUnique();
+            e.Property(x => x.StripeSubscriptionId).HasMaxLength(100);
+            e.HasIndex(x => x.StripeSubscriptionId);
+            e.Property(x => x.Currency).IsRequired().HasMaxLength(3);
+            e.Property(x => x.Status).IsRequired().HasMaxLength(20);
+            e.Property(x => x.HostedInvoiceUrl).HasMaxLength(2048);
+            e.Property(x => x.InvoicePdfUrl).HasMaxLength(2048);
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => new { x.CompanyId, x.PaidAt });
+            e.HasOne<Features.Companies.Company>()
                 .WithMany()
                 .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Cascade);

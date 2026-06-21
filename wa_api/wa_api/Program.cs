@@ -61,9 +61,17 @@ try
     var redisConnection = builder.Configuration["REDIS_CONNECTION"];
     if (!string.IsNullOrWhiteSpace(redisConnection))
     {
-        builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redisConnection);
+        // Default AbortOnConnectFail=false (unless the string sets abortConnect explicitly): a brief Redis
+        // outage at startup must NOT crash the app. The multiplexer reconnects in the background, and any
+        // rate-limit call during the outage falls through to the bounded in-process fallback. Parsed once and
+        // shared by the cache and the multiplexer (Connect clones internally, so the instance isn't mutated).
+        var redisOptions = ConfigurationOptions.Parse(redisConnection);
+        if (!redisConnection.Contains("abortConnect", StringComparison.OrdinalIgnoreCase))
+            redisOptions.AbortOnConnectFail = false;
+
+        builder.Services.AddStackExchangeRedisCache(o => o.ConfigurationOptions = redisOptions);
         builder.Services.AddSingleton<IConnectionMultiplexer>(
-            _ => ConnectionMultiplexer.Connect(redisConnection));
+            _ => ConnectionMultiplexer.Connect(redisOptions));
         builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
     }
     else
@@ -102,7 +110,20 @@ try
     builder.Services.AddScoped<wa_api.Features.Users.IUserService, wa_api.Features.Users.UserService>();
     builder.Services.AddScoped<wa_api.Features.Contacts.IContactService, wa_api.Features.Contacts.ContactService>();
     builder.Services.AddScoped<wa_api.Features.ContactLists.IContactListService, wa_api.Features.ContactLists.ContactListService>();
-    builder.Services.AddScoped<wa_api.Infrastructure.RateLimiting.IWabaRateLimiter, wa_api.Infrastructure.RateLimiting.FixedWindowWabaRateLimiter>();
+    // ── WABA send rate limiter (PRD 6.1) ──────────────────────────────────
+    // Redis token bucket when configured (atomic across replicas); else an in-process bucket for
+    // single-process/dev. The Redis limiter also degrades to the in-process bucket on a cache outage,
+    // so the shared LocalBucketRegistry is always registered. Never fail-open.
+    builder.Services.Configure<wa_api.Infrastructure.RateLimiting.RateLimitOptions>(
+        builder.Configuration.GetSection("RateLimit"));
+    builder.Services.AddSingleton<wa_api.Infrastructure.RateLimiting.LocalBucketRegistry>();
+    builder.Services.AddSingleton<wa_api.Infrastructure.RateLimiting.InProcessTokenBucket>();
+    if (!string.IsNullOrWhiteSpace(redisConnection))
+        builder.Services.AddScoped<wa_api.Infrastructure.RateLimiting.IWabaRateLimiter,
+            wa_api.Infrastructure.RateLimiting.RedisTokenBucketRateLimiter>();
+    else
+        builder.Services.AddSingleton<wa_api.Infrastructure.RateLimiting.IWabaRateLimiter>(
+            sp => sp.GetRequiredService<wa_api.Infrastructure.RateLimiting.InProcessTokenBucket>());
     builder.Services.AddScoped<wa_api.Features.Messages.IMessageService, wa_api.Features.Messages.MessageService>();
     builder.Services.AddScoped<wa_api.Features.Messages.IWhatsAppMessageSender, wa_api.Features.Messages.WhatsAppMessageSender>();
     builder.Services.AddScoped<wa_api.Features.Conversations.IConversationService, wa_api.Features.Conversations.ConversationService>();
@@ -127,6 +148,13 @@ try
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>();
     builder.Services.AddScoped<wa_api.Features.Analytics.AnalyticsService>();
     builder.Services.AddScoped<wa_api.Features.Monitoring.MonitoringService>();
+
+    // ── Stripe (PRD 3.2 / 3.3 / 3.5) ─────────────────────────────────────
+    builder.Services.Configure<wa_api.Infrastructure.Stripe.StripeOptions>(
+        builder.Configuration.GetSection("Stripe"));
+    builder.Services.AddScoped<wa_api.Infrastructure.Stripe.IStripeService, wa_api.Infrastructure.Stripe.StripeService>();
+    builder.Services.AddScoped<wa_api.Features.Billing.IInvoiceService, wa_api.Features.Billing.InvoiceService>();
+    builder.Services.AddTransient<wa_api.Features.Billing.Jobs.StripeWebhookProcessingJob>();
 
     // ── Webhooks (Meta inbound: template status 5.2 + delivery status 6.4; inbound stub → Phase 7) ──
     builder.Services.AddScoped<wa_api.Features.Webhooks.Signature.IMetaSignatureVerifier, wa_api.Features.Webhooks.Signature.MetaSignatureVerifier>();
