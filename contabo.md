@@ -307,6 +307,19 @@ ssh root@213.136.74.159 'cd /opt/wa_api && docker compose up -d --build'
 ssh root@213.136.74.159 'curl -s http://localhost:8080/health'
 ```
 
+### ⚠️ If your change includes a NEW EF MIGRATION — you MUST apply it manually
+
+**Production does NOT auto-run migrations** (only Dev/Staging do, see `Program.cs`). If you added a migration and skip this, the app will 500 with errors like `42703: column ... does not exist`.
+
+Apply pending migrations to the live (Frankfurt) DB from your **local machine** (your `appsettings.Development.json` points at Frankfurt):
+```bash
+cd /d/Github/bitlabs-whatsapp-crm-v1-2026/wa_api/wa_api
+dotnet ef database update          # applies any pending migrations to the DB in appsettings.Development.json
+```
+- Schema changes take effect immediately — no container restart needed.
+- Check what's pending first: `dotnet ef migrations list` (✓ = applied).
+- Alternative (no SDK): generate SQL with `dotnet ef migrations script <from> <to> -o up.sql`, copy to the server, and run it via `docker run --rm -v ...:/b postgres:17-alpine psql "<conn>" -f /b/up.sql`.
+
 Notes:
 - `docker compose up -d --build` only restarts the `api` container if its image changed; Redis keeps running.
 - `appsettings.Development.json` and `.env` are **never** overwritten by the transfer (excluded), so server secrets are safe.
