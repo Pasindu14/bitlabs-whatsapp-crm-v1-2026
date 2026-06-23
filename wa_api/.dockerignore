@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.git/
+**/*.user
+**/*.suo
+# Secrets are injected at runtime via the .env / environment, never baked into the image
+**/appsettings.Development.json
+**/appsettings.Development.example.json
+wa_api.Tests/
+.env
