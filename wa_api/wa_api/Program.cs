@@ -148,6 +148,7 @@ try
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>();
     builder.Services.AddScoped<wa_api.Features.Analytics.AnalyticsService>();
     builder.Services.AddScoped<wa_api.Features.Monitoring.MonitoringService>();
+    builder.Services.AddScoped<wa_api.Features.AdminReports.AdminReportsService>();
 
     // ── Stripe (PRD 3.2 / 3.3 / 3.5) ─────────────────────────────────────
     builder.Services.Configure<wa_api.Infrastructure.Stripe.StripeOptions>(

@@ -175,4 +175,13 @@ export const queryKeys = {
     campaigns: (from?: string, to?: string) => [...queryKeys.analytics.all, 'campaigns', { from, to }] as const,
     costs: (from?: string, to?: string) => [...queryKeys.analytics.all, 'costs', { from, to }] as const,
   },
+
+  // Admin reports (SuperAdmin — packages purchased, balances, dashboard, usage)
+  adminReports: {
+    all: ['admin-reports'] as const,
+    dashboard: () => [...queryKeys.adminReports.all, 'dashboard'] as const,
+    packages: (from?: string, to?: string) => [...queryKeys.adminReports.all, 'packages', { from, to }] as const,
+    balances: () => [...queryKeys.adminReports.all, 'balances'] as const,
+    usage: (from?: string, to?: string) => [...queryKeys.adminReports.all, 'usage', { from, to }] as const,
+  },
 } as const
