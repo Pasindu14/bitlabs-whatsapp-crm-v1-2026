@@ -14,7 +14,7 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import type { Company } from "@/features/companies/types";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", {
+const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
   year: "numeric",

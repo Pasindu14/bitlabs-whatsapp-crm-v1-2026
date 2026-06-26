@@ -15,7 +15,7 @@ import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import type { User } from "@/features/users/types";
 import type { UserRole } from "@/features/users/schema/user-schema";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", {
+const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
   year: "numeric",

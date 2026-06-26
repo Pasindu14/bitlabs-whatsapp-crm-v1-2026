@@ -15,7 +15,7 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import type { Subscription, SubscriptionStatus } from "@/features/subscriptions/types";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", {
+const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
   year: "numeric",

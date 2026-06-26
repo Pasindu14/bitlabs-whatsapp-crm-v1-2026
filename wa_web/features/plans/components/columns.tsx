@@ -15,7 +15,7 @@ import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import { permissionLabel } from "@/features/team/permissions";
 import type { Plan } from "@/features/plans/types";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", {
+const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
   year: "numeric",

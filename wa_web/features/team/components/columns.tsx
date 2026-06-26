@@ -16,7 +16,7 @@ import type { TeamMember } from "@/features/team/types";
 import type { TeamRole } from "@/features/team/schema/team-schema";
 import { permissionLabel } from "@/features/team/permissions";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", {
+const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
   year: "numeric",

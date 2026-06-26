@@ -12,7 +12,14 @@ export const createCampaignSchema = z
     contactIds: z.array(z.string().uuid()).optional(),
     variableMapping: z.string().optional(),
     scheduleType: z.enum(["Immediate", "OneTime", "Recurring"]),
-    scheduledAt: z.string().optional().nullable(),
+    // datetime-local gives "YYYY-MM-DDTHH:mm" — transform appends ":00Z" so the API
+    // receives a proper UTC ISO string regardless of the user's browser timezone.
+    scheduledAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, "Invalid date/time format")
+      .transform((v) => v.slice(0, 16) + ":00.000Z")
+      .optional()
+      .nullable(),
     recurrenceCron: z
       .string()
       .max(120)

@@ -49,7 +49,7 @@ export function TemplatePreview({ values }: { values: BuilderFormValues }) {
           )}
 
           <p className="mt-1 text-right text-[10px] text-zinc-400">
-            {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
+            {new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
               new Date(2024, 0, 1, 10, 30)
             )}
           </p>

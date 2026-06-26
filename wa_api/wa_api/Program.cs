@@ -185,6 +185,8 @@ try
         {
             options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
             options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            options.JsonSerializerOptions.Converters.Add(new wa_api.Common.Json.UtcDateTimeConverter());
+            options.JsonSerializerOptions.Converters.Add(new wa_api.Common.Json.NullableUtcDateTimeConverter());
         })
         .ConfigureApiBehaviorOptions(options =>
         {

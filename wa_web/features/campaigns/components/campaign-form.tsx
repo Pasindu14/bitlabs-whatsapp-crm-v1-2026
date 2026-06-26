@@ -66,7 +66,10 @@ export function CampaignForm({
       contactIds: defaultValues?.contactIds ?? [],
       variableMapping: defaultValues?.variableMapping ?? "{}",
       scheduleType: defaultValues?.scheduleType ?? "Immediate",
-      scheduledAt: defaultValues?.scheduledAt ?? null,
+      // datetime-local requires "YYYY-MM-DDTHH:mm" (16 chars, no Z). Slice the UTC ISO string.
+      scheduledAt: defaultValues?.scheduledAt
+        ? new Date(defaultValues.scheduledAt).toISOString().slice(0, 16)
+        : null,
       recurrenceCron: defaultValues?.recurrenceCron ?? null,
     },
   });

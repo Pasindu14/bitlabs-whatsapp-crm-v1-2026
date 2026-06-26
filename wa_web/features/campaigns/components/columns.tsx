@@ -14,10 +14,18 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import type { Campaign, CampaignStatus } from "@/features/campaigns/types";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", {
+const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
   year: "numeric",
+});
+
+const dateTimeFmt = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
 });
 
 const STATUS_VARIANT: Record<CampaignStatus, "default" | "secondary" | "destructive" | "outline"> =
@@ -89,7 +97,7 @@ export function getCampaignColumns(actions: CampaignColumnActions): ColumnDef<Ca
         if (c.scheduleType === "OneTime" && c.scheduledAt) {
           return (
             <span className="text-sm text-muted-foreground">
-              {dateFmt.format(new Date(c.scheduledAt))}
+              {dateTimeFmt.format(new Date(c.scheduledAt))}
             </span>
           );
         }

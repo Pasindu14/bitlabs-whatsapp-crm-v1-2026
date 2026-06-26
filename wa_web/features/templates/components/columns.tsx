@@ -14,7 +14,7 @@ import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import { TemplateStatusBadge } from "./template-status-badge";
 import type { TemplateRow } from "@/features/templates/types";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
+const dateFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
 
 export interface TemplateColumnActions {
   onOpen: (id: string) => void;

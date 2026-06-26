@@ -24,6 +24,7 @@ public class CampaignService(
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = db.Campaigns.AsNoTracking()
+            .Where(c => c.IsActive)
             .Include(c => c.Template)
             .Include(c => c.ContactLists).ThenInclude(cl => cl.ContactList)
             .Include(c => c.IndividualContacts)
@@ -81,7 +82,7 @@ public class CampaignService(
             TemplateId = request.TemplateId,
             VariableMapping = request.VariableMapping ?? "{}",
             ScheduleType = request.ScheduleType,
-            ScheduledAt = request.ScheduledAt,
+            ScheduledAt = request.ScheduledAt.HasValue ? DateTime.SpecifyKind(request.ScheduledAt.Value, DateTimeKind.Utc) : null,
             RecurrenceCron = request.RecurrenceCron,
             Status = CampaignStatus.Draft,
         };
@@ -110,7 +111,7 @@ public class CampaignService(
         campaign.TemplateId = request.TemplateId;
         campaign.VariableMapping = request.VariableMapping ?? "{}";
         campaign.ScheduleType = request.ScheduleType;
-        campaign.ScheduledAt = request.ScheduledAt;
+        campaign.ScheduledAt = request.ScheduledAt.HasValue ? DateTime.SpecifyKind(request.ScheduledAt.Value, DateTimeKind.Utc) : null;
         campaign.RecurrenceCron = request.RecurrenceCron;
 
         await db.SaveChangesAsync(ct);

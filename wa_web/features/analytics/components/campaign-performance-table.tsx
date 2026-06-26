@@ -10,7 +10,7 @@ interface Props {
 }
 
 const numFmt = new Intl.NumberFormat("en-US");
-const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
+const dateFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
 
 function pct(part: number, total: number): string {
   if (total === 0) return "—";

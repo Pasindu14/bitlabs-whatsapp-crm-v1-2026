@@ -15,7 +15,7 @@ import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import type { WabaConnection } from "@/features/waba-connections/types";
 import type { WabaConnectionStatus } from "@/features/waba-connections/schema/waba-connection-schema";
 
-const dateFmt = new Intl.DateTimeFormat("en-US", {
+const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
   year: "numeric",

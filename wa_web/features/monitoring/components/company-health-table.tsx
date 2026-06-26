@@ -7,7 +7,7 @@ import { useCompanyHealth } from "@/features/monitoring/hooks/use-monitoring";
 import type { CompanyHealth } from "@/features/monitoring/types";
 
 const numFmt = new Intl.NumberFormat("en-US");
-const dateFmt = new Intl.DateTimeFormat("en-US", {
+const dateFmt = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
   year: "numeric",
