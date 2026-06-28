@@ -38,6 +38,17 @@ interface CampaignFormProps {
 
 type TargetMode = "lists" | "contacts";
 
+/**
+ * Convert a stored UTC ISO timestamp into the "YYYY-MM-DDTHH:mm" string a datetime-local input
+ * expects, using the viewer's LOCAL wall-clock components — so editing shows the same local time
+ * the user originally picked (mirrors the schema's local→UTC conversion on submit).
+ */
+function toLocalDatetimeInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function CampaignForm({
   mode,
   defaultValues,
@@ -66,9 +77,10 @@ export function CampaignForm({
       contactIds: defaultValues?.contactIds ?? [],
       variableMapping: defaultValues?.variableMapping ?? "{}",
       scheduleType: defaultValues?.scheduleType ?? "Immediate",
-      // datetime-local requires "YYYY-MM-DDTHH:mm" (16 chars, no Z). Slice the UTC ISO string.
+      // datetime-local requires "YYYY-MM-DDTHH:mm" in LOCAL time — convert the stored UTC instant
+      // back to the viewer's local wall clock so editing shows the time they originally picked.
       scheduledAt: defaultValues?.scheduledAt
-        ? new Date(defaultValues.scheduledAt).toISOString().slice(0, 16)
+        ? toLocalDatetimeInput(defaultValues.scheduledAt)
         : null,
       recurrenceCron: defaultValues?.recurrenceCron ?? null,
     },
@@ -306,7 +318,7 @@ export function CampaignForm({
         {scheduleType === "OneTime" && (
           <div className="space-y-1">
             <Label htmlFor="scheduledAt" className="text-xs text-muted-foreground">
-              Send date and time (UTC)
+              Send date and time (your local time)
             </Label>
             <Input
               id="scheduledAt"
