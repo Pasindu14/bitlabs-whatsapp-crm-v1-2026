@@ -9,12 +9,51 @@ import {
   ShieldCheck,
   ShieldX,
   Clock,
+  Activity,
+  Gauge,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useConnections } from "@/features/connections/hooks/use-connections";
-import type { MyWabaConnection, WabaConnectionStatus } from "@/features/connections/types";
+import type {
+  MessagingTier,
+  MyWabaConnection,
+  WabaConnectionStatus,
+} from "@/features/connections/types";
+
+// Meta quality rating → badge styling + label. Null = not yet synced from Meta.
+const QUALITY_RATING: Record<string, { label: string; className: string }> = {
+  GREEN: { label: "High", className: "bg-green-100 text-green-700 border-green-200" },
+  YELLOW: { label: "Medium", className: "bg-amber-100 text-amber-700 border-amber-200" },
+  RED: { label: "Low", className: "bg-red-100 text-red-700 border-red-200" },
+};
+
+// Messaging tier → human daily unique-recipient cap.
+const TIER_LABEL: Record<MessagingTier, string> = {
+  Tier250: "250 / day",
+  Tier1K: "1,000 / day",
+  Tier10K: "10,000 / day",
+  Tier100K: "100,000 / day",
+  Unlimited: "Unlimited",
+};
+
+function QualityBadge({ rating }: { rating: string | null }) {
+  const r = rating ? QUALITY_RATING[rating.toUpperCase()] : undefined;
+  if (!r)
+    return (
+      <Badge className="gap-1 bg-zinc-100 text-zinc-600 hover:bg-zinc-100 border-zinc-200">
+        <Activity className="size-3" />
+        Unknown
+      </Badge>
+    );
+  return (
+    <Badge className={cn("gap-1 hover:opacity-90", r.className)} title={`Meta quality rating: ${rating}`}>
+      <Activity className="size-3" />
+      {r.label}
+    </Badge>
+  );
+}
 
 function StatusBadge({ status }: { status: WabaConnectionStatus }) {
   if (status === "Connected")
@@ -53,6 +92,23 @@ function ConnectionCard({ conn }: { conn: MyWabaConnection }) {
           </div>
         </div>
         <StatusBadge status={conn.status} />
+      </div>
+
+      {/* WhatsApp account health — quality rating drives ban risk + send throttling */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg bg-muted/40 px-4 py-3">
+        <div>
+          <p className="text-xs text-muted-foreground">Quality rating</p>
+          <div className="mt-1">
+            <QualityBadge rating={conn.qualityRating} />
+          </div>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Messaging tier</p>
+          <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
+            <Gauge className="size-3.5 text-muted-foreground" />
+            {TIER_LABEL[conn.messagingTier] ?? conn.messagingTier}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">

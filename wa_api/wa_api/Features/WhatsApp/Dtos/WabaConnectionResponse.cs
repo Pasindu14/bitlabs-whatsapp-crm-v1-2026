@@ -18,5 +18,9 @@ public record WabaConnectionResponse(
     bool IsActive,
     DateTime CreatedAt,
     DateTime? LastHealthCheckAt,
-    string? HealthCheckErrorMessage
+    string? HealthCheckErrorMessage,
+    /// <summary>Meta quality rating (GREEN/YELLOW/RED). Null until first synced from Meta.</summary>
+    string? QualityRating,
+    /// <summary>Meta messaging limit tier (24-hour unique-recipient cap).</summary>
+    MessagingTier MessagingTier
 );

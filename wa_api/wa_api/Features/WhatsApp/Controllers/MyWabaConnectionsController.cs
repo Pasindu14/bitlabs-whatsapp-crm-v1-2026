@@ -30,7 +30,7 @@ public class MyWabaConnectionsController(AppDbContext db) : ControllerBase
             .Select(w => new WabaConnectionResponse(
                 w.Id, w.CompanyId, w.Company.Name, w.PhoneNumberId, w.WabaId,
                 w.DisplayPhoneNumber, w.Status, w.EncryptedAccessToken != "", w.IsActive, w.CreatedAt,
-                w.LastHealthCheckAt, w.HealthCheckErrorMessage))
+                w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier))
             .ToListAsync(ct);
 
         return Ok(ResponseHelper.Ok(items, CorrelationId));
@@ -45,7 +45,7 @@ public class MyWabaConnectionsController(AppDbContext db) : ControllerBase
             .Select(w => new WabaConnectionResponse(
                 w.Id, w.CompanyId, w.Company.Name, w.PhoneNumberId, w.WabaId,
                 w.DisplayPhoneNumber, w.Status, w.EncryptedAccessToken != "", w.IsActive, w.CreatedAt,
-                w.LastHealthCheckAt, w.HealthCheckErrorMessage))
+                w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier))
             .ToListAsync(ct);
 
         return Ok(ResponseHelper.Ok(items, CorrelationId));
