@@ -14,5 +14,10 @@ public record CreateCampaignRequest(
     string? VariableMapping,
     [Required] ScheduleType ScheduleType,
     DateTime? ScheduledAt,
-    [MaxLength(120)] string? RecurrenceCron
+    [MaxLength(120)] string? RecurrenceCron,
+    /// <summary>
+    /// Send to contacts without recorded opt-in consent (bypasses the NO_CONSENT skip gate).
+    /// Compliance risk is the operator's — only enable with off-platform consent proof. Defaults false.
+    /// </summary>
+    bool? OverrideConsentGate = false
 );

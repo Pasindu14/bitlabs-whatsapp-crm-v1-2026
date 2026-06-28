@@ -43,7 +43,7 @@ public class ContactService(AppDbContext db) : IContactService
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(c => new ContactResponse(c.Id, c.Phone, c.Name, c.IsActive,
-                c.IsOptedOut, c.OptedOutAt, c.HasOptedIn, c.OptedInAt, c.CreatedAt))
+                c.IsOptedOut, c.OptedOutAt, c.HasOptedIn, c.OptedInAt, c.ConsentSource, c.CreatedAt))
             .ToListAsync(ct);
 
         return (items, total);
@@ -72,6 +72,8 @@ public class ContactService(AppDbContext db) : IContactService
             Name = request.Name.Trim(),
             HasOptedIn = request.HasOptedIn,
             OptedInAt = request.HasOptedIn ? DateTime.UtcNow : null,
+            // Manual opt-in at creation attests to off-platform consent proof.
+            ConsentSource = request.HasOptedIn ? ConsentSource.ManualEntry : ConsentSource.None,
             // CompanyId is auto-stamped from tenant context by AuditInterceptor on insert.
         };
         db.Contacts.Add(contact);
@@ -101,10 +103,12 @@ public class ContactService(AppDbContext db) : IContactService
             {
                 contact.HasOptedIn = true;
                 contact.OptedInAt = DateTime.UtcNow;
+                contact.ConsentSource = ConsentSource.ManualEntry;
             }
             else if (!request.HasOptedIn.Value)
             {
                 contact.HasOptedIn = false;
+                contact.ConsentSource = ConsentSource.None;
             }
         }
 
@@ -133,5 +137,5 @@ public class ContactService(AppDbContext db) : IContactService
         => new(phone.Where(char.IsDigit).ToArray());
 
     private static ContactResponse Map(Contact c)
-        => new(c.Id, c.Phone, c.Name, c.IsActive, c.IsOptedOut, c.OptedOutAt, c.HasOptedIn, c.OptedInAt, c.CreatedAt);
+        => new(c.Id, c.Phone, c.Name, c.IsActive, c.IsOptedOut, c.OptedOutAt, c.HasOptedIn, c.OptedInAt, c.ConsentSource, c.CreatedAt);
 }

@@ -13,6 +13,7 @@ import {
   useDeleteCampaignDialog,
   useCancelCampaignDialog,
   useRecipientsDialog,
+  useLaunchCampaignDialog,
 } from "@/features/campaigns/store/campaign-store";
 import { getCampaignColumns } from "./columns";
 import { CampaignDialogs } from "./campaign-dialogs";
@@ -24,6 +25,7 @@ export function CampaignTable() {
   const { open: openDelete } = useDeleteCampaignDialog();
   const { open: openCancel } = useCancelCampaignDialog();
   const { open: openRecipients } = useRecipientsDialog();
+  const { open: confirmLaunch } = useLaunchCampaignDialog();
   const { mutate: launch } = useLaunchCampaign();
   const { mutate: pause } = usePauseCampaign();
   const { mutate: resume } = useResumeCampaign();
@@ -40,11 +42,12 @@ export function CampaignTable() {
         openRecipients,
         viewDetails,
         launch,
+        confirmLaunch,
         pause,
         resume,
         duplicate,
       }),
-    [openEdit, openDelete, openCancel, openRecipients, viewDetails, launch, pause, resume, duplicate]
+    [openEdit, openDelete, openCancel, openRecipients, viewDetails, launch, confirmLaunch, pause, resume, duplicate]
   );
 
   return (

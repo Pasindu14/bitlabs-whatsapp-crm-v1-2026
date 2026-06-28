@@ -34,6 +34,12 @@ public class CampaignRecipient : BaseEntity, ITenantEntity
     public string? ErrorCode { get; set; }
 
     /// <summary>
+    /// True when this message was sent despite the contact having no recorded opt-in — i.e. the
+    /// campaign's consent override was on at send time. Audit trail for compliance / quality monitoring.
+    /// </summary>
+    public bool SentWithoutConsent { get; set; } = false;
+
+    /// <summary>
     /// Snapshot of resolved variable values at send time for audit trail.
     /// e.g. { "body_1": "John", "body_2": "Acme Corp" }
     /// </summary>

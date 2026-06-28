@@ -59,13 +59,15 @@ export interface CampaignColumnActions {
   openDelete: (id: string) => void;
   openCancel: (id: string) => void;
   launch: (id: string) => void;
+  /** Opens a confirmation dialog before launching (used for consent-override campaigns). */
+  confirmLaunch: (id: string) => void;
   pause: (id: string) => void;
   resume: (id: string) => void;
   duplicate: (id: string) => void;
 }
 
 export function getCampaignColumns(actions: CampaignColumnActions): ColumnDef<Campaign>[] {
-  const { openEdit, openRecipients, viewDetails, openDelete, openCancel, launch, pause, resume, duplicate } =
+  const { openEdit, openRecipients, viewDetails, openDelete, openCancel, launch, confirmLaunch, pause, resume, duplicate } =
     actions;
 
   return [
@@ -174,7 +176,9 @@ export function getCampaignColumns(actions: CampaignColumnActions): ColumnDef<Ca
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               {canLaunch && (
-                <DropdownMenuItem onClick={() => launch(c.id)}>
+                <DropdownMenuItem
+                  onClick={() => (c.overrideConsentGate ? confirmLaunch(c.id) : launch(c.id))}
+                >
                   <Send className="mr-2 h-4 w-4" />
                   Launch
                 </DropdownMenuItem>

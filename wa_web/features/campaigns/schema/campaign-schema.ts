@@ -26,6 +26,8 @@ export const createCampaignSchema = z
       .max(120)
       .optional()
       .nullable(),
+    // Send to contacts without recorded opt-in (bypasses the NO_CONSENT skip gate). Defaults off.
+    overrideConsentGate: z.boolean().optional(),
   })
   .refine(
     (d) =>

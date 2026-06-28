@@ -83,6 +83,7 @@ export function CampaignForm({
         ? toLocalDatetimeInput(defaultValues.scheduledAt)
         : null,
       recurrenceCron: defaultValues?.recurrenceCron ?? null,
+      overrideConsentGate: defaultValues?.overrideConsentGate ?? false,
     },
   });
 
@@ -294,6 +295,31 @@ export function CampaignForm({
           </div>
         )}
       </div>
+
+      {/* Consent override — compliance-sensitive, styled as a warning */}
+      <Controller
+        control={control}
+        name="overrideConsentGate"
+        render={({ field }) => (
+          <label className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 cursor-pointer">
+            <Checkbox
+              className="mt-0.5"
+              checked={field.value ?? false}
+              onCheckedChange={(v) => field.onChange(v === true)}
+            />
+            <div className="space-y-1">
+              <div className="text-sm font-medium text-destructive">
+                Send to contacts without recorded opt-in
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Bypasses the consent gate. Only enable if you have proof of consent on file outside
+                this system. Messaging non-consenting contacts risks your WhatsApp number being
+                banned. Opted-out contacts are still never messaged.
+              </p>
+            </div>
+          </label>
+        )}
+      />
 
       {/* Schedule type */}
       <div className="space-y-2">
