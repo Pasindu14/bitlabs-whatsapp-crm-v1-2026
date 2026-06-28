@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using wa_api.Common.Errors;
 using wa_api.Common.Subscriptions;
+using wa_api.Features.Conversations.Entities;
 using wa_api.Features.Messages.Dtos;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Subscriptions.Entities;
@@ -84,6 +85,27 @@ public class MessageService(
         if (!waba.IsActive)
             throw new BusinessRuleException("WABA_INACTIVE",
                 "The selected WhatsApp connection is inactive.");
+
+        // ── Anti-ban guards (this endpoint sends free-form text, NOT a template) ──────────────
+        // Free-form is only permitted to a reachable contact inside an open 24-hour customer-service
+        // window. Sending outside the window is a policy violation (Meta 131047) that hurts the number's
+        // quality rating; pre-checking turns a quality-damaging round-trip into a clean local error.
+        // For business-initiated outreach (cold contacts / closed window) callers must use a campaign template.
+        if (!contact.IsWhatsAppValid)
+            throw new BusinessRuleException("NOT_ON_WHATSAPP",
+                "This contact is not a WhatsApp user, so the message can't be delivered.");
+
+        var windowExpiresAt = await db.Conversations
+            .Where(c => c.ContactId == contact.Id
+                     && c.WabaConnectionId == waba.Id
+                     && c.Status == ConversationStatus.Open)
+            .Select(c => c.WindowExpiresAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (windowExpiresAt is null || windowExpiresAt <= DateTime.UtcNow)
+            throw new BusinessRuleException("WINDOW_CLOSED",
+                "The 24-hour customer service window is closed for this contact. Reach them with an "
+                + "approved template via a campaign instead.");
 
         // Standalone send is a session message (free-form text): per-second pacing only, no tier consumption.
         await rateLimiter.AcquireOrThrowAsync(

@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Campaigns.Entities;
+using wa_api.Features.Messages;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Webhooks.Payloads;
 using wa_api.Infrastructure.Persistence;
@@ -61,6 +62,13 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
                 message.ErrorCode = err?.Code?.ToString(CultureInfo.InvariantCulture);
                 message.ErrorMessage = err?.Message ?? err?.Title ?? message.ErrorMessage;
                 message.StatusAt = statusAt;
+
+                // Undeliverable recipient (131026): the number isn't on WhatsApp. Stamp the contact invalid
+                // so future sends skip it. This is the only registration signal the Cloud API gives us, and
+                // it usually arrives here (async status webhook) rather than on the original send response.
+                if (MetaPolicyErrorCodes.IsUndeliverableRecipient(message.ErrorCode))
+                    await MarkContactNotOnWhatsAppAsync(message.ContactId, ct);
+
                 if (message.CampaignId.HasValue)
                     campaignMessageUpdates[message.Id] = (MessageStatus.Failed, message.ErrorCode);
                 continue;
@@ -123,6 +131,27 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
             if (msgStatus == MessageStatus.Failed)
                 recipient.ErrorCode ??= errorCode;
         }
+    }
+
+    /// <summary>
+    /// Mark a contact as not on WhatsApp so future sends skip it. Webhook scope has no tenant context,
+    /// so we read across tenants with IgnoreQueryFilters and only stamp once (idempotent on duplicate
+    /// callbacks). The change is persisted by the caller's SaveChanges, like message/recipient updates.
+    /// </summary>
+    private async Task MarkContactNotOnWhatsAppAsync(Guid contactId, CancellationToken ct)
+    {
+        var contact = await db.Contacts
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == contactId, ct);
+
+        if (contact is null || !contact.IsWhatsAppValid)
+            return;
+
+        contact.IsWhatsAppValid = false;
+        contact.WhatsAppInvalidAt = DateTime.UtcNow;
+        logger.LogInformation(
+            "Contact {ContactId} marked not on WhatsApp (code 131026) — will be skipped in future sends.",
+            contactId);
     }
 
     private static int RecipientRank(RecipientStatus s) => s switch

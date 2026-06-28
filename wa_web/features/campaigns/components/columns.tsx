@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Send, Pause, Play, XCircle, Copy, Trash2, Users } from "lucide-react";
+import { MoreHorizontal, Send, Pause, Play, XCircle, Copy, Trash2, Users, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +43,7 @@ const STATUS_VARIANT: Record<CampaignStatus, "default" | "secondary" | "destruct
 export interface CampaignColumnActions {
   openEdit: (id: string) => void;
   openRecipients: (id: string) => void;
+  viewDetails: (id: string) => void;
   openDelete: (id: string) => void;
   openCancel: (id: string) => void;
   launch: (id: string) => void;
@@ -51,7 +53,7 @@ export interface CampaignColumnActions {
 }
 
 export function getCampaignColumns(actions: CampaignColumnActions): ColumnDef<Campaign>[] {
-  const { openEdit, openRecipients, openDelete, openCancel, launch, pause, resume, duplicate } =
+  const { openEdit, openRecipients, viewDetails, openDelete, openCancel, launch, pause, resume, duplicate } =
     actions;
 
   return [
@@ -69,7 +71,9 @@ export function getCampaignColumns(actions: CampaignColumnActions): ColumnDef<Ca
               : "No target";
         return (
           <div className="min-w-0">
-            <div className="truncate font-medium">{c.name}</div>
+            <Link href={`/campaigns/${c.id}`} className="truncate font-medium hover:underline">
+              {c.name}
+            </Link>
             <div className="truncate text-xs text-muted-foreground">{c.templateName}</div>
             <div className="truncate text-xs text-muted-foreground">{target}</div>
           </div>
@@ -175,9 +179,13 @@ export function getCampaignColumns(actions: CampaignColumnActions): ColumnDef<Ca
                   Resume
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onClick={() => viewDetails(c.id)}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                View details
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => openRecipients(c.id)}>
                 <Users className="mr-2 h-4 w-4" />
-                Recipients
+                Quick stats
               </DropdownMenuItem>
               {isDraft && (
                 <DropdownMenuItem onClick={() => openEdit(c.id)}>Edit</DropdownMenuItem>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table/data-table";
@@ -17,6 +18,7 @@ import { getCampaignColumns } from "./columns";
 import { CampaignDialogs } from "./campaign-dialogs";
 
 export function CampaignTable() {
+  const router = useRouter();
   const openCreate = useCampaignDialogStore((s) => s.openCreate);
   const { open: openEdit } = useEditCampaignDialog();
   const { open: openDelete } = useDeleteCampaignDialog();
@@ -27,6 +29,8 @@ export function CampaignTable() {
   const { mutate: resume } = useResumeCampaign();
   const { mutate: duplicate } = useDuplicateCampaign();
 
+  const viewDetails = useCallback((id: string) => router.push(`/campaigns/${id}`), [router]);
+
   const getColumns = useCallback(
     () =>
       getCampaignColumns({
@@ -34,12 +38,13 @@ export function CampaignTable() {
         openDelete,
         openCancel,
         openRecipients,
+        viewDetails,
         launch,
         pause,
         resume,
         duplicate,
       }),
-    [openEdit, openDelete, openCancel, openRecipients, launch, pause, resume, duplicate]
+    [openEdit, openDelete, openCancel, openRecipients, viewDetails, launch, pause, resume, duplicate]
   );
 
   return (

@@ -22,6 +22,7 @@ import {
   resumeCampaignAction,
   cancelCampaignAction,
   getCampaignStatsAction,
+  getCampaignRecipientsAction,
   duplicateCampaignAction,
 } from "@/features/campaigns/actions/campaign-actions";
 import {
@@ -87,7 +88,38 @@ export function useCampaignStats(id: string | null) {
       return res.data;
     },
     enabled: !!id,
-    refetchInterval: 10_000,
+    // Poll fast while recipients are still being processed; stop once the queue drains
+    // (queued === 0 means every recipient reached a terminal status — nothing left to watch).
+    refetchInterval: (query) => {
+      const stats = query.state.data;
+      if (!stats) return 4_000;
+      return stats.queued > 0 ? 4_000 : false;
+    },
+  });
+}
+
+/**
+ * Paged per-recipient delivery list for a campaign. `isLive` (set when the campaign still has
+ * queued recipients) drives the same status-aware polling as the stats hook — refetch every ~4s
+ * while sending, then stop. keepPreviousData avoids a flash to empty when paging/filtering.
+ */
+export function useCampaignRecipients(
+  id: string | null,
+  page: number,
+  pageSize: number,
+  status: string | undefined,
+  isLive: boolean
+) {
+  return useQuery({
+    queryKey: queryKeys.campaigns.recipients(id ?? "", { page, pageSize, status }),
+    queryFn: async () => {
+      const res = await getCampaignRecipientsAction(id!, page, pageSize, status);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: !!id,
+    placeholderData: keepPreviousData,
+    refetchInterval: isLive ? 4_000 : false,
   });
 }
 

@@ -34,6 +34,8 @@ appsettings.*.local.json
 # Dev settings hold real secrets (DB password, Meta app secret) — never commit.
 appsettings.Development.json
 !appsettings.Development.example.json
+# Deployment runbook — contains SSH password, DB passwords, Meta secret, encryption key.
+contabo.md
 
 # ---- Logs ----
 logs/

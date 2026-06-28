@@ -140,6 +140,8 @@ export const queryKeys = {
     list: (filters?: any) => [...queryKeys.campaigns.lists(), filters] as const,
     details: () => [...queryKeys.campaigns.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.campaigns.details(), id] as const,
+    recipients: (id: string, filters?: any) =>
+      [...queryKeys.campaigns.detail(id), 'recipients', filters] as const,
   },
 
   // Connections (CompanyAdmin — own WABA phone number connections)

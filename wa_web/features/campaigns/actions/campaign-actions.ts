@@ -66,6 +66,12 @@ export const getCampaignStatsAction = createAction(
   async (id: string) => CampaignService.getStats(id)
 );
 
+export const getCampaignRecipientsAction = createAction(
+  { name: "getCampaignRecipientsAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async (id: string, page: number, pageSize: number, status?: string) =>
+    CampaignService.getRecipients(id, page, pageSize, status)
+);
+
 export const duplicateCampaignAction = createAction(
   { name: "duplicateCampaignAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
   async (id: string) => CampaignService.duplicate(id)

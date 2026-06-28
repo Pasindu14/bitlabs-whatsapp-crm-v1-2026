@@ -46,4 +46,15 @@ public class Contact : BaseEntity, ITenantEntity
 
     /// <summary>UTC timestamp of the most recent opt-in consent grant.</summary>
     public DateTime? OptedInAt { get; set; }
+
+    /// <summary>
+    /// True until Meta tells us this number isn't a reachable WhatsApp user. The Cloud API has no
+    /// pre-send registration check, so this starts true (optimistic) and is set false the first time a
+    /// send or delivery webhook returns an undeliverable-recipient code (131026). Once false, the contact
+    /// is skipped in all future sends so we never waste a send — or a daily tier slot — on a dead number.
+    /// </summary>
+    public bool IsWhatsAppValid { get; set; } = true;
+
+    /// <summary>UTC timestamp when this contact was first marked not on WhatsApp. Null while still valid.</summary>
+    public DateTime? WhatsAppInvalidAt { get; set; }
 }

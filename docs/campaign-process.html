@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campaign Engine &amp; Anti-Ban Strategy — BitLabs WhatsApp CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f7fb;
+    --panel:#ffffff;
+    --ink:#1f2333;
+    --muted:#6b7186;
+    --line:#e7e9f2;
+    --brand:#5b6ef5;
+    --brand-soft:#eef0ff;
+    --green:#2fa36b;
+    --green-soft:#e7f6ee;
+    --yellow:#c98a14;
+    --yellow-soft:#fbf2dc;
+    --red:#d2503f;
+    --red-soft:#fbe7e3;
+    --radius:16px;
+    --shadow:0 1px 2px rgba(31,35,51,.04),0 8px 24px rgba(31,35,51,.06);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;font-family:'Jost',sans-serif;background:var(--bg);color:var(--ink);
+    line-height:1.65;font-weight:400;-webkit-font-smoothing:antialiased;
+  }
+  code,.mono{font-family:'JetBrains Mono',monospace;font-size:.85em}
+  .wrap{max-width:980px;margin:0 auto;padding:56px 24px 96px}
+  header.hero{
+    background:linear-gradient(135deg,#5b6ef5,#7b86f8);
+    color:#fff;border-radius:24px;padding:48px 44px;box-shadow:var(--shadow);
+    margin-bottom:40px;
+  }
+  header.hero .kicker{
+    text-transform:uppercase;letter-spacing:.18em;font-size:.72rem;font-weight:600;
+    opacity:.85;margin-bottom:14px;
+  }
+  header.hero h1{font-size:2.5rem;font-weight:600;margin:0 0 12px;line-height:1.15}
+  header.hero p{font-size:1.08rem;opacity:.92;margin:0;max-width:60ch}
+  .toc{
+    display:flex;flex-wrap:wrap;gap:10px;margin:28px 0 8px;
+  }
+  .toc a{
+    text-decoration:none;color:var(--ink);background:var(--panel);
+    border:1px solid var(--line);padding:8px 14px;border-radius:999px;
+    font-size:.86rem;font-weight:500;transition:.15s;
+  }
+  .toc a:hover{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+  section{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:34px 36px;margin:22px 0;box-shadow:var(--shadow);
+  }
+  h2{font-size:1.55rem;font-weight:600;margin:0 0 6px;display:flex;align-items:center;gap:12px}
+  h2 .num{
+    background:var(--brand-soft);color:var(--brand);width:38px;height:38px;flex:none;
+    border-radius:10px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:1rem;font-weight:600;
+  }
+  h3{font-size:1.12rem;font-weight:600;margin:26px 0 8px}
+  .lead{color:var(--muted);margin:0 0 18px;font-size:1.02rem}
+  p{margin:12px 0}
+  ul,ol{margin:12px 0;padding-left:22px}
+  li{margin:7px 0}
+  strong{font-weight:600}
+  .pill{
+    display:inline-block;padding:2px 10px;border-radius:999px;font-size:.78rem;
+    font-weight:600;font-family:'JetBrains Mono',monospace;
+  }
+  .pill.green{background:var(--green-soft);color:var(--green)}
+  .pill.yellow{background:var(--yellow-soft);color:var(--yellow)}
+  .pill.red{background:var(--red-soft);color:var(--red)}
+  .pill.brand{background:var(--brand-soft);color:var(--brand)}
+  .flow{display:flex;flex-direction:column;gap:14px;margin:22px 0}
+  .step{
+    display:flex;gap:18px;align-items:flex-start;border:1px solid var(--line);
+    border-radius:14px;padding:18px 20px;background:#fcfcff;position:relative;
+  }
+  .step .dot{
+    flex:none;width:34px;height:34px;border-radius:50%;background:var(--brand);
+    color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;
+    font-size:.92rem;
+  }
+  .step h4{margin:0 0 4px;font-size:1.02rem;font-weight:600}
+  .step .meta{font-size:.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace}
+  .step p{margin:6px 0 0;font-size:.95rem;color:#414764}
+  pre{
+    background:#1f2333;color:#e8eafc;border-radius:12px;padding:18px 20px;overflow:auto;
+    font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.6;margin:16px 0;
+  }
+  pre .c{color:#8a90b8}
+  pre .k{color:#9fb4ff}
+  pre .s{color:#a7e3b8}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.92rem}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line)}
+  th{font-weight:600;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.06em}
+  tr:last-child td{border-bottom:none}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:18px 0}
+  .card{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:#fcfcff}
+  .card h4{margin:0 0 6px;font-size:1rem;font-weight:600}
+  .card p{margin:0;font-size:.9rem;color:#525873}
+  .callout{
+    border-left:4px solid var(--brand);background:var(--brand-soft);
+    border-radius:0 12px 12px 0;padding:16px 20px;margin:18px 0;font-size:.95rem;
+  }
+  .callout.green{border-color:var(--green);background:var(--green-soft)}
+  .callout.red{border-color:var(--red);background:var(--red-soft)}
+  .callout strong{display:block;margin-bottom:4px}
+  .gate-row{display:flex;gap:14px;flex-wrap:wrap;margin:16px 0}
+  .gate{flex:1;min-width:200px;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .gate.green{border-top:4px solid var(--green)}
+  .gate.yellow{border-top:4px solid var(--yellow)}
+  .gate.red{border-top:4px solid var(--red)}
+  .gate h4{margin:0 0 6px;font-size:.98rem}
+  .gate p{margin:0;font-size:.88rem;color:#525873}
+  .filemap{font-family:'JetBrains Mono',monospace;font-size:.82rem}
+  /* worked-example timeline */
+  .bignum{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0 6px}
+  .bignum .b{flex:1;min-width:130px;border:1px solid var(--line);border-radius:14px;padding:16px 18px;text-align:center;background:#fcfcff}
+  .bignum .b .v{font-size:1.7rem;font-weight:600;color:var(--brand);font-family:'Jost',sans-serif}
+  .bignum .b .l{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+  .tl{position:relative;margin:24px 0 8px;padding-left:30px}
+  .tl::before{content:'';position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--line)}
+  .tl .ev{position:relative;margin:0 0 20px;padding:0 0 0 6px}
+  .tl .ev::before{content:'';position:absolute;left:-29px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--brand)}
+  .tl .ev.day::before{border-color:var(--green);background:var(--green)}
+  .tl .ev.stop::before{border-color:var(--yellow);background:var(--yellow)}
+  .tl .ev.done::before{border-color:var(--green);background:var(--green)}
+  .tl .ev h4{margin:0 0 2px;font-size:1rem;font-weight:600}
+  .tl .ev .t{font-family:'JetBrains Mono',monospace;font-size:.76rem;color:var(--brand);font-weight:500}
+  .tl .ev p{margin:4px 0 0;font-size:.92rem;color:#414764}
+  .bar{display:flex;height:30px;border-radius:8px;overflow:hidden;margin:14px 0;border:1px solid var(--line)}
+  .bar span{display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;color:#fff;font-family:'JetBrains Mono',monospace}
+  .bar .d1{background:var(--green);flex:1}
+  .bar .d2{background:var(--brand);flex:1}
+  /* token-bucket pacing strip */
+  .pace{display:flex;align-items:flex-end;gap:4px;margin:18px 0 6px;height:64px}
+  .pace .m{width:14px;background:var(--brand);border-radius:3px 3px 0 0;height:46px;position:relative}
+  .pace .m.burst{background:var(--green)}
+  .pace .gap{width:22px;align-self:flex-end;border-bottom:2px dashed var(--muted);height:0;position:relative}
+  .pace .gap::after{content:'~50ms';position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--muted);font-family:'JetBrains Mono',monospace;white-space:nowrap}
+  .pace-legend{display:flex;gap:18px;font-size:.8rem;color:var(--muted);margin:2px 0 0}
+  .pace-legend span{display:inline-flex;align-items:center;gap:6px}
+  .pace-legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+  footer{text-align:center;color:var(--muted);font-size:.85rem;margin-top:40px}
+  .divider{height:1px;background:var(--line);margin:26px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker">BitLabs WhatsApp CRM · Engineering Brief</div>
+    <h1>The Campaign Engine &amp; How We Stay Off Meta's Ban Radar</h1>
+    <p>How a campaign goes from <em>Draft</em> to delivered messages, the guard-rails that keep our WhatsApp numbers healthy, and how dozens of campaigns run side-by-side without tripping Meta's spam detection.</p>
+  </header>
+
+  <nav class="toc">
+    <a href="#overview">Big Picture</a>
+    <a href="#lifecycle">Send Lifecycle</a>
+    <a href="#antiban">Anti-Ban Strategy</a>
+    <a href="#precautions">Precautions</a>
+    <a href="#multi">Multiple Campaigns</a>
+    <a href="#example">Worked Example · 2000 Contacts</a>
+    <a href="#progress">Live Progress</a>
+    <a href="#failure">Failure &amp; Recovery</a>
+    <a href="#files">Code Map</a>
+  </nav>
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h2><span class="num">1</span> The Big Picture</h2>
+    <p class="lead">A campaign is a scheduled, template-based blast to a deduplicated audience — sent in small paced batches by background jobs, never all at once.</p>
+    <p>Everything runs on <strong>Hangfire background jobs</strong> backed by Redis. The web request only <em>creates</em> the campaign; the actual sending is handed off to workers so we can pace, throttle, pause, and resume without holding an HTTP connection. Every read and write is <strong>tenant-isolated</strong> — because Hangfire has no <code>HttpContext</code>, jobs stamp <code>CompanyId</code> by hand and use <code>IgnoreQueryFilters()</code> deliberately.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h4>Template-only</h4>
+        <p>Every campaign must reference a Meta-<strong>Approved</strong> template. Unapproved → campaign fails fast at launch.</p>
+      </div>
+      <div class="card">
+        <h4>Batched, not bulk</h4>
+        <p>Recipients are sent in chained batches of <strong>50</strong> (or 25 under stress), one batch enqueuing the next.</p>
+      </div>
+      <div class="card">
+        <h4>Rate-limited per number</h4>
+        <p>A Redis token bucket caps sends per phone number — shared across <em>all</em> campaigns on that number.</p>
+      </div>
+      <div class="card">
+        <h4>Quality-aware</h4>
+        <p>Meta's GREEN / YELLOW / RED quality rating directly modulates throughput, and can auto-pause.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIFECYCLE -->
+  <section id="lifecycle">
+    <h2><span class="num">2</span> The Send Lifecycle</h2>
+    <p class="lead">Four jobs, each with one responsibility. A campaign flows through them like a pipeline.</p>
+
+    <div class="flow">
+      <div class="step">
+        <div class="dot">A</div>
+        <div>
+          <h4>CampaignSchedulerJob <span class="pill brand">runs every minute</span></h4>
+          <div class="meta">Cron.Minutely</div>
+          <p>Scans for <code>Scheduled</code> one-time campaigns whose time has arrived and enqueues a launch. Also acts as a <strong>watchdog</strong>: if a <code>Running</code> campaign still has queued recipients but no live Hangfire job, it re-enqueues a fresh batch (stall recovery).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="dot">B</div>
+        <div>
+          <h4>CampaignLaunchJob <span class="pill brand">once per campaign</span></h4>
+          <div class="meta">enqueued by scheduler / immediate launch</div>
+          <p>Validates the template is <code>Approved</code>. Resolves the audience by taking the <strong>union of all contact lists + individually-added contacts and deduplicating</strong>. Bulk-inserts one <code>CampaignRecipient</code> row per unique contact in status <code>Queued</code> (idempotent on retry). Flips the campaign to <code>Running</code> and kicks off the first batch.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="dot">C</div>
+        <div>
+          <h4>CampaignBatchSendJob <span class="pill brand">the core sender · chains itself</span></h4>
+          <div class="meta">AutomaticRetry(5), self-rescheduling</div>
+          <p>Pulls up to 50 queued recipients FIFO, runs every consent + rate-limit + quality gate, sends each through Meta's <code>/messages</code> endpoint, records the result, then <strong>enqueues the next batch</strong> until the audience is exhausted. This is where all the anti-ban logic lives (section 3).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="dot">D</div>
+        <div>
+          <h4>CampaignPoisonHandlerJob <span class="pill red">on permanent failure</span></h4>
+          <div class="meta">triggered after 5 exhausted retries</div>
+          <p>If a batch job dies for good, this marks the campaign <code>Failed</code>, flips all remaining queued recipients to <code>Failed</code> (<code>CAMPAIGN_FAILED</code>), and notifies the tenant. Nothing is left silently stuck.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>Recipient status journey</h3>
+    <p>
+      <span class="pill brand">Queued</span> →
+      <span class="pill green">Sent</span> →
+      <span class="pill green">Delivered</span> →
+      <span class="pill green">Read</span>
+      &nbsp;&nbsp;(or&nbsp; <span class="pill red">Failed</span> / <span class="pill yellow">Skipped</span>)
+    </p>
+    <p>Delivery/read advancement comes from Meta status webhooks and is <strong>forward-only and idempotent</strong> — out-of-order or duplicate callbacks can never regress a status.</p>
+  </section>
+
+  <!-- ANTI-BAN -->
+  <section id="antiban">
+    <h2><span class="num">3</span> How We Minimize Getting Banned by Meta</h2>
+    <p class="lead">Meta bans numbers that send too fast, message people who didn't opt in, or rack up blocks. We defend on all three fronts — automatically, inside the send loop.</p>
+
+    <h3>3.1 — Rate limiting (the token bucket)</h3>
+    <p>Before <em>every single send</em>, the job must acquire a permit from a <strong>Redis-backed token bucket keyed by phone number</strong>. It enforces two independent limits at once:</p>
+    <ul>
+      <li><strong>Per-second throttle</strong> — capacity 20, refills at 20/sec, so we never burst past Meta's per-second ceiling on a number.</li>
+      <li><strong>24-hour tier cap</strong> — a Redis set per calendar day counts <em>unique recipients</em> against the number's messaging tier (<code>Tier250 / 1K / 10K / 100K / Unlimited</code>). Counting is idempotent, so re-sends and retries never double-count.</li>
+    </ul>
+    <pre><span class="c">// appsettings.json — the dials</span>
+<span class="k">"RateLimit"</span>: {
+  <span class="k">"PerSecondCapacity"</span>: 20,      <span class="c">// burst ceiling per number</span>
+  <span class="k">"PerSecondRefill"</span>:   20,      <span class="c">// sustained permits/sec</span>
+  <span class="k">"FallbackRefill"</span>:    5,       <span class="c">// conservative, if Redis is down</span>
+  <span class="k">"CampaignWaitCapMs"</span>: 750      <span class="c">// max inline wait before reschedule</span>
+}</pre>
+    <div class="callout">
+      <strong>Never fail open.</strong> If Redis is unreachable, the limiter falls back to an in-process bucket using the conservative <code>FallbackRefill = 5</code>, so even degraded we stay comfortably under Meta's limits rather than flooding.
+    </div>
+
+    <h3>3.2 — How "20/sec" is actually paced</h3>
+    <p>This is the part people assume wrong. We do <strong>not</strong> sleep a fixed gap after every message. The gap is <em>emergent</em> from the token bucket — it only appears when the bucket runs dry, and it's exactly the time needed to regenerate one token.</p>
+
+    <p>The bucket holds up to <strong>20 tokens</strong> and refills <strong>continuously at 20/sec</strong> — i.e. one token every <strong>~50ms</strong>. Each message costs one token. It starts full, so:</p>
+
+    <div class="pace">
+      <div class="m burst"></div><div class="m burst"></div><div class="m burst"></div>
+      <div class="m burst"></div><div class="m burst"></div>
+      <div class="gap"></div>
+      <div class="m"></div>
+      <div class="gap"></div>
+      <div class="m"></div>
+      <div class="gap"></div>
+      <div class="m"></div>
+      <div class="gap"></div>
+      <div class="m"></div>
+    </div>
+    <div class="pace-legend">
+      <span><i style="background:var(--green)"></i> burst — bucket starts full (up to 20, zero gap)</span>
+      <span><i style="background:var(--brand)"></i> paced — one token every ~50ms</span>
+    </div>
+
+    <ul>
+      <li><strong>Phase 1 — the burst.</strong> The first ~20 messages fire essentially back-to-back, draining the full bucket. No gap between them.</li>
+      <li><strong>Phase 2 — the steady gap.</strong> Once empty, the next send is denied and Redis returns a <code>retryAfter ≈ 50ms</code> (computed as <code>(want − tokens) / refill</code>). The job waits that exact amount inline, then retries — and by then a token has refilled. It settles into <em>send → ~50ms → send → ~50ms…</em> = 20/sec average.</li>
+    </ul>
+
+    <p>The wait is precise, not a flat sleep: if the bucket had half a token, the wait is ~25ms, not 50. And waits are only taken inline while they're short — anything over <code>CampaignWaitCapMs</code> (750ms) parks the whole batch via reschedule instead of blocking a worker (see 3.3).</p>
+
+    <div class="callout green">
+      <strong>Why this can't be cheated by adding workers</strong>
+      The bucket lives in <strong>Redis, keyed by phone number</strong>, and each check is one atomic Lua script. If four Hangfire workers send four batches on the same number at once, they all draw from the <em>same</em> 20 tokens. More workers or more campaigns never raise the rate — the number's combined output stays pinned at 20/sec.
+    </div>
+
+    <h3>3.3 — Pacing &amp; jitter (don't look like a robot)</h3>
+    <p>When a permit is denied, the job <strong>doesn't hammer</strong>. It saves progress and reschedules the whole batch:</p>
+    <ul>
+      <li><strong>Per-second throttle hit</strong> → wait <strong>5–15 seconds with random jitter</strong>. The jitter matters: it stops several concurrent campaigns from waking in lockstep and spiking together.</li>
+      <li><strong>Daily tier exhausted</strong> → sleep until just after the next UTC midnight, when the tier window resets.</li>
+    </ul>
+    <p>Because recipients stay <code>Queued</code>, the rescheduled run resumes exactly where it stopped — no double-sends.</p>
+
+    <h3>3.4 — Quality-rating gates (listen to Meta's signal)</h3>
+    <p>A health-check job refreshes each number's <code>QualityRating</code>. The batch sender reacts to it <em>before</em> sending:</p>
+    <div class="gate-row">
+      <div class="gate green">
+        <h4><span class="pill green">GREEN</span> Full speed</h4>
+        <p>Normal batch size of 50, full rate.</p>
+      </div>
+      <div class="gate yellow">
+        <h4><span class="pill yellow">YELLOW</span> Back off</h4>
+        <p>Batch size halved to 25 — we voluntarily reduce pressure to let quality recover.</p>
+      </div>
+      <div class="gate red">
+        <h4><span class="pill red">RED</span> Stop</h4>
+        <p>Campaign is auto-paused and the tenant is notified. We refuse to keep sending on a damaged number.</p>
+      </div>
+    </div>
+
+    <h3>3.5 — Consent &amp; reachability gates (only message people who agreed — and who exist)</h3>
+    <p>For every recipient, three checks run before a permit is even requested:</p>
+    <ul>
+      <li>No opt-in (<code>HasOptedIn == false</code>) → <span class="pill yellow">Skipped</span> · <code>NO_CONSENT</code></li>
+      <li>Opted out (<code>IsOptedOut == true</code>) → <span class="pill yellow">Skipped</span> · <code>OPT_OUT</code></li>
+      <li>Not a WhatsApp user (<code>IsWhatsAppValid == false</code>) → <span class="pill yellow">Skipped</span> · <code>NOT_ON_WHATSAPP</code></li>
+    </ul>
+    <p>Messaging non-consenting users is the fastest route to blocks and bans — so we never do it, even if they're on the list. The third gate is about <em>reachability</em>: once Meta has told us a number isn't on WhatsApp (see 3.8), we skip it for free on every future send instead of burning a send — or a precious daily-tier slot — on a dead number.</p>
+
+    <h3>3.6 — Reading Meta's error codes &amp; reacting</h3>
+    <p>When Meta returns a policy error, we don't blindly retry — we interpret it and contain the blast radius:</p>
+    <table>
+      <thead><tr><th>Code</th><th>Meaning</th><th>Our response</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">131048</td><td>Spam rate hit</td><td>Pause <em>this</em> campaign</td></tr>
+        <tr><td class="mono">131049</td><td>Healthy-ecosystem limit</td><td>Pause <em>this</em> campaign</td></tr>
+        <tr><td class="mono">368</td><td>Account restricted</td><td>Deactivate WABA + pause</td></tr>
+        <tr><td class="mono">131031</td><td>Account suspended</td><td>Deactivate WABA + pause</td></tr>
+        <tr><td class="mono">130429</td><td>Throughput rate limit</td><td>Back off + retry (recipient stays Queued)</td></tr>
+        <tr><td class="mono">131056</td><td>Per-recipient pair limit</td><td>Back off + retry (recipient stays Queued)</td></tr>
+        <tr><td class="mono">131026</td><td>Message undeliverable (not a WhatsApp user)</td><td>Mark recipient Failed <em>and</em> stamp the contact unreachable (see 3.8)</td></tr>
+      </tbody>
+    </table>
+    <p>Campaign-level errors pause just the offending campaign; account-level errors deactivate the whole number connection so nothing else keeps pushing into a restriction.</p>
+
+    <h3>3.7 — When Meta says "slow down" (130429)</h3>
+    <p><code>130429</code> (throughput rate limit) and <code>131056</code> (per-recipient pair limit) are <strong>transient</strong> — Meta is asking us to ease off, not flagging a violation. The message was <em>not</em> sent, so treating these as permanent failures would silently drop deliverable messages. We handle them exactly like our own internal throttle:</p>
+    <ul>
+      <li>The recipient <strong>stays <span class="pill brand">Queued</span></strong> — nothing is marked failed.</li>
+      <li>Progress is persisted and the <strong>whole batch is rescheduled</strong> with a 5–15s jittered back-off.</li>
+      <li>When it wakes, it resumes from the exact same recipient — duplicate-safe, nothing lost.</li>
+    </ul>
+    <div class="callout">
+      <strong>In practice this should rarely fire.</strong> Our token bucket already paces sends below Meta's throughput ceiling, so we usually never see <code>130429</code>. The handler is a safety net for the edge cases — a number shared with another integration, a freshly throttled new number, or a Redis hiccup that desyncs the limiter. Either way, the response is back-off-and-retry, never lose the message.
+    </div>
+
+    <h3>3.8 — Learning who isn't on WhatsApp (131026)</h3>
+    <p>A common question: <em>can't we check whether a number is on WhatsApp before we send?</em> On Meta's <strong>Cloud API the answer is no</strong> — there is no pre-send registration lookup. (The old On-Premises API had a <code>/contacts</code> endpoint; Meta removed it and never ported it, specifically to stop number-harvesting.) So the only signal we ever get is <strong>post-send</strong>: error code <code>131026</code> — <em>"message undeliverable / recipient is not a WhatsApp user."</em></p>
+    <p>Rather than waste that signal, we <strong>learn from it once and never repeat the mistake</strong>:</p>
+    <ul>
+      <li>When a send response <em>or</em> a delivery-status webhook returns <code>131026</code>, we stamp the contact <code>IsWhatsAppValid = false</code> (with a <code>WhatsAppInvalidAt</code> timestamp).</li>
+      <li>From then on, the reachability gate in 3.5 skips that contact with <code>NOT_ON_WHATSAPP</code> — costing zero sends and, crucially, <strong>zero daily-tier slots</strong>.</li>
+      <li>The stamp is idempotent: duplicate or out-of-order webhooks only set it once, and it's written by mutating the tracked entity (the webhook batch's single <code>SaveChanges</code> commits it — no mid-handler save).</li>
+    </ul>
+    <div class="callout green">
+      <strong>Post-send, not pre-send — but only once per number</strong>
+      The very first message to a non-WhatsApp number will always fail; there's no way around that on the Cloud API. But every campaign after that skips the number automatically. Over time the audience self-cleans, and real deliverable contacts stop sharing their daily-tier budget with dead numbers.
+    </div>
+    <div class="callout">
+      <strong>Existing contacts default to reachable.</strong> The <code>IsWhatsAppValid</code> column ships with a default of <code>true</code> — we never assume a number is dead until Meta tells us so. The flag only ever flips on a real <code>131026</code>.
+    </div>
+  </section>
+
+  <!-- PRECAUTIONS -->
+  <section id="precautions">
+    <h2><span class="num">4</span> Precautions — The Full Checklist</h2>
+    <p class="lead">Beyond rate limiting, these are the defensive choices baked into the system.</p>
+    <div class="grid">
+      <div class="card"><h4>✅ Approved templates only</h4><p>Launch fails fast if the template isn't Meta-approved — no unapproved content ever leaves.</p></div>
+      <div class="card"><h4>✅ Audience dedup</h4><p>Union of lists + individuals is deduplicated so no contact is messaged twice in one campaign.</p></div>
+      <div class="card"><h4>✅ Idempotency keys</h4><p>Recipients carry idempotency keys; retries and webhook replays never cause a re-send or status regression.</p></div>
+      <div class="card"><h4>✅ Quota pre-checks</h4><p>A subscription gate verifies plan quota before launch; a daily job warns 72h/48h/24h/6h before a big send would exceed quota.</p></div>
+      <div class="card"><h4>✅ Quality health checks</h4><p>A scheduled job refreshes quality rating + tier every ~15 min so gates act on fresh data.</p></div>
+      <div class="card"><h4>✅ Pause / resume / cancel</h4><p>Mid-loop pause checks mean a human can stop a campaign instantly without corrupting state.</p></div>
+      <div class="card"><h4>✅ Graceful degradation</h4><p>Redis outage → conservative local limiter. The system slows down, it never floods.</p></div>
+      <div class="card"><h4>✅ Tenant isolation</h4><p>Every job manually scopes to <code>CompanyId</code> — one tenant's campaign can never touch another's data or number.</p></div>
+    </div>
+  </section>
+
+  <!-- MULTIPLE CAMPAIGNS -->
+  <section id="multi">
+    <h2><span class="num">5</span> How Multiple Campaigns Run Together</h2>
+    <p class="lead">Many campaigns can be live at once. The key insight: <strong>the rate limit belongs to the phone number, not the campaign.</strong></p>
+
+    <p>If three campaigns all send through the same WhatsApp number, they don't each get their own quota — they <strong>share one token bucket and one daily tier counter</strong> for that number. That's exactly what Meta cares about: total volume per number, regardless of how many campaigns produced it.</p>
+
+    <div class="callout green">
+      <strong>Why this is safe by design</strong>
+      Because the lock key is the phone number, the combined output of every campaign on a number is automatically capped at Meta's limit. You physically cannot misconfigure two campaigns into doubling the send rate.
+    </div>
+
+    <h3>The concurrency model</h3>
+    <ul>
+      <li><strong>Per-number rate limiter</strong> — all campaigns on a number queue through the same bucket; the 24h tier set is shared, so a contact reached by campaign A isn't re-counted by campaign B that day.</li>
+      <li><strong>Independent batch chains</strong> — each campaign chains its own batches (A's batch 1 → A's batch 2), so campaigns interleave rather than block one another.</li>
+      <li><strong>No campaign-level locking</strong> — they don't serialize; the Hangfire worker pool (<code>max(4, cores×2)</code> workers) runs many batches concurrently, and the rate limiter is the single point that keeps the shared number within bounds.</li>
+      <li><strong>Jitter prevents thundering herd</strong> — the 5–15s randomized reschedule stops concurrent campaigns from all retrying on the same tick.</li>
+    </ul>
+
+    <table>
+      <thead><tr><th>Scenario</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td>3 campaigns, same number</td><td>Share one bucket + one daily tier. Total rate stays ≤ Meta's cap.</td></tr>
+        <tr><td>Campaigns on different numbers</td><td>Independent buckets — run fully in parallel at full speed each.</td></tr>
+        <tr><td>One campaign hits YELLOW</td><td>Only that number's campaigns slow down; others unaffected.</td></tr>
+        <tr><td>One campaign hits a policy error</td><td>That campaign pauses; siblings on the same number keep going (unless it's an account-level restriction).</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- WORKED EXAMPLE -->
+  <section id="example">
+    <h2><span class="num">6</span> Worked Example — A List of 2,000 Contacts</h2>
+    <p class="lead">Let's trace one campaign to a 2,000-contact list on a number with the default <span class="pill brand">Tier1K</span> tier and a healthy <span class="pill green">GREEN</span> rating. The interesting part: 2,000 is bigger than the 1,000/day tier cap, so the engine spreads it across two days automatically.</p>
+
+    <div class="bignum">
+      <div class="b"><div class="v">2,000</div><div class="l">contacts</div></div>
+      <div class="b"><div class="v">50</div><div class="l">batch size</div></div>
+      <div class="b"><div class="v">40</div><div class="l">batches</div></div>
+      <div class="b"><div class="v">20/s</div><div class="l">send rate</div></div>
+      <div class="b"><div class="v">1,000</div><div class="l">daily tier cap</div></div>
+    </div>
+
+    <h3>Step 0 — Launch (audience is frozen)</h3>
+    <p><strong>CampaignLaunchJob</strong> validates the template, then takes the list and <strong>deduplicates</strong> it. Say 40 were duplicates already reached by another list and 60 never opted in — those get filtered/skipped. The job bulk-inserts <strong>~1,900 <code>CampaignRecipient</code> rows in <code>Queued</code></strong> (we'll round to 2,000 for the walkthrough). Campaign flips to <code>Running</code> and the first batch is enqueued.</p>
+
+    <h3>The timeline</h3>
+    <div class="tl">
+      <div class="ev day">
+        <div class="t">DAY 1 · 00:00</div>
+        <h4>Batches 1 → 20 fire (recipients 1–1,000)</h4>
+        <p>Each batch grabs 50 queued recipients FIFO. Before every send the job acquires a token-bucket permit. At 20 permits/sec, 50 messages clear in ~2.5s, so 1,000 messages take roughly <strong>50 seconds of actual send time</strong> (plus tiny jitter pauses whenever the per-second bucket momentarily empties). Each success writes a <code>Message</code> row, flips the recipient to <span class="pill green">Sent</span>, and bumps <code>SentCount</code>.</p>
+      </div>
+      <div class="ev stop">
+        <div class="t">DAY 1 · ~00:01</div>
+        <h4>Batch 21 hits the daily tier cap</h4>
+        <p>The 1,001st permit request comes back <code>DailyTierExceeded</code> — the number has used its full Tier1K allowance for the UTC day. The job <strong>does not fail</strong>: it persists progress and reschedules the whole batch for <strong>just after the next UTC midnight</strong>. The remaining ~1,000 recipients stay <span class="pill brand">Queued</span> exactly where they are.</p>
+      </div>
+      <div class="ev">
+        <div class="t">DAY 1 · rest of day</div>
+        <h4>Campaign sits idle, 1,000 / 2,000 sent</h4>
+        <p>Nothing is stuck or lost. The watchdog scheduler sees a <code>Running</code> campaign that's intentionally parked and leaves it. Delivery/read webhooks for the first 1,000 keep arriving and advance those recipients to <span class="pill green">Delivered</span> / <span class="pill green">Read</span>.</p>
+      </div>
+      <div class="ev day">
+        <div class="t">DAY 2 · 00:05</div>
+        <h4>Batches 21 → 40 fire (recipients 1,001–2,000)</h4>
+        <p>The daily tier set resets at UTC midnight. The rescheduled batch wakes, permits flow again, and the final ~1,000 messages send in another ~50 seconds.</p>
+      </div>
+      <div class="ev done">
+        <div class="t">DAY 2 · ~00:06</div>
+        <h4>Campaign → Completed</h4>
+        <p>No recipients remain <code>Queued</code>, so the batch job stops chaining and marks the campaign <span class="pill green">Completed</span>. Final tallies: Sent / Skipped (no-consent &amp; opt-out) / Failed are all visible on the campaign stats.</p>
+      </div>
+    </div>
+
+    <div class="bar">
+      <span class="d1">DAY 1 — 1,000 sent</span>
+      <span class="d2">DAY 2 — 1,000 sent</span>
+    </div>
+
+    <div class="callout">
+      <strong>The takeaway</strong>
+      You never have to think about any of this. You point the campaign at 2,000 contacts and press go — the engine paces it to ~20/sec, respects the 1,000/day tier by splitting across two days, and resumes precisely where it paused. No flooding, no double-sends, no manual babysitting.
+    </div>
+
+    <h3>How the numbers change in other conditions</h3>
+    <table>
+      <thead><tr><th>Condition</th><th>What happens to the 2,000</th></tr></thead>
+      <tbody>
+        <tr><td>Number is on <span class="pill brand">Tier10K</span></td><td>Daily cap is 10,000, so all 2,000 send in <strong>one day</strong> (~100 seconds total). No overnight split.</td></tr>
+        <tr><td>Quality drops to <span class="pill yellow">YELLOW</span></td><td>Batch size halves to 25 → 80 batches. Same caps, gentler pressure to let quality recover.</td></tr>
+        <tr><td>Quality drops to <span class="pill red">RED</span> mid-send</td><td>Campaign <strong>auto-pauses</strong> and you're notified — remaining recipients wait until you resume on a healthy number.</td></tr>
+        <tr><td>Another campaign shares the number</td><td>Both draw from the <strong>same</strong> bucket + same 1,000/day tier. Combined they still can't exceed the cap — the 2,000 just shares the day's budget with the other campaign.</td></tr>
+        <tr><td>Plan quota is below 2,000</td><td>Launch is blocked by the subscription gate, and the daily quota-warning job flags it up to 72h ahead.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- LIVE PROGRESS -->
+  <section id="progress">
+    <h2><span class="num">7</span> Watching a Campaign Live</h2>
+    <p class="lead">While a campaign is sending, you don't have to guess how far along it is — the stats refresh on their own and a progress bar fills in real time.</p>
+
+    <p>Every recipient's status lives in the database, so a campaign's progress is just a live rollup of those rows. The API exposes it at <code>GET /campaigns/{id}/stats</code> (<code>CampaignService.GetStatsAsync</code>), which counts recipients by status straight from <code>CampaignRecipient</code> — no extra bookkeeping that could drift out of sync with reality.</p>
+
+    <h3>What the rollup returns</h3>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">totalRecipients</td><td>Audience size frozen at launch</td></tr>
+        <tr><td class="mono">queued</td><td>Not yet processed — the work remaining</td></tr>
+        <tr><td class="mono">sent / delivered / read</td><td>Forward-only delivery progress (advanced by webhooks)</td></tr>
+        <tr><td class="mono">failed / skipped</td><td>Terminal outcomes (errors, no-consent, opt-out, not-on-WhatsApp)</td></tr>
+        <tr><td class="mono">deliveryRate / readRate</td><td>Derived percentages for at-a-glance health</td></tr>
+      </tbody>
+    </table>
+
+    <h3>The progress bar</h3>
+    <p>"Progress" is simply how much of the audience has left the queue:</p>
+    <pre><span class="k">processed</span> = total − queued
+<span class="k">percent</span>   = round(processed / total × 100)</pre>
+    <p>The campaign-stats dialog leads with a bar showing <code>processed of total (percent%)</code> — e.g. <strong>"730 of 1,000 (73%)"</strong> — above the per-status count grid. While recipients remain queued it shows a <strong>"Sending…"</strong> spinner; once the queue drains it flips to <strong>"Completed."</strong></p>
+
+    <h3>Status-aware polling</h3>
+    <p>The frontend hook (<code>useCampaignStats</code>) doesn't poll blindly. It refetches the rollup <strong>every ~4 seconds while <code>queued &gt; 0</code></strong> — so the numbers and the bar climb on their own with no manual refresh — and then <strong>stops automatically</strong> the moment the queue hits zero (every recipient has reached a terminal status). A finished campaign isn't polled forever.</p>
+    <div class="callout">
+      <strong>Why <code>queued === 0</code> is the right stop signal.</strong> A recipient only leaves <code>Queued</code> when it reaches a terminal-for-sending state (Sent/Delivered/Read/Failed/Skipped). So an empty queue means there's nothing left for the engine to do on this campaign — exactly when live polling should wind down. (Delivery/read webhooks may still trickle in afterwards; reopening the dialog picks them up.)
+    </div>
+  </section>
+
+  <!-- FAILURE -->
+  <section id="failure">
+    <h2><span class="num">8</span> Failure Handling &amp; Recovery</h2>
+    <p class="lead">Resilience is layered so nothing gets stuck, lost, or double-sent.</p>
+    <ul>
+      <li><strong>Rate-limit backoff isn't a failure</strong> — progress is persisted and the batch reschedules; the job never throws on a throttle.</li>
+      <li><strong>Per-recipient failures are isolated</strong> — one bad recipient is marked <code>Failed</code> with its error code; the batch keeps going.</li>
+      <li><strong>Job-level retries</strong> — <code>AutomaticRetry(5)</code> on the batch job for transient infra hiccups.</li>
+      <li><strong>Poison handler</strong> — after retries are exhausted, the campaign and its remaining recipients are cleanly marked <code>Failed</code> and the tenant is notified.</li>
+      <li><strong>Stall watchdog</strong> — the per-minute scheduler re-enqueues any <code>Running</code> campaign that has queued recipients but lost its live job.</li>
+      <li><strong>Forward-only status webhooks</strong> — Sent → Delivered → Read advance idempotently; duplicates and out-of-order callbacks are safe.</li>
+    </ul>
+  </section>
+
+  <!-- FILES -->
+  <section id="files">
+    <h2><span class="num">9</span> Where It Lives in the Code</h2>
+    <p class="lead">Quick map for anyone diving in.</p>
+    <table class="filemap">
+      <thead><tr><th>Component</th><th>Path</th></tr></thead>
+      <tbody>
+        <tr><td>Campaign entity</td><td>Features/Campaigns/Entities/Campaign.cs</td></tr>
+        <tr><td>Recipient entity</td><td>Features/Campaigns/Entities/CampaignRecipient.cs</td></tr>
+        <tr><td>Scheduler job</td><td>Features/Campaigns/Jobs/CampaignSchedulerJob.cs</td></tr>
+        <tr><td>Launch job</td><td>Features/Campaigns/Jobs/CampaignLaunchJob.cs</td></tr>
+        <tr><td>Batch send job (core)</td><td>Features/Campaigns/Jobs/CampaignBatchSendJob.cs</td></tr>
+        <tr><td>Poison handler</td><td>Features/Campaigns/Jobs/CampaignPoisonHandlerJob.cs</td></tr>
+        <tr><td>Quota warning job</td><td>Features/Campaigns/Jobs/QuotaWarningCheckerJob.cs</td></tr>
+        <tr><td>Rate limiter (Redis)</td><td>Infrastructure/RateLimiting/RedisTokenBucketRateLimiter.cs</td></tr>
+        <tr><td>Local fallback limiter</td><td>Infrastructure/RateLimiting/LocalBucketRegistry.cs</td></tr>
+        <tr><td>WABA connection (tier/quality)</td><td>Features/WhatsApp/Entities/WabaConnection.cs</td></tr>
+        <tr><td>Meta policy error codes</td><td>Features/Messages/MetaPolicyErrorCodes.cs</td></tr>
+        <tr><td>Status webhook handler</td><td>Features/Webhooks/Handlers/MessageStatusWebhookHandler.cs</td></tr>
+        <tr><td>Contact entity (IsWhatsAppValid)</td><td>Features/Contacts/Entities/Contact.cs</td></tr>
+        <tr><td>Live stats rollup</td><td>Features/Campaigns/CampaignService.cs → GetStatsAsync</td></tr>
+        <tr><td>Progress hook (polling)</td><td>wa_web/features/campaigns/hooks/use-campaigns.ts → useCampaignStats</td></tr>
+        <tr><td>Progress dialog (bar/UI)</td><td>wa_web/features/campaigns/components/campaign-dialogs.tsx</td></tr>
+        <tr><td>Rate-limit config</td><td>appsettings.json → "RateLimit"</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    BitLabs WhatsApp CRM · Campaign Engine Documentation · Generated for internal engineering reference
+  </footer>
+
+</div>
+</body>
+</html>

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import { Progress } from "@/components/ui/progress";
 import {
   useCreateCampaignDialog,
   useEditCampaignDialog,
@@ -203,6 +204,32 @@ function RecipientsDialog() {
           </div>
         ) : stats ? (
           <div className="space-y-4">
+            {(() => {
+              const total = stats.totalRecipients;
+              const processed = total - stats.queued;
+              const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+              const inProgress = stats.queued > 0;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 font-medium">
+                      {inProgress ? (
+                        <>
+                          <Spinner className="size-3.5" />
+                          Sending…
+                        </>
+                      ) : (
+                        "Completed"
+                      )}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {processed.toLocaleString()} of {total.toLocaleString()} ({percent}%)
+                    </span>
+                  </div>
+                  <Progress value={percent} />
+                </div>
+              );
+            })()}
             <div className="grid grid-cols-2 gap-3">
               {(
                 [

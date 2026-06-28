@@ -150,6 +150,18 @@ public class CampaignBatchSendJob(
                 continue;
             }
 
+            // Registration gate: a prior send/webhook proved this number isn't on WhatsApp (131026).
+            // Skip it so we don't waste a send — or a daily tier slot — on a known-dead number.
+            if (!recipient.Contact.IsWhatsAppValid)
+            {
+                recipient.Status = RecipientStatus.Skipped;
+                recipient.ErrorCode = "NOT_ON_WHATSAPP";
+                logger.LogInformation(
+                    "Skipping contact {ContactId} in campaign {CampaignId} — not a WhatsApp user.",
+                    recipient.ContactId, campaignId);
+                continue;
+            }
+
             // ── Acquire a send permit (graceful: brief wait, else reschedule the whole batch) ──
             // Per-second pacing + the number's daily unique-recipient tier cap.
             var permit = await rateLimiter.TryAcquireAsync(waba.PhoneNumberId, recipient.ContactId, tierLimit, ct);
@@ -242,6 +254,36 @@ public class CampaignBatchSendJob(
                             "Campaign paused. Review your template content and contact list quality before resuming.",
                             ct);
                         return;
+                    }
+
+                    // Transient throughput throttle (130429 / 131056): Meta asked us to slow down, so the send
+                    // did NOT happen. Leave this recipient Queued, persist progress, and reschedule the batch
+                    // with backoff — the same graceful path as our own per-second limiter. Retrying the same
+                    // Queued recipient is duplicate-safe; failing it would drop a deliverable message.
+                    if (MetaPolicyErrorCodes.IsTransientThrottle(errorCode))
+                    {
+                        logger.LogWarning(
+                            "Meta returned throttle code {Code} for campaign {CampaignId} — backing off and rescheduling batch.",
+                            errorCode, campaignId);
+
+                        await db.SaveChangesAsync(ct);
+                        await RescheduleBatchAsync(
+                            campaign, campaignId,
+                            new RateLimitResult(false, TimeSpan.Zero, RateLimitReason.PerSecondThrottle),
+                            db, notifier, ct);
+                        return;
+                    }
+
+                    // Recipient isn't on WhatsApp (131026): stamp the contact invalid so every future
+                    // campaign's registration gate skips it. The send genuinely failed for this run.
+                    if (MetaPolicyErrorCodes.IsUndeliverableRecipient(errorCode)
+                        && recipient.Contact.IsWhatsAppValid)
+                    {
+                        recipient.Contact.IsWhatsAppValid = false;
+                        recipient.Contact.WhatsAppInvalidAt = DateTime.UtcNow;
+                        logger.LogInformation(
+                            "Contact {ContactId} marked not on WhatsApp (code {Code}) — will be skipped in future sends.",
+                            recipient.ContactId, errorCode);
                     }
 
                     // Non-policy failure — mark recipient failed and continue the batch.

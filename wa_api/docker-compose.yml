@@ -24,6 +24,29 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    # Liveness probe: /health/live runs no dependency checks, so it only fails when the
+    # process itself is wedged (deadlock, thread-pool exhaustion) — not on a transient DB blip.
+    # start_period gives the app room to boot + run EF migrations before failures count.
+    # NOTE: the healthcheck only *marks* the container unhealthy; the autoheal sidecar below
+    # is what actually restarts it (plain Compose won't restart on health status alone).
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # Watches every container that defines a healthcheck and restarts any that goes unhealthy.
+  # This closes the "hung but alive" gap that restart:unless-stopped alone cannot cover.
+  autoheal:
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all   # monitor all containers that have a healthcheck
+      AUTOHEAL_INTERVAL: 10           # seconds between checks
+      AUTOHEAL_START_PERIOD: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   caddy:
     image: caddy:2-alpine
@@ -39,7 +62,35 @@ services:
     depends_on:
       - api
 
+  # Real-time server-load dashboard (CPU / RAM / disk / network + per-container metrics).
+  # Bound to 127.0.0.1 only — Netdata ships with NO auth, so it is NOT exposed publicly.
+  # Reach it via an SSH tunnel:  ssh -L 19999:localhost:19999 <user>@<vps>  →  http://localhost:19999
+  # The /proc, /sys and docker.sock mounts let it read host + container metrics from the bridge network.
+  netdata:
+    image: netdata/netdata:stable
+    hostname: wa-api-vps
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:19999:19999"
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdata-config:/etc/netdata
+      - netdata-lib:/var/lib/netdata
+      - netdata-cache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
 volumes:
   redis-data:
   caddy-data:
   caddy-config:
+  netdata-config:
+  netdata-lib:
+  netdata-cache:
