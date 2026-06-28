@@ -44,4 +44,12 @@ public sealed class InProcessTokenBucket(LocalBucketRegistry registry, IOptions<
 
         return Task.FromResult(RateLimitResult.Allow);
     }
+
+    public Task<int> GetDailyUsageAsync(string phoneNumberId, CancellationToken ct = default)
+    {
+        var dayKey = $"{phoneNumberId}:{DateTime.UtcNow:yyyyMMdd}";
+        if (_dailyRecipients.TryGetValue(dayKey, out var set))
+            lock (set) return Task.FromResult(set.Count);
+        return Task.FromResult(0);
+    }
 }

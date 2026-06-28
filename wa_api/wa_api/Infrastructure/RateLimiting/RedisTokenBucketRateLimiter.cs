@@ -122,4 +122,19 @@ return 1";
             return _fallback.TryTake($"fb:{phoneNumberId}", _opts.FallbackRefill, _opts.FallbackRefill);
         }
     }
+
+    public async Task<int> GetDailyUsageAsync(string phoneNumberId, CancellationToken ct = default)
+    {
+        try
+        {
+            // Same key the DailyCapScript SADDs into — the set's cardinality is the unique recipients today.
+            var dayKey = $"rl:day:{phoneNumberId}:{DateTime.UtcNow:yyyyMMdd}";
+            return (int)await _db.SetLengthAsync(dayKey);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read daily usage for {Phone}; returning 0.", phoneNumberId);
+            return 0;
+        }
+    }
 }

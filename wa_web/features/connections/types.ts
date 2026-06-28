@@ -20,4 +20,6 @@ export interface MyWabaConnection {
   qualityRating: string | null;
   /** Meta messaging limit tier (24-hour unique-recipient cap). */
   messagingTier: MessagingTier;
+  /** Unique business-initiated recipients sent today, counted toward the tier cap (UTC day). */
+  dailySentToday: number;
 }

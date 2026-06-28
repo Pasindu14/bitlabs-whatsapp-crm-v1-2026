@@ -43,4 +43,10 @@ public interface IWabaRateLimiter
         Guid? recipientContactId,
         int dailyTierLimit,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Unique business-initiated recipients already counted toward the number's 24-hour tier cap for the
+    /// current UTC day. Read-only (consumes no permit). Best-effort: returns 0 on a backing-store error.
+    /// </summary>
+    Task<int> GetDailyUsageAsync(string phoneNumberId, CancellationToken ct = default);
 }

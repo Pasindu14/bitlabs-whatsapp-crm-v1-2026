@@ -5,6 +5,7 @@ using wa_api.Common.Errors;
 using wa_api.Features.WhatsApp.Dtos;
 using wa_api.Features.WhatsApp.Entities;
 using wa_api.Infrastructure.Persistence;
+using wa_api.Infrastructure.RateLimiting;
 
 namespace wa_api.Features.WhatsApp.Controllers;
 
@@ -15,9 +16,19 @@ namespace wa_api.Features.WhatsApp.Controllers;
 [ApiController]
 [Route("my-waba-connections")]
 [Authorize(Roles = "CompanyAdmin")]
-public class MyWabaConnectionsController(AppDbContext db) : ControllerBase
+public class MyWabaConnectionsController(AppDbContext db, IWabaRateLimiter rateLimiter) : ControllerBase
 {
     private string? CorrelationId => HttpContext.Items["CorrelationId"]?.ToString();
+
+    /// <summary>Fills in each connection's daily send usage (read-only; never blocks the response on a cache blip).</summary>
+    private async Task<List<WabaConnectionResponse>> WithDailyUsageAsync(
+        List<WabaConnectionResponse> items, CancellationToken ct)
+    {
+        var result = new List<WabaConnectionResponse>(items.Count);
+        foreach (var item in items)
+            result.Add(item with { DailySentToday = await rateLimiter.GetDailyUsageAsync(item.PhoneNumberId, ct) });
+        return result;
+    }
 
     /// <summary>GET /api/v1/my-waba-connections — active connected connections (message picker).</summary>
     [HttpGet]
@@ -30,10 +41,10 @@ public class MyWabaConnectionsController(AppDbContext db) : ControllerBase
             .Select(w => new WabaConnectionResponse(
                 w.Id, w.CompanyId, w.Company.Name, w.PhoneNumberId, w.WabaId,
                 w.DisplayPhoneNumber, w.Status, w.EncryptedAccessToken != "", w.IsActive, w.CreatedAt,
-                w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier))
+                w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier, 0))
             .ToListAsync(ct);
 
-        return Ok(ResponseHelper.Ok(items, CorrelationId));
+        return Ok(ResponseHelper.Ok(await WithDailyUsageAsync(items, ct), CorrelationId));
     }
 
     /// <summary>GET /api/v1/my-waba-connections/all — all connections regardless of status (connections page).</summary>
@@ -45,9 +56,9 @@ public class MyWabaConnectionsController(AppDbContext db) : ControllerBase
             .Select(w => new WabaConnectionResponse(
                 w.Id, w.CompanyId, w.Company.Name, w.PhoneNumberId, w.WabaId,
                 w.DisplayPhoneNumber, w.Status, w.EncryptedAccessToken != "", w.IsActive, w.CreatedAt,
-                w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier))
+                w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier, 0))
             .ToListAsync(ct);
 
-        return Ok(ResponseHelper.Ok(items, CorrelationId));
+        return Ok(ResponseHelper.Ok(await WithDailyUsageAsync(items, ct), CorrelationId));
     }
 }

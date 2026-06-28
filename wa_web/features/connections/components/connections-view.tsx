@@ -29,13 +29,13 @@ const QUALITY_RATING: Record<string, { label: string; className: string }> = {
   RED: { label: "Low", className: "bg-red-100 text-red-700 border-red-200" },
 };
 
-// Messaging tier → human daily unique-recipient cap.
-const TIER_LABEL: Record<MessagingTier, string> = {
-  Tier250: "250 / day",
-  Tier1K: "1,000 / day",
-  Tier10K: "10,000 / day",
-  Tier100K: "100,000 / day",
-  Unlimited: "Unlimited",
+// Messaging tier → daily unique-recipient cap as a number (null = unlimited).
+const TIER_CAP: Record<MessagingTier, number | null> = {
+  Tier250: 250,
+  Tier1K: 1000,
+  Tier10K: 10000,
+  Tier100K: 100000,
+  Unlimited: null,
 };
 
 function QualityBadge({ rating }: { rating: string | null }) {
@@ -102,12 +102,32 @@ function ConnectionCard({ conn }: { conn: MyWabaConnection }) {
             <QualityBadge rating={conn.qualityRating} />
           </div>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Messaging tier</p>
-          <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
-            <Gauge className="size-3.5 text-muted-foreground" />
-            {TIER_LABEL[conn.messagingTier] ?? conn.messagingTier}
+        <div className="min-w-[160px] flex-1">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Gauge className="size-3.5" />
+              Sent today
+            </p>
+            <p className="text-xs font-medium tabular-nums">
+              {(() => {
+                const cap = TIER_CAP[conn.messagingTier];
+                return cap === null
+                  ? `${conn.dailySentToday.toLocaleString()} (Unlimited)`
+                  : `${conn.dailySentToday.toLocaleString()} / ${cap.toLocaleString()}`;
+              })()}
+            </p>
           </div>
+          {(() => {
+            const cap = TIER_CAP[conn.messagingTier];
+            if (cap === null) return null;
+            const pct = Math.min(100, Math.round((conn.dailySentToday / cap) * 100));
+            const bar = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-green-500";
+            return (
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div className={cn("h-full rounded-full transition-all", bar)} style={{ width: `${pct}%` }} />
+              </div>
+            );
+          })()}
         </div>
       </div>
 

@@ -44,7 +44,7 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
             .Select(w => new WabaConnectionResponse(
                 w.Id, w.CompanyId, w.Company.Name, w.PhoneNumberId, w.WabaId,
                 w.DisplayPhoneNumber, w.Status, w.EncryptedAccessToken != "", w.IsActive, w.CreatedAt,
-                w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier))
+                w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier, 0))
             .ToListAsync(ct);
 
         return (items, total);
@@ -161,5 +161,5 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
             w.Id, w.CompanyId, companyName ?? w.Company?.Name,
             w.PhoneNumberId, w.WabaId, w.DisplayPhoneNumber, w.Status,
             !string.IsNullOrEmpty(w.EncryptedAccessToken), w.IsActive, w.CreatedAt,
-            w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier);
+            w.LastHealthCheckAt, w.HealthCheckErrorMessage, w.QualityRating, w.MessagingTier, 0);
 }
