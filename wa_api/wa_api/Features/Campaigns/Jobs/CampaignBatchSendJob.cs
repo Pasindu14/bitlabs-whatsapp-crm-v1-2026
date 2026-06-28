@@ -123,6 +123,17 @@ public class CampaignBatchSendJob(
 
         var resolvedMapping = ResolveMapping(campaign.VariableMapping);
 
+        // Idempotency guard: of THIS batch's contacts, which already have a message in this campaign
+        // (from a prior, possibly interrupted, run). A recipient here was sent before — never send again.
+        // This closes the duplicate-message window where Meta accepted a send but the status flip wasn't
+        // committed before the job was retried/re-enqueued. Scoped to the batch so it stays cheap at scale.
+        var batchContactIds = batch.Select(r => r.ContactId).ToList();
+        var alreadyMessaged = new HashSet<Guid>(
+            await db.Messages.IgnoreQueryFilters()
+                .Where(m => m.CampaignId == campaignId && batchContactIds.Contains(m.ContactId))
+                .Select(m => m.ContactId)
+                .ToListAsync(ct));
+
         foreach (var recipient in batch)
         {
             // Re-check campaign status inside loop — pause/cancel can arrive mid-batch.
@@ -161,6 +172,18 @@ public class CampaignBatchSendJob(
                 recipient.ErrorCode = "NOT_ON_WHATSAPP";
                 logger.LogInformation(
                     "Skipping contact {ContactId} in campaign {CampaignId} — not a WhatsApp user.",
+                    recipient.ContactId, campaignId);
+                continue;
+            }
+
+            // Idempotency: this contact already received a message in this campaign (a prior run sent it
+            // but didn't commit the status flip before being retried). Reconcile the status and skip the
+            // resend — this is the guard against the duplicate-message bug.
+            if (alreadyMessaged.Contains(recipient.ContactId))
+            {
+                recipient.Status = RecipientStatus.Sent;
+                logger.LogWarning(
+                    "Recipient {ContactId} in campaign {CampaignId} already has a message — reconciling to Sent, skipping resend.",
                     recipient.ContactId, campaignId);
                 continue;
             }
@@ -208,10 +231,13 @@ public class CampaignBatchSendJob(
                         ExternalMessageId = externalId,
                     };
                     db.Messages.Add(message);
-                    await db.SaveChangesAsync(ct);
 
+                    // Flip the recipient to Sent in the SAME save as the message insert, so the send is
+                    // recorded atomically. (Previously the status flip lagged to a later save; if the job
+                    // was retried in that window the recipient was still Queued and got sent a SECOND time.)
+                    // Setting the Message nav fills MessageId on insert without a separate round-trip.
                     recipient.Status = RecipientStatus.Sent;
-                    recipient.MessageId = message.Id;
+                    recipient.Message = message;
                     recipient.ResolvedVariables = JsonSerializer.Serialize(resolvedVars, JsonOpts);
                     campaign.SentCount++;
 
@@ -221,6 +247,11 @@ public class CampaignBatchSendJob(
                         recipient.SentWithoutConsent = true;
                         campaign.NoConsentSentCount++;
                     }
+
+                    // Track within this run too, so a contact can never be picked twice in one batch.
+                    alreadyMessaged.Add(recipient.ContactId);
+
+                    await db.SaveChangesAsync(ct);
                 }
                 else
                 {
