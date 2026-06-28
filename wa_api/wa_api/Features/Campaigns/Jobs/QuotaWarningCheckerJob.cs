@@ -53,7 +53,7 @@ public class QuotaWarningCheckerJob(
             if (!subscriptions.TryGetValue(campaign.CompanyId, out var sub) || sub.Plan is null)
                 continue;
 
-            int remaining = sub.Plan.MonthlyMessageQuota - sub.MessagesUsedThisPeriod;
+            int remaining = sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits - sub.MessagesUsedThisPeriod;
 
             int recipients = campaign.TotalRecipients > 0
                 ? campaign.TotalRecipients

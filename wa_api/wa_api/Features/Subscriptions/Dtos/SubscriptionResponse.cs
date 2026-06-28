@@ -15,6 +15,8 @@ public record SubscriptionResponse(
     string? PlanName,
     SubscriptionStatus? Status,
     int MonthlyMessageQuota,
+    int ExtraMessageCredits,
+    int EffectiveMessageQuota,
     int MessagesUsedThisPeriod,
     int MessagesRemaining,
     DateTime? CurrentPeriodStart,
@@ -26,5 +28,5 @@ public record SubscriptionResponse(
 {
     /// <summary>The empty shape for a company with no active subscription.</summary>
     public static SubscriptionResponse None(Guid companyId, string? companyName = null)
-        => new(null, companyId, companyName, null, null, null, 0, 0, 0, null, null, false, false, null);
+        => new(null, companyId, companyName, null, null, null, 0, 0, 0, 0, 0, null, null, false, false, null);
 }

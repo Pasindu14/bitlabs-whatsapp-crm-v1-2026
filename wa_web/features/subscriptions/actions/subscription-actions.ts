@@ -5,6 +5,7 @@ import { SubscriptionService } from "@/features/subscriptions/services/subscript
 import {
   assignSubscriptionSchema,
   changePlanSchema,
+  addPackageSchema,
 } from "@/features/subscriptions/schema/subscription-schema";
 import type { SubscriptionListParams } from "@/features/subscriptions/types";
 
@@ -39,5 +40,20 @@ export const cancelSubscriptionAction = createAction(
   { name: "cancelSubscriptionAction", requireAuth: true, requiredRole: SUPERADMIN },
   async (companyId: string) => {
     return SubscriptionService.cancel(companyId);
+  }
+);
+
+export const addPackageAction = createAction(
+  { name: "addPackageAction", requireAuth: true, requiredRole: SUPERADMIN },
+  async (companyId: string, raw: unknown) => {
+    const input = addPackageSchema.parse(raw);
+    return SubscriptionService.addPackage(companyId, input);
+  }
+);
+
+export const getPackageHistoryAction = createAction(
+  { name: "getPackageHistoryAction", requireAuth: true, requiredRole: SUPERADMIN },
+  async (companyId: string) => {
+    return SubscriptionService.getPackageHistory(companyId);
   }
 );

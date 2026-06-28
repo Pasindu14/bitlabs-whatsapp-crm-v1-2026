@@ -61,4 +61,20 @@ public class SubscriptionsController(ISubscriptionService service) : ControllerB
         var result = await service.CancelAsync(companyId, ct);
         return Ok(ResponseHelper.Ok(result, CorrelationId));
     }
+
+    /// <summary>POST /api/v1/subscriptions/company/{companyId}/packages — add credit package to a company.</summary>
+    [HttpPost("company/{companyId:guid}/packages")]
+    public async Task<IActionResult> AddPackage(Guid companyId, AddPackageRequest request, CancellationToken ct)
+    {
+        var result = await service.AddPackageAsync(companyId, request, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>GET /api/v1/subscriptions/company/{companyId}/packages — a company's package-purchase history.</summary>
+    [HttpGet("company/{companyId:guid}/packages")]
+    public async Task<IActionResult> GetPackageHistory(Guid companyId, CancellationToken ct)
+    {
+        var result = await service.GetPackageHistoryAsync(companyId, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
 }

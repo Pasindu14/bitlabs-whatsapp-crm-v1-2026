@@ -32,12 +32,13 @@ const statusVariant: Record<SubscriptionStatus, "default" | "secondary" | "destr
 export interface SubscriptionColumnActions {
   openChange: (companyId: string) => void;
   openCancel: (companyId: string) => void;
+  openAddPackage: (companyId: string) => void;
 }
 
 export function getSubscriptionColumns(
   actions: SubscriptionColumnActions
 ): ColumnDef<Subscription>[] {
-  const { openChange, openCancel } = actions;
+  const { openChange, openCancel, openAddPackage } = actions;
 
   return [
     {
@@ -84,18 +85,20 @@ export function getSubscriptionColumns(
       enableSorting: false,
       cell: ({ row }) => {
         const s = row.original;
-        if (!s.hasSubscription || s.monthlyMessageQuota === 0) {
+        // Effective quota = plan quota + purchased extra credits.
+        const quota = s.effectiveMessageQuota || s.monthlyMessageQuota;
+        if (!s.hasSubscription || quota === 0) {
           return <span className="text-muted-foreground">—</span>;
         }
-        const pct = Math.min(
-          100,
-          Math.round((s.messagesUsedThisPeriod / s.monthlyMessageQuota) * 100)
-        );
+        const pct = Math.min(100, Math.round((s.messagesUsedThisPeriod / quota) * 100));
         return (
           <div className="min-w-[140px] space-y-1">
             <Progress value={pct} className="h-2" />
             <div className="text-xs text-muted-foreground">
-              {numFmt.format(s.messagesUsedThisPeriod)} / {numFmt.format(s.monthlyMessageQuota)}
+              {numFmt.format(s.messagesUsedThisPeriod)} / {numFmt.format(quota)}
+              {s.extraMessageCredits > 0 && (
+                <span className="text-primary"> (+{numFmt.format(s.extraMessageCredits)})</span>
+              )}
             </div>
           </div>
         );
@@ -133,6 +136,9 @@ export function getSubscriptionColumns(
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem onClick={() => openChange(s.companyId)}>
                 Change plan
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openAddPackage(s.companyId)}>
+                Add package
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => openCancel(s.companyId)}>

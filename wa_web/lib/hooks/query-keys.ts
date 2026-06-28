@@ -72,6 +72,15 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.plans.details(), id] as const,
   },
 
+  // Packages (SuperAdmin — message-credit add-on catalog)
+  packages: {
+    all: ['packages'] as const,
+    lists: () => [...queryKeys.packages.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.packages.lists(), filters] as const,
+    details: () => [...queryKeys.packages.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.packages.details(), id] as const,
+  },
+
   // Subscriptions (SuperAdmin — company ↔ plan assignments)
   subscriptions: {
     all: ['subscriptions'] as const,
@@ -79,6 +88,8 @@ export const queryKeys = {
     list: (filters?: any) => [...queryKeys.subscriptions.lists(), filters] as const,
     forCompany: (companyId: string) =>
       [...queryKeys.subscriptions.all, 'company', companyId] as const,
+    packageHistory: (companyId: string) =>
+      [...queryKeys.subscriptions.all, 'package-history', companyId] as const,
   },
 
   // My subscription (tenant — the caller's own plan + usage)

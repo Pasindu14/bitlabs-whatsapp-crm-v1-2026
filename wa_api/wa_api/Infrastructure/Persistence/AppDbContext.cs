@@ -11,6 +11,7 @@ using wa_api.Features.Contacts.Entities;
 using wa_api.Features.ContactLists.Entities;
 using wa_api.Features.Conversations.Entities;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Packages.Entities;
 using wa_api.Features.Plans.Entities;
 using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.Templates.Entities;
@@ -48,6 +49,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<MessagePackage> MessagePackages => Set<MessagePackage>();
+    public DbSet<PackagePurchase> PackagePurchases => Set<PackagePurchase>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
@@ -337,8 +340,47 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .HasForeignKey(x => x.PlanId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Extra message credits from add-on packages — defaults to 0 for existing rows.
+            e.Property(x => x.ExtraMessageCredits).HasDefaultValue(0);
+
             // Tenant isolation (Phase 1.1/1.3): SuperAdmin bypasses; everyone else sees only
             // their own company. IsActive is intentionally left out (mirrors WabaConnection).
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<MessagePackage>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(120);
+            e.HasIndex(x => x.Name).IsUnique();          // package name is platform-unique
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.Price).HasColumnType("numeric(12,2)");
+            e.Property(x => x.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("USD");
+            // Platform catalog — NO tenant query filter (shared across all companies, like Plan).
+        });
+
+        modelBuilder.Entity<PackagePurchase>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.PackageName).IsRequired().HasMaxLength(120);
+            e.Property(x => x.Price).HasColumnType("numeric(12,2)");
+            e.Property(x => x.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("USD");
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => new { x.CompanyId, x.CreatedAt });   // history list, newest first
+            e.HasOne(x => x.Company)
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Subscription)
+                .WithMany()
+                .HasForeignKey(x => x.SubscriptionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Package)
+                .WithMany()
+                .HasForeignKey(x => x.PackageId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Tenant-scoped audit history — same filter as Subscription.
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
 

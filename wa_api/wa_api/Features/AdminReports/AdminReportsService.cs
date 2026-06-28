@@ -98,6 +98,7 @@ public class AdminReportsService(AppDbContext db)
                 s.CompanyId,
                 s.PlanId,
                 s.MessagesUsedThisPeriod,
+                s.ExtraMessageCredits,
                 s.CurrentPeriodEnd,
             })
             .ToListAsync(ct);
@@ -115,7 +116,8 @@ public class AdminReportsService(AppDbContext db)
         return subs.Select(s =>
         {
             planById.TryGetValue(s.PlanId, out var plan);
-            var quota = plan?.MonthlyMessageQuota ?? 0;
+            // Effective quota = plan's monthly quota + purchased extra-credit balance.
+            var quota = (plan?.MonthlyMessageQuota ?? 0) + s.ExtraMessageCredits;
             var remaining = quota - s.MessagesUsedThisPeriod;
             var isLow = quota > 0 && remaining < quota * LowBalanceThreshold;
 

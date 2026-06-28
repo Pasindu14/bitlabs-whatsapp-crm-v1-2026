@@ -1,10 +1,15 @@
 import client, { type ApiSuccessBody, createIdempotencyKey } from "@/lib/api/client";
 import { executeService } from "@/lib/services/wrapper";
 import type { PaginatedResponse } from "@/lib/types/actions";
-import type { Subscription, SubscriptionListParams } from "@/features/subscriptions/types";
+import type {
+  Subscription,
+  SubscriptionListParams,
+  PackagePurchase,
+} from "@/features/subscriptions/types";
 import type {
   AssignSubscriptionInput,
   ChangePlanInput,
+  AddPackageInput,
 } from "@/features/subscriptions/schema/subscription-schema";
 
 /**
@@ -100,6 +105,32 @@ export const SubscriptionService = {
           `/api/v1/subscriptions/company/${companyId}/cancel`
         );
         return res.data.data;
+      }
+    );
+  },
+
+  async addPackage(companyId: string, input: AddPackageInput): Promise<Subscription> {
+    return executeService(
+      { context: "SubscriptionService", method: "addPackage" },
+      async () => {
+        const res = await client.post<ApiSuccessBody<Subscription>>(
+          `/api/v1/subscriptions/company/${companyId}/packages`,
+          input,
+          { headers: { "X-Idempotency-Key": createIdempotencyKey() } }
+        );
+        return res.data.data;
+      }
+    );
+  },
+
+  async getPackageHistory(companyId: string): Promise<PackagePurchase[]> {
+    return executeService(
+      { context: "SubscriptionService", method: "getPackageHistory" },
+      async () => {
+        const res = await client.get<ApiSuccessBody<PackagePurchase[]>>(
+          `/api/v1/subscriptions/company/${companyId}/packages`
+        );
+        return res.data.data ?? [];
       }
     );
   },

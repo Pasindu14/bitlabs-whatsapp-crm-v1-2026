@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Errors;
 using wa_api.Common.Tenancy;
+using wa_api.Features.Packages.Dtos;
+using wa_api.Features.Packages.Entities;
 using wa_api.Features.Plans.Entities;
 using wa_api.Features.Subscriptions.Dtos;
 using wa_api.Features.Subscriptions.Entities;
@@ -151,6 +153,55 @@ public class SubscriptionService(AppDbContext db, ITenantContext tenant) : ISubs
         return Map(sub);
     }
 
+    public async Task<SubscriptionResponse> AddPackageAsync(Guid companyId, AddPackageRequest request, CancellationToken ct = default)
+    {
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct)
+            ?? throw new NotFoundException("Company", companyId);
+
+        var package = await db.MessagePackages.FirstOrDefaultAsync(p => p.Id == request.PackageId, ct)
+            ?? throw new NotFoundException("Package", request.PackageId);
+
+        if (!package.IsActive)
+            throw new BusinessRuleException("PACKAGE_INACTIVE", "The selected package is inactive and cannot be added.");
+
+        var sub = await LoadActiveAsync(companyId, asNoTracking: false, ct)
+            ?? throw new BusinessRuleException("SUBSCRIPTION_INACTIVE",
+                "This company has no active subscription to add a package to. Assign a plan first.");
+
+        // Top up the credit balance and record the purchase (snapshotting the package fields so
+        // later catalog edits don't rewrite history).
+        sub.ExtraMessageCredits += package.ExtraMessages;
+
+        db.PackagePurchases.Add(new PackagePurchase
+        {
+            CompanyId = company.Id,          // explicit — SuperAdmin scope has no tenant context
+            SubscriptionId = sub.Id,
+            PackageId = package.Id,
+            PackageName = package.Name,
+            MessagesAdded = package.ExtraMessages,
+            Price = package.Price,
+            Currency = package.Currency,
+        });
+
+        await db.SaveChangesAsync(ct);
+
+        return Map(sub);
+    }
+
+    public async Task<IReadOnlyList<PackagePurchaseResponse>> GetPackageHistoryAsync(Guid companyId, CancellationToken ct = default)
+    {
+        _ = await db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == companyId, ct)
+            ?? throw new NotFoundException("Company", companyId);
+
+        // SuperAdmin path: query filter bypassed, so scope by the explicit CompanyId predicate.
+        var rows = await db.PackagePurchases.AsNoTracking()
+            .Where(p => p.CompanyId == companyId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(ct);
+
+        return rows.Select(PackagePurchaseResponse.From).ToList();
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>Loads the company's single active subscription (Plan + Company included).</summary>
@@ -196,11 +247,12 @@ public class SubscriptionService(AppDbContext db, ITenantContext tenant) : ISubs
 
     private static SubscriptionResponse Map(Subscription s)
     {
-        var quota = s.Plan?.MonthlyMessageQuota ?? 0;
-        var remaining = Math.Max(0, quota - s.MessagesUsedThisPeriod);
+        var baseQuota = s.Plan?.MonthlyMessageQuota ?? 0;
+        var effective = baseQuota + s.ExtraMessageCredits;
+        var remaining = Math.Max(0, effective - s.MessagesUsedThisPeriod);
         return new SubscriptionResponse(
             s.Id, s.CompanyId, s.Company?.Name, s.PlanId, s.Plan?.Name, s.Status,
-            quota, s.MessagesUsedThisPeriod, remaining,
+            baseQuota, s.ExtraMessageCredits, effective, s.MessagesUsedThisPeriod, remaining,
             s.CurrentPeriodStart, s.CurrentPeriodEnd, s.IsActive, true, s.CreatedAt);
     }
 }

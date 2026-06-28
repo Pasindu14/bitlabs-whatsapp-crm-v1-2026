@@ -22,14 +22,17 @@ import {
   useAssignSubscriptionDialog,
   useChangePlanDialog,
   useCancelSubscriptionDialog,
+  useAddPackageDialog,
 } from "@/features/subscriptions/store/subscription-store";
 import {
   useAssignSubscription,
   useChangePlan,
   useCancelSubscription,
+  useAddPackage,
 } from "@/features/subscriptions/hooks/use-subscriptions";
 import { AssignSubscriptionForm } from "./assign-subscription-form";
 import { ChangePlanForm } from "./change-plan-form";
+import { AddPackageForm } from "./add-package-form";
 
 function AssignSubscriptionDialog() {
   const { isOpen, close } = useAssignSubscriptionDialog();
@@ -127,12 +130,48 @@ function CancelSubscriptionDialog() {
   );
 }
 
+function AddPackageDialog() {
+  const { isOpen, selectedCompanyId, close } = useAddPackageDialog();
+  const { mutate, isPending, fieldErrors, clearFieldErrors } = useAddPackage();
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          close();
+          clearFieldErrors();
+        }
+      }}
+    >
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Package</DialogTitle>
+          <DialogDescription>
+            Top up this company&apos;s message credits with an add-on package.
+          </DialogDescription>
+        </DialogHeader>
+        <AddPackageForm
+          companyId={isOpen ? selectedCompanyId : null}
+          onSubmit={(data) => {
+            if (!selectedCompanyId) return;
+            mutate({ companyId: selectedCompanyId, data });
+          }}
+          isLoading={isPending}
+          fieldErrors={fieldErrors}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function SubscriptionDialogs() {
   return (
     <>
       <AssignSubscriptionDialog />
       <ChangePlanDialog />
       <CancelSubscriptionDialog />
+      <AddPackageDialog />
     </>
   );
 }

@@ -134,6 +134,7 @@ try
     builder.Services.AddSignalR()
         .AddJsonProtocol(o => o.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
     builder.Services.AddScoped<wa_api.Features.Plans.IPlanService, wa_api.Features.Plans.PlanService>();
+    builder.Services.AddScoped<wa_api.Features.Packages.IPackageService, wa_api.Features.Packages.PackageService>();
     builder.Services.AddScoped<wa_api.Features.Subscriptions.ISubscriptionService, wa_api.Features.Subscriptions.SubscriptionService>();
     builder.Services.AddScoped<wa_api.Features.Templates.ITemplateService, wa_api.Features.Templates.TemplateService>();
     builder.Services.AddScoped<wa_api.Features.Templates.IMetaTemplateClient, wa_api.Features.Templates.MetaTemplateClient>();

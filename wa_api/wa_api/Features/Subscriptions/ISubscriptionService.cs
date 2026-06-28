@@ -1,3 +1,4 @@
+using wa_api.Features.Packages.Dtos;
 using wa_api.Features.Subscriptions.Dtos;
 
 namespace wa_api.Features.Subscriptions;
@@ -26,4 +27,14 @@ public interface ISubscriptionService
 
     /// <summary>Cancels a company's active subscription (SuperAdmin). Throws if none active.</summary>
     Task<SubscriptionResponse> CancelAsync(Guid companyId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adds a message-credit package to a company's active subscription (SuperAdmin), topping up
+    /// its <c>ExtraMessageCredits</c> and recording a <c>PackagePurchase</c>. Throws on unknown
+    /// company / package, an inactive package, or no active subscription.
+    /// </summary>
+    Task<SubscriptionResponse> AddPackageAsync(Guid companyId, AddPackageRequest request, CancellationToken ct = default);
+
+    /// <summary>The package-purchase history for a company, newest first (SuperAdmin).</summary>
+    Task<IReadOnlyList<PackagePurchaseResponse>> GetPackageHistoryAsync(Guid companyId, CancellationToken ct = default);
 }

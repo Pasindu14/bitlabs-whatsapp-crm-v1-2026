@@ -10,6 +10,7 @@ import {
   useSubscriptionDialogStore,
   useChangePlanDialog,
   useCancelSubscriptionDialog,
+  useAddPackageDialog,
 } from "@/features/subscriptions/store/subscription-store";
 import { getSubscriptionColumns } from "./columns";
 import { SubscriptionDialogs } from "./subscription-dialogs";
@@ -18,10 +19,11 @@ export function SubscriptionTable() {
   const openAssign = useSubscriptionDialogStore((s) => s.openAssign);
   const { open: openChange } = useChangePlanDialog();
   const { open: openCancel } = useCancelSubscriptionDialog();
+  const { open: openAddPackage } = useAddPackageDialog();
 
   const getColumns = useCallback(
-    () => getSubscriptionColumns({ openChange, openCancel }),
-    [openChange, openCancel]
+    () => getSubscriptionColumns({ openChange, openCancel, openAddPackage }),
+    [openChange, openCancel, openAddPackage]
   );
 
   return (

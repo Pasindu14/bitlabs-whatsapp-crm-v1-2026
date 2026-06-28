@@ -10,6 +10,8 @@ export interface Subscription {
   planName: string | null;
   status: SubscriptionStatus | null;
   monthlyMessageQuota: number;
+  extraMessageCredits: number;
+  effectiveMessageQuota: number;
   messagesUsedThisPeriod: number;
   messagesRemaining: number;
   currentPeriodStart: string | null;
@@ -19,6 +21,19 @@ export interface Subscription {
   createdAt: string | null;
   // Index signature required by the @data-table ExportableData constraint.
   [key: string]: string | number | boolean | null | undefined;
+}
+
+/** A package-purchase audit row (mirrors wa_api PackagePurchaseResponse). */
+export interface PackagePurchase {
+  id: string;
+  companyId: string;
+  subscriptionId: string;
+  packageId: string;
+  packageName: string;
+  messagesAdded: number;
+  price: number;
+  currency: string;
+  createdAt: string;
 }
 
 /** Filters/pagination the list endpoint accepts. */

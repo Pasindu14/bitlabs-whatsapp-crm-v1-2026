@@ -25,6 +25,7 @@ public class SubscriptionPeriodResetJob(
 
         var due = await db.Subscriptions
             .IgnoreQueryFilters()
+            .Include(s => s.Plan)   // need MonthlyMessageQuota to split base vs. credit usage
             .Where(s => s.Status == SubscriptionStatus.Active && s.CurrentPeriodEnd <= now)
             .ToListAsync();
 
@@ -45,6 +46,13 @@ public class SubscriptionPeriodResetJob(
                 sub.CurrentPeriodStart = sub.CurrentPeriodEnd;
                 sub.CurrentPeriodEnd = sub.CurrentPeriodEnd.AddDays(PeriodDays);
             }
+
+            // Extra credits are one-time top-ups, not a recurring grant: only the portion consumed
+            // ABOVE the plan's monthly quota draws down the credit balance. The unused remainder
+            // carries forward to the next period. (The base monthly quota itself resets freely.)
+            var baseQuota = sub.Plan?.MonthlyMessageQuota ?? 0;
+            var creditsUsed = Math.Max(0, sub.MessagesUsedThisPeriod - baseQuota);
+            sub.ExtraMessageCredits = Math.Max(0, sub.ExtraMessageCredits - creditsUsed);
             sub.MessagesUsedThisPeriod = 0;
         }
 

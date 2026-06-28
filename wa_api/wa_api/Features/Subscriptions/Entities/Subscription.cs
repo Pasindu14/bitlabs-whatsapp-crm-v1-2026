@@ -38,8 +38,18 @@ public class Subscription : BaseEntity, ITenantEntity
     /// <summary>UTC end of the current usage period; quota resets when this passes.</summary>
     public DateTime CurrentPeriodEnd { get; set; }
 
-    /// <summary>Messages consumed against the plan quota in the current period.</summary>
+    /// <summary>Messages consumed against the effective quota in the current period.</summary>
     public int MessagesUsedThisPeriod { get; set; }
+
+    /// <summary>
+    /// Remaining balance of extra message credits purchased via add-on
+    /// <see cref="Packages.Entities.MessagePackage"/>s. Stacks on top of the plan's
+    /// <see cref="Plans.Entities.Plan.MonthlyMessageQuota"/> to form the effective quota.
+    /// Unlike the monthly quota these are a one-time top-up: the period-reset job carries the
+    /// unused remainder forward and only deducts what was actually consumed (see
+    /// <c>SubscriptionPeriodResetJob</c>).
+    /// </summary>
+    public int ExtraMessageCredits { get; set; }
 
     /// <summary>
     /// Stripe Subscription ID (<c>sub_xxx</c>). Null for manually-assigned subscriptions.

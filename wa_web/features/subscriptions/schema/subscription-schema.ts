@@ -24,5 +24,11 @@ export const changePlanSchema = z.object({
     .optional(),
 });
 
+/** Add-package form schema. Mirrors wa_api AddPackageRequest. */
+export const addPackageSchema = z.object({
+  packageId: z.string().trim().min(1, "Select a package"),
+});
+
 export type AssignSubscriptionInput = z.infer<typeof assignSubscriptionSchema>;
 export type ChangePlanInput = z.infer<typeof changePlanSchema>;
+export type AddPackageInput = z.infer<typeof addPackageSchema>;

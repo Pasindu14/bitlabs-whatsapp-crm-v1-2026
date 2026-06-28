@@ -16,17 +16,22 @@ import {
   assignSubscriptionAction,
   changePlanAction,
   cancelSubscriptionAction,
+  addPackageAction,
+  getPackageHistoryAction,
 } from "@/features/subscriptions/actions/subscription-actions";
 import { getCompaniesAction } from "@/features/companies/actions/company-actions";
 import { getPlansAction } from "@/features/plans/actions/plan-actions";
+import { getPackagesAction } from "@/features/packages/actions/package-actions";
 import {
   useAssignSubscriptionDialog,
   useChangePlanDialog,
   useCancelSubscriptionDialog,
+  useAddPackageDialog,
 } from "@/features/subscriptions/store/subscription-store";
 import type {
   AssignSubscriptionInput,
   ChangePlanInput,
+  AddPackageInput,
 } from "@/features/subscriptions/schema/subscription-schema";
 
 // ── DataTable source ─────────────────────────────────────────────────────
@@ -106,6 +111,45 @@ export function usePlanOptions(enabled = true) {
   });
 }
 
+export function usePackageOptions(enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.packages.all, "active-options"] as const,
+    queryFn: async () => {
+      const res = await getPackagesAction({
+        page: 1,
+        pageSize: 100,
+        sortBy: "name",
+        sortOrder: "asc",
+      });
+      if (!res.success) throw new Error(res.error);
+      return res.data.items
+        .filter((p) => p.isActive)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          extraMessages: p.extraMessages,
+          price: p.price,
+          currency: p.currency,
+        }));
+    },
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+// ── Package history (read) ───────────────────────────────────────────────
+export function usePackageHistory(companyId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.subscriptions.packageHistory(companyId ?? ""),
+    queryFn: async () => {
+      const res = await getPackageHistoryAction(companyId!);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: !!companyId,
+  });
+}
+
 // ── Mutations ────────────────────────────────────────────────────────────
 export function useAssignSubscription() {
   const qc = useQueryClient();
@@ -175,4 +219,31 @@ export function useCancelSubscription() {
     },
     onError: (error: ActionFailure) => handleErrorToast(error, "Subscription", "delete"),
   });
+}
+
+export function useAddPackage() {
+  const qc = useQueryClient();
+  const { close } = useAddPackageDialog();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string> | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: async ({ companyId, data }: { companyId: string; data: AddPackageInput }) => {
+      const res = await addPackageAction(companyId, data);
+      if (!res.success) throw res;
+      return res.data;
+    },
+    onSuccess: (_data, { companyId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.subscriptions.all });
+      qc.invalidateQueries({ queryKey: queryKeys.subscriptions.packageHistory(companyId) });
+      setFieldErrors(null);
+      close();
+      toast.success("Package added successfully");
+    },
+    onError: (error: ActionFailure) => {
+      if (error.fields) setFieldErrors(error.fields);
+      handleErrorToast(error, "Package", "create");
+    },
+  });
+
+  return { ...mutation, fieldErrors, clearFieldErrors: () => setFieldErrors(null) };
 }

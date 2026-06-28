@@ -36,7 +36,7 @@ public class SubscriptionGate(AppDbContext db, ITenantContext tenant) : ISubscri
             throw new BusinessRuleException("SUBSCRIPTION_INACTIVE",
                 "Your subscription period has ended. Contact your platform administrator.");
 
-        if (sub.MessagesUsedThisPeriod >= sub.Plan.MonthlyMessageQuota)
+        if (sub.MessagesUsedThisPeriod >= sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits)
             throw new BusinessRuleException("QUOTA_EXCEEDED",
                 "Your monthly message quota has been reached.");
     }
@@ -63,7 +63,7 @@ public class SubscriptionGate(AppDbContext db, ITenantContext tenant) : ISubscri
             throw new BusinessRuleException("SUBSCRIPTION_INACTIVE",
                 "Your subscription period has ended. Contact your platform administrator.");
 
-        var remaining = sub.Plan.MonthlyMessageQuota - sub.MessagesUsedThisPeriod;
+        var remaining = sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits - sub.MessagesUsedThisPeriod;
         if (remaining < count)
             throw new BusinessRuleException("INSUFFICIENT_QUOTA",
                 $"Insufficient message quota. This campaign requires {count} messages but only {Math.Max(0, remaining)} remain in your current period.");

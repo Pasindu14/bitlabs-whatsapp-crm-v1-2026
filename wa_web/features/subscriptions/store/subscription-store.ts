@@ -9,6 +9,7 @@ interface SubscriptionDialogState {
   isAssignOpen: boolean;
   isChangeOpen: boolean;
   isCancelOpen: boolean;
+  isAddPackageOpen: boolean;
   selectedCompanyId: string | null;
 
   openAssign: () => void;
@@ -17,12 +18,15 @@ interface SubscriptionDialogState {
   closeChange: () => void;
   openCancel: (companyId: string) => void;
   closeCancel: () => void;
+  openAddPackage: (companyId: string) => void;
+  closeAddPackage: () => void;
 }
 
 export const useSubscriptionDialogStore = create<SubscriptionDialogState>((set) => ({
   isAssignOpen: false,
   isChangeOpen: false,
   isCancelOpen: false,
+  isAddPackageOpen: false,
   selectedCompanyId: null,
 
   openAssign: () => set({ isAssignOpen: true }),
@@ -31,6 +35,8 @@ export const useSubscriptionDialogStore = create<SubscriptionDialogState>((set) 
   closeChange: () => set({ isChangeOpen: false, selectedCompanyId: null }),
   openCancel: (companyId) => set({ isCancelOpen: true, selectedCompanyId: companyId }),
   closeCancel: () => set({ isCancelOpen: false, selectedCompanyId: null }),
+  openAddPackage: (companyId) => set({ isAddPackageOpen: true, selectedCompanyId: companyId }),
+  closeAddPackage: () => set({ isAddPackageOpen: false, selectedCompanyId: null }),
 }));
 
 // --- Selectors (stable shallow slices) ---
@@ -57,5 +63,15 @@ export const useCancelSubscriptionDialog = () =>
       selectedCompanyId: s.selectedCompanyId,
       open: s.openCancel,
       close: s.closeCancel,
+    }))
+  );
+
+export const useAddPackageDialog = () =>
+  useSubscriptionDialogStore(
+    useShallow((s) => ({
+      isOpen: s.isAddPackageOpen,
+      selectedCompanyId: s.selectedCompanyId,
+      open: s.openAddPackage,
+      close: s.closeAddPackage,
     }))
   );

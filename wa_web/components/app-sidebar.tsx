@@ -57,6 +57,7 @@ const navConfig: NavGroup[] = [
       { title: "Companies", url: "/superadmin/companies" },
       { title: "WABA Connections", url: "/superadmin/waba-connections" },
       { title: "Plans", url: "/superadmin/plans" },
+      { title: "Packages", url: "/superadmin/packages" },
       { title: "Subscriptions", url: "/superadmin/subscriptions" },
       { title: "Users", url: "/superadmin/users" },
       { title: "Monitoring", url: "/superadmin/monitoring" },
