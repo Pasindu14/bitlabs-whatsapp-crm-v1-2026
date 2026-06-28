@@ -20,6 +20,13 @@ const dateFmt = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
 });
 
+const CONSENT_SOURCE_LABELS: Record<string, string> = {
+  InboundMessage: "Messaged us first",
+  ManualEntry: "Added manually",
+  Import: "Imported",
+  None: "—",
+};
+
 export interface ContactColumnActions {
   openEdit: (id: string) => void;
   openActivate: (id: string) => void;
@@ -60,6 +67,39 @@ export function getContactColumns(actions: ContactColumnActions): ColumnDef<Cont
         </Badge>
       ),
       size: 110,
+    },
+    {
+      id: "consent",
+      header: "Consent",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const c = row.original;
+        if (c.isOptedOut) {
+          return (
+            <Badge variant="destructive" title={c.optedOutAt ?? undefined}>
+              Opted out
+            </Badge>
+          );
+        }
+        if (c.hasOptedIn) {
+          return (
+            <div className="flex flex-col">
+              <Badge variant="default" className="w-fit">
+                Opted in
+              </Badge>
+              <span className="mt-1 text-xs text-muted-foreground">
+                {CONSENT_SOURCE_LABELS[c.consentSource] ?? c.consentSource}
+              </span>
+            </div>
+          );
+        }
+        return (
+          <Badge variant="secondary" title="No recorded opt-in consent">
+            No consent
+          </Badge>
+        );
+      },
+      size: 150,
     },
     {
       accessorKey: "createdAt",

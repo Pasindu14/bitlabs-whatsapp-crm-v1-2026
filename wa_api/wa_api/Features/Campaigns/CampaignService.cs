@@ -14,7 +14,8 @@ public class CampaignService(
     AppDbContext db,
     IBackgroundJobClient jobClient,
     IRecurringJobManager recurringJobs,
-    ISubscriptionGate subscriptionGate)
+    ISubscriptionGate subscriptionGate,
+    ILogger<CampaignService> logger)
     : ICampaignService
 {
     public async Task<(IReadOnlyList<CampaignResponse> Items, int Total)> GetPagedAsync(
@@ -84,6 +85,7 @@ public class CampaignService(
             ScheduleType = request.ScheduleType,
             ScheduledAt = request.ScheduledAt.HasValue ? DateTime.SpecifyKind(request.ScheduledAt.Value, DateTimeKind.Utc) : null,
             RecurrenceCron = request.RecurrenceCron,
+            OverrideConsentGate = request.OverrideConsentGate ?? false,
             Status = CampaignStatus.Draft,
         };
 
@@ -113,6 +115,7 @@ public class CampaignService(
         campaign.ScheduleType = request.ScheduleType;
         campaign.ScheduledAt = request.ScheduledAt.HasValue ? DateTime.SpecifyKind(request.ScheduledAt.Value, DateTimeKind.Utc) : null;
         campaign.RecurrenceCron = request.RecurrenceCron;
+        campaign.OverrideConsentGate = request.OverrideConsentGate ?? false;
 
         await db.SaveChangesAsync(ct);
 
@@ -168,6 +171,16 @@ public class CampaignService(
         {
             var recipientCount = await EstimateRecipientCountAsync(id, ct);
             await subscriptionGate.EnsureCanSendBatchAsync(recipientCount, ct);
+        }
+
+        // Compliance audit: launching with the consent gate overridden is a deliberate, risky act.
+        // Record it so there's a trail of who sent to non-opted-in contacts and when.
+        if (campaign.OverrideConsentGate)
+        {
+            logger.LogWarning(
+                "Campaign {CampaignId} (company {CompanyId}) launched with CONSENT GATE OVERRIDDEN — "
+                + "messages will be sent to contacts without recorded opt-in.",
+                campaign.Id, campaign.CompanyId);
         }
 
         string jobId;
@@ -289,11 +302,12 @@ public class CampaignService(
                 Read = g.Count(r => r.Status == RecipientStatus.Read),
                 Failed = g.Count(r => r.Status == RecipientStatus.Failed),
                 Skipped = g.Count(r => r.Status == RecipientStatus.Skipped),
+                SentWithoutConsent = g.Count(r => r.SentWithoutConsent),
             })
             .FirstOrDefaultAsync(ct);
 
         if (counts is null)
-            return new CampaignStatsResponse(id, 0, 0, 0, 0, 0, 0, 0, 0m, 0m);
+            return new CampaignStatsResponse(id, 0, 0, 0, 0, 0, 0, 0, 0, 0m, 0m);
 
         var delivered = counts.Delivered + counts.Read;
         var deliveryRate = counts.Total > 0 ? Math.Round((decimal)delivered / counts.Total * 100, 1) : 0m;
@@ -302,7 +316,7 @@ public class CampaignService(
         return new CampaignStatsResponse(
             id, counts.Total, counts.Queued, counts.Sent,
             counts.Delivered, counts.Read, counts.Failed, counts.Skipped,
-            deliveryRate, readRate);
+            counts.SentWithoutConsent, deliveryRate, readRate);
     }
 
     public async Task<(IReadOnlyList<CampaignRecipientResponse> Items, int Total)> GetRecipientsAsync(
@@ -331,7 +345,7 @@ public class CampaignService(
             .Take(pageSize)
             .Select(r => new CampaignRecipientResponse(
                 r.Id, r.ContactId, r.Contact.Name, r.Contact.Phone,
-                r.Status, r.ErrorCode, r.MessageId, r.CreatedAt))
+                r.Status, r.ErrorCode, r.SentWithoutConsent, r.MessageId, r.CreatedAt))
             .ToListAsync(ct);
 
         return (items, total);
@@ -353,6 +367,7 @@ public class CampaignService(
             ScheduleType = source.ScheduleType,
             ScheduledAt = source.ScheduledAt,
             RecurrenceCron = source.RecurrenceCron,
+            OverrideConsentGate = source.OverrideConsentGate,
             Status = CampaignStatus.Draft,
         };
 
@@ -480,6 +495,7 @@ public class CampaignService(
         c.VariableMapping, c.Status, c.ScheduleType,
         c.ScheduledAt, c.RecurrenceCron,
         c.TotalRecipients, c.SentCount,
+        c.OverrideConsentGate, c.NoConsentSentCount,
         c.LaunchedAt, c.CompletedAt,
         c.CreatedAt, c.UpdatedAt);
 }

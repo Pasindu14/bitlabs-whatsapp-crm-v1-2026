@@ -92,6 +92,7 @@ public sealed class InboundMessageWebhookHandler(
                 contact.IsOptedOut = true;
                 contact.OptedOutAt = now;
                 contact.HasOptedIn = false;
+                contact.ConsentSource = ConsentSource.None;
                 logger.LogInformation(
                     "Contact {Phone} sent opt-out intent (\"{Body}\") — suppressed from future outbound sends.",
                     phone, m.Text.Body.Trim());
@@ -139,6 +140,7 @@ public sealed class InboundMessageWebhookHandler(
                 Name = string.IsNullOrWhiteSpace(profileName) ? phone : profileName!,
                 HasOptedIn = true,
                 OptedInAt = DateTime.UtcNow,
+                ConsentSource = ConsentSource.InboundMessage,
             };
             db.Contacts.Add(contact);
         }

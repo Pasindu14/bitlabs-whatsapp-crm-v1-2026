@@ -129,8 +129,11 @@ public class CampaignBatchSendJob(
             if (campaign.Status is CampaignStatus.Paused or CampaignStatus.Cancelled)
                 break;
 
-            // Consent gate: skip contacts with no opt-in consent or who have opted out.
-            if (!recipient.Contact.HasOptedIn)
+            // Consent gate: skip contacts with no opt-in consent UNLESS this campaign explicitly
+            // overrides it (operator attests to off-platform consent). The override does NOT bypass
+            // the opt-out or not-on-WhatsApp gates below — those remain hard stops.
+            var noConsent = !recipient.Contact.HasOptedIn;
+            if (noConsent && !campaign.OverrideConsentGate)
             {
                 recipient.Status = RecipientStatus.Skipped;
                 recipient.ErrorCode = "NO_CONSENT";
@@ -211,6 +214,13 @@ public class CampaignBatchSendJob(
                     recipient.MessageId = message.Id;
                     recipient.ResolvedVariables = JsonSerializer.Serialize(resolvedVars, JsonOpts);
                     campaign.SentCount++;
+
+                    // Audit: this send went to a contact without recorded opt-in (override was on).
+                    if (noConsent)
+                    {
+                        recipient.SentWithoutConsent = true;
+                        campaign.NoConsentSentCount++;
+                    }
                 }
                 else
                 {

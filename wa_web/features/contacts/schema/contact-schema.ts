@@ -15,6 +15,8 @@ export const createContactSchema = z.object({
     .trim()
     .min(5, "Phone number is required")
     .max(20, "Phone number must be at most 20 characters"),
+  // Explicit opt-in consent — attests to off-platform proof. Sent as HasOptedIn to the API.
+  hasOptedIn: z.boolean().optional(),
 });
 
 /** Update schema — same shape as create (kept separate so the two can diverge later). */

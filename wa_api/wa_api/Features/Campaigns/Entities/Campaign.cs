@@ -47,6 +47,20 @@ public class Campaign : BaseEntity, ITenantEntity
     public CampaignStatus Status { get; set; } = CampaignStatus.Draft;
     public ScheduleType ScheduleType { get; set; } = ScheduleType.Immediate;
 
+    /// <summary>
+    /// When true, the campaign sends to contacts without recorded opt-in consent, bypassing the
+    /// NO_CONSENT skip gate in <c>CampaignBatchSendJob</c>. Does NOT bypass the opt-out or
+    /// not-on-WhatsApp gates. Compliance risk sits with the operator — intended only when consent
+    /// exists outside this system (e.g. an imported signup list). Defaults to false (safe).
+    /// </summary>
+    public bool OverrideConsentGate { get; set; } = false;
+
+    /// <summary>
+    /// Audit counter: messages this campaign sent to contacts without recorded opt-in (override on).
+    /// Mirrors the per-recipient <c>CampaignRecipient.SentWithoutConsent</c> flag for cheap display.
+    /// </summary>
+    public int NoConsentSentCount { get; set; } = 0;
+
     /// <summary>UTC fire time for OneTime campaigns.</summary>
     public DateTime? ScheduledAt { get; set; }
 

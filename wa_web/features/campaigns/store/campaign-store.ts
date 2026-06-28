@@ -7,6 +7,7 @@ interface CampaignDialogState {
   isDeleteOpen: boolean;
   isCancelOpen: boolean;
   isRecipientsOpen: boolean;
+  isLaunchOpen: boolean;
   selectedCampaignId: string | null;
 
   openCreate: () => void;
@@ -19,6 +20,8 @@ interface CampaignDialogState {
   closeCancel: () => void;
   openRecipients: (id: string) => void;
   closeRecipients: () => void;
+  openLaunch: (id: string) => void;
+  closeLaunch: () => void;
 }
 
 export const useCampaignDialogStore = create<CampaignDialogState>((set) => ({
@@ -27,6 +30,7 @@ export const useCampaignDialogStore = create<CampaignDialogState>((set) => ({
   isDeleteOpen: false,
   isCancelOpen: false,
   isRecipientsOpen: false,
+  isLaunchOpen: false,
   selectedCampaignId: null,
 
   openCreate: () => set({ isCreateOpen: true }),
@@ -39,6 +43,8 @@ export const useCampaignDialogStore = create<CampaignDialogState>((set) => ({
   closeCancel: () => set({ isCancelOpen: false, selectedCampaignId: null }),
   openRecipients: (id) => set({ isRecipientsOpen: true, selectedCampaignId: id }),
   closeRecipients: () => set({ isRecipientsOpen: false, selectedCampaignId: null }),
+  openLaunch: (id) => set({ isLaunchOpen: true, selectedCampaignId: id }),
+  closeLaunch: () => set({ isLaunchOpen: false, selectedCampaignId: null }),
 }));
 
 export const useCreateCampaignDialog = () =>
@@ -83,5 +89,15 @@ export const useRecipientsDialog = () =>
       selectedId: s.selectedCampaignId,
       open: s.openRecipients,
       close: s.closeRecipients,
+    }))
+  );
+
+export const useLaunchCampaignDialog = () =>
+  useCampaignDialogStore(
+    useShallow((s) => ({
+      isOpen: s.isLaunchOpen,
+      selectedId: s.selectedCampaignId,
+      open: s.openLaunch,
+      close: s.closeLaunch,
     }))
   );

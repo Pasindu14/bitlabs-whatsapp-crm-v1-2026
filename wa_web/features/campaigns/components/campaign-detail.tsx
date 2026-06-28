@@ -132,6 +132,11 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               {campaign.status}
             </Badge>
           )}
+          {campaign?.overrideConsentGate && (
+            <Badge variant="destructive" title="This campaign sends to contacts without recorded opt-in">
+              Consent override
+            </Badge>
+          )}
         </div>
         {campaign && (
           <p className="text-sm text-muted-foreground">
@@ -178,6 +183,14 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               </div>
             ))}
           </div>
+
+          {stats.sentWithoutConsent > 0 && (
+            <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              ⚠ {stats.sentWithoutConsent.toLocaleString()} message
+              {stats.sentWithoutConsent !== 1 ? "s" : ""} sent to contacts without recorded opt-in
+              (consent override).
+            </div>
+          )}
         </div>
       )}
 
@@ -233,7 +246,13 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {errorLabel(r.errorCode)}
+                      {r.sentWithoutConsent ? (
+                        <span className="text-destructive" title="Sent despite no recorded opt-in">
+                          No consent (sent)
+                        </span>
+                      ) : (
+                        errorLabel(r.errorCode)
+                      )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {dateTimeFmt.format(new Date(r.createdAt))}

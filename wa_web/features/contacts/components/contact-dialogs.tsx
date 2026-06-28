@@ -96,7 +96,7 @@ function EditContactDialog() {
             mode="edit"
             defaultValues={
               contact
-                ? { name: contact.name, phone: contact.phone }
+                ? { name: contact.name, phone: contact.phone, hasOptedIn: contact.hasOptedIn }
                 : undefined
             }
             onSubmit={(data) => {

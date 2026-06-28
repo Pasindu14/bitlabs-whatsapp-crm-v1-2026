@@ -19,6 +19,10 @@ public record CampaignResponse(
     string? RecurrenceCron,
     int TotalRecipients,
     int SentCount,
+    /// <summary>Whether this campaign bypasses the opt-in consent gate.</summary>
+    bool OverrideConsentGate,
+    /// <summary>Count of messages sent to contacts without recorded opt-in (audit).</summary>
+    int NoConsentSentCount,
     DateTime? LaunchedAt,
     DateTime? CompletedAt,
     DateTime CreatedAt,
@@ -34,6 +38,8 @@ public record CampaignStatsResponse(
     int Read,
     int Failed,
     int Skipped,
+    /// <summary>Messages sent to contacts without recorded opt-in (consent override). Audit metric.</summary>
+    int SentWithoutConsent,
     decimal DeliveryRate,
     decimal ReadRate
 );
@@ -45,6 +51,8 @@ public record CampaignRecipientResponse(
     string ContactPhone,
     RecipientStatus Status,
     string? ErrorCode,
+    /// <summary>True when sent despite no recorded opt-in (campaign consent override was on).</summary>
+    bool SentWithoutConsent,
     Guid? MessageId,
     DateTime CreatedAt
 );

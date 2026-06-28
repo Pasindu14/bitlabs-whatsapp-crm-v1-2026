@@ -171,6 +171,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.HasKey(x => x.Id);
             e.Property(x => x.Phone).IsRequired().HasMaxLength(20);
             e.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            // How opt-in consent was obtained — stored as a readable string, like other enums.
+            e.Property(x => x.ConsentSource).HasConversion<string>().HasMaxLength(20).IsRequired();
             // Phone is unique PER COMPANY (composite), not globally — two companies can hold
             // the same number, one company cannot duplicate it (PRD §1.2). This composite
             // index also makes Excel re-import safe (upsert by CompanyId + Phone).

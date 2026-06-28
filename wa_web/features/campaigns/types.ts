@@ -25,6 +25,10 @@ export interface Campaign {
   recurrenceCron: string | null;
   totalRecipients: number;
   sentCount: number;
+  /** Send to contacts without recorded opt-in (bypasses the consent gate). */
+  overrideConsentGate: boolean;
+  /** Messages sent to contacts without recorded opt-in (audit counter). */
+  noConsentSentCount: number;
   launchedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -42,6 +46,8 @@ export interface CampaignStats {
   read: number;
   failed: number;
   skipped: number;
+  /** Messages sent to contacts without recorded opt-in (consent override). Audit metric. */
+  sentWithoutConsent: number;
   deliveryRate: number;
   readRate: number;
 }
@@ -53,6 +59,8 @@ export interface CampaignRecipient {
   contactPhone: string;
   status: string;
   errorCode: string | null;
+  /** True when sent despite no recorded opt-in (campaign consent override was on). */
+  sentWithoutConsent: boolean;
   messageId: string | null;
   createdAt: string;
 }

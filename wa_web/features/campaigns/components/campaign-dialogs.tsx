@@ -26,6 +26,7 @@ import {
   useDeleteCampaignDialog,
   useCancelCampaignDialog,
   useRecipientsDialog,
+  useLaunchCampaignDialog,
 } from "@/features/campaigns/store/campaign-store";
 import {
   useCampaign,
@@ -33,6 +34,7 @@ import {
   useUpdateCampaign,
   useDeleteCampaign,
   useCancelCampaign,
+  useLaunchCampaign,
   useCampaignStats,
 } from "@/features/campaigns/hooks/use-campaigns";
 import { CampaignForm } from "./campaign-form";
@@ -178,6 +180,49 @@ function CancelCampaignDialog() {
   );
 }
 
+function LaunchCampaignDialog() {
+  const { isOpen, selectedId, close } = useLaunchCampaignDialog();
+  const { data: campaign } = useCampaign(isOpen ? selectedId : null);
+  const { mutate: launch, isPending } = useLaunchCampaign();
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && close()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Launch with consent override?</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              <p>
+                <span className="font-medium text-destructive">{campaign?.name}</span> will send to
+                contacts <span className="font-medium">without recorded opt-in consent</span>.
+              </p>
+              <p>
+                This can get your WhatsApp number rate-limited or banned if recipients block or report
+                you. Only proceed if you have proof of consent on file outside this system. Opted-out
+                contacts are still never messaged.
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={isPending}
+            onClick={(e) => {
+              e.preventDefault();
+              if (selectedId) launch(selectedId, { onSuccess: () => close() });
+            }}
+          >
+            {isPending && <Spinner className="mr-2" />}
+            Launch anyway
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 const STATUS_BADGE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   Queued: "secondary",
   Sent: "outline",
@@ -271,6 +316,7 @@ export function CampaignDialogs() {
       <DeleteCampaignDialog />
       <CancelCampaignDialog />
       <RecipientsDialog />
+      <LaunchCampaignDialog />
     </>
   );
 }
