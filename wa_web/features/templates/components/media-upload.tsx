@@ -15,7 +15,8 @@ interface MediaUploadProps {
   mediaType: "image" | "document";
   /** Current handle ("" when none). */
   value: string;
-  onChange: (handle: string) => void;
+  /** Reports both the Meta handle and the id of our persisted copy (for the preview); both "" when cleared. */
+  onChange: (handle: string, previewId: string) => void;
   disabled?: boolean;
 }
 
@@ -32,7 +33,7 @@ export function MediaUpload({ mediaType, value, onChange, disabled }: MediaUploa
       const res = await fetch("/api/templates/media-handle", { method: "POST", body: fd });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.handle) throw new Error(json?.error ?? "Upload failed");
-      onChange(json.handle);
+      onChange(json.handle, json.previewId ?? "");
       setFileName(file.name);
       toast.success("Sample media uploaded");
     } catch (e) {
@@ -72,7 +73,7 @@ export function MediaUpload({ mediaType, value, onChange, disabled }: MediaUploa
             <button
               type="button"
               onClick={() => {
-                onChange("");
+                onChange("", "");
                 setFileName(null);
               }}
               className="text-muted-foreground hover:text-foreground"

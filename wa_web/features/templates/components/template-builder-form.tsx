@@ -279,7 +279,10 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
                 <MediaUpload
                   mediaType={headerType}
                   value={values.headerMediaHandle}
-                  onChange={(h) => setValue("headerMediaHandle", h, { shouldValidate: true, shouldDirty: true })}
+                  onChange={(h, previewId) => {
+                    setValue("headerMediaHandle", h, { shouldValidate: true, shouldDirty: true });
+                    setValue("headerMediaPreviewId", previewId, { shouldDirty: true });
+                  }}
                   disabled={isSaving}
                 />
                 {errors.headerMediaHandle && (

@@ -76,6 +76,7 @@ export const builderSchema = z
     headerText: z.string().trim().max(60, "Max 60 characters"),
     headerTextExample: z.string().trim(),
     headerMediaHandle: z.string().trim(),
+    headerMediaPreviewId: z.string().trim(),
     body: z.string().trim().min(1, "Body text is required").max(1024, "Max 1024 characters"),
     bodyExamples: z.array(z.object({ value: z.string().trim() })),
     footerEnabled: z.boolean(),
@@ -170,6 +171,7 @@ export function emptyBuilderValues(): BuilderFormValues {
     headerText: "",
     headerTextExample: "",
     headerMediaHandle: "",
+    headerMediaPreviewId: "",
     body: "",
     bodyExamples: [],
     footerEnabled: false,
@@ -205,7 +207,7 @@ export function buildTemplatePayload(v: BuilderFormValues): TemplatePayload {
       ? null
       : v.headerType === "text"
         ? { type: "text", text: v.headerText, textExample: placeholderCount(v.headerText) === 1 ? v.headerTextExample : null }
-        : { type: v.headerType, mediaHandle: v.headerMediaHandle };
+        : { type: v.headerType, mediaHandle: v.headerMediaHandle, mediaPreviewId: v.headerMediaPreviewId || null };
 
   const components: TemplateComponents = {
     header,
@@ -239,6 +241,7 @@ export function templateToFormValues(t: Template): BuilderFormValues {
     headerText: h?.text ?? "",
     headerTextExample: h?.textExample ?? "",
     headerMediaHandle: h?.mediaHandle ?? "",
+    headerMediaPreviewId: h?.mediaPreviewId ?? "",
     body: t.components.body?.text ?? "",
     bodyExamples: (t.components.body?.examples ?? []).map((value) => ({ value })),
     footerEnabled: !!t.components.footer,

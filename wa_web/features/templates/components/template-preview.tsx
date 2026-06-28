@@ -25,13 +25,22 @@ export function TemplatePreview({ values }: { values: BuilderFormValues }) {
               {fill(values.headerText, values.headerTextExample ? [values.headerTextExample] : [])}
             </p>
           )}
-          {(values.headerType === "image" || values.headerType === "document") && (
-            <div className="mb-2 flex h-28 items-center justify-center rounded-md bg-zinc-100 text-zinc-400 dark:bg-zinc-600 dark:text-zinc-300">
-              {(() => {
-                const Icon = MEDIA_ICON[values.headerType];
-                return <Icon className="h-8 w-8" />;
-              })()}
-            </div>
+          {values.headerType === "image" && values.headerMediaPreviewId ? (
+            // eslint-disable-next-line @next/next/no-img-element -- blob served by a dynamic API route, not optimizable
+            <img
+              src={`/api/templates/media-preview/${values.headerMediaPreviewId}`}
+              alt="Header media"
+              className="mb-2 h-28 w-full rounded-md object-cover"
+            />
+          ) : (
+            (values.headerType === "image" || values.headerType === "document") && (
+              <div className="mb-2 flex h-28 items-center justify-center rounded-md bg-zinc-100 text-zinc-400 dark:bg-zinc-600 dark:text-zinc-300">
+                {(() => {
+                  const Icon = MEDIA_ICON[values.headerType];
+                  return <Icon className="h-8 w-8" />;
+                })()}
+              </div>
+            )
           )}
 
           {/* Body */}

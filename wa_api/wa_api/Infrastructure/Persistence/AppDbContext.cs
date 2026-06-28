@@ -53,6 +53,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<PackagePurchase> PackagePurchases => Set<PackagePurchase>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Template> Templates => Set<Template>();
+    public DbSet<TemplateMediaSample> TemplateMediaSamples => Set<TemplateMediaSample>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<CampaignContactList> CampaignContactLists => Set<CampaignContactList>();
     public DbSet<CampaignContact> CampaignContacts => Set<CampaignContact>();
@@ -429,6 +430,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
 
             // Tenant isolation (Phase 1.1/1.3): SuperAdmin bypasses; everyone else sees only their
             // own company. IsActive is intentionally left out (mirrors WabaConnection).
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<TemplateMediaSample>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ContentType).IsRequired().HasMaxLength(128);
+            e.Property(x => x.FileName).HasMaxLength(512);
+            e.Property(x => x.MetaHandle).HasMaxLength(2048);
+            e.Property(x => x.Data).IsRequired();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Same tenant isolation as Template.
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
 

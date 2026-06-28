@@ -38,8 +38,11 @@ export async function POST(req: Request) {
     const res = await client.post("/api/v1/templates/media-handle", forward, {
       headers: forward.getHeaders(),
     });
-    // wa_api returns ApiResponse<MediaHandleResponse> → { data: { handle } }.
-    return NextResponse.json({ handle: res.data?.data?.handle ?? null });
+    // wa_api returns ApiResponse<MediaHandleResponse> → { data: { handle, previewId } }.
+    return NextResponse.json({
+      handle: res.data?.data?.handle ?? null,
+      previewId: res.data?.data?.previewId ?? null,
+    });
   } catch (e) {
     // The interceptor turns every non-2xx into an ApiError (carries Meta's reason for MEDIA_UPLOAD_FAILED).
     if (e instanceof ApiError) {

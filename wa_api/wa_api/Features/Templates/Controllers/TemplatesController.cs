@@ -13,7 +13,10 @@ namespace wa_api.Features.Templates.Controllers;
 [ApiController]
 [Route("templates")]
 [Authorize(Roles = "CompanyAdmin")]
-public class TemplatesController(ITemplateService service, IMetaMediaUploader mediaUploader) : ControllerBase
+public class TemplatesController(
+    ITemplateService service,
+    IMetaMediaUploader mediaUploader,
+    ITemplateMediaSampleStore mediaSamples) : ControllerBase
 {
     private string? CorrelationId => HttpContext.Items["CorrelationId"]?.ToString();
 
@@ -81,15 +84,37 @@ public class TemplatesController(ITemplateService service, IMetaMediaUploader me
     }
 
     /// <summary>POST /api/v1/templates/media-handle — upload a sample media file and get a Meta
-    /// handle to use as a media header's example (Plan 004 Step 4).</summary>
+    /// handle to use as a media header's example (Plan 004 Step 4). We also persist our own copy of
+    /// the bytes and return its <c>previewId</c> so the builder can render a real preview — Meta's
+    /// handle is opaque and can't be displayed.</summary>
     [HttpPost("media-handle")]
     public async Task<IActionResult> UploadMediaHandle(IFormFile file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
             throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["A non-empty file is required."] });
 
-        await using var stream = file.OpenReadStream();
-        var handle = await mediaUploader.UploadSampleAsync(stream, file.Length, file.FileName, file.ContentType, ct);
-        return Ok(ResponseHelper.Ok(new Dtos.MediaHandleResponse(handle), CorrelationId));
+        // Buffer once: the same bytes go to Meta (for the header_handle) and to our own store (for preview).
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms, ct);
+        var bytes = ms.ToArray();
+
+        var handle = await mediaUploader.UploadSampleAsync(
+            new MemoryStream(bytes), bytes.LongLength, file.FileName, file.ContentType, ct);
+        var previewId = await mediaSamples.SaveAsync(bytes, file.ContentType, file.FileName, handle, ct);
+
+        return Ok(ResponseHelper.Ok(new Dtos.MediaHandleResponse(handle, previewId), CorrelationId));
+    }
+
+    /// <summary>GET /api/v1/templates/media-preview/{id} — stream a previously-uploaded sample media
+    /// file so the builder can show a real header preview. Tenant-scoped by the query filter.</summary>
+    [HttpGet("media-preview/{id:guid}")]
+    public async Task<IActionResult> GetMediaPreview(Guid id, CancellationToken ct)
+    {
+        var sample = await mediaSamples.GetAsync(id, ct)
+            ?? throw new NotFoundException("TemplateMediaSample", id);
+
+        // Bytes for a given id never change → let the browser cache them.
+        Response.Headers.CacheControl = "private, max-age=86400";
+        return File(sample.Data, sample.ContentType);
     }
 }

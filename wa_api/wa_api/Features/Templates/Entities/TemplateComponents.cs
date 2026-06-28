@@ -30,6 +30,10 @@ public class TemplateHeader
 
     /// <summary>Sample-media handle from the resumable upload (Type = image/video/document) → Meta <c>header_handle</c>.</summary>
     public string? MediaHandle { get; set; }
+
+    /// <summary>Id of our persisted sample-media copy (<see cref="TemplateMediaSample"/>) so the builder can
+    /// render the actual image; the <see cref="MediaHandle"/> above is opaque and can't be displayed. Null for text headers.</summary>
+    public Guid? MediaPreviewId { get; set; }
 }
 
 /// <summary>Mandatory body. <see cref="Examples"/> holds one sample per positional <c>{{n}}</c>.</summary>

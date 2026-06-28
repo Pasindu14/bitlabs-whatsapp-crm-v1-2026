@@ -139,6 +139,7 @@ try
     builder.Services.AddScoped<wa_api.Features.Templates.ITemplateService, wa_api.Features.Templates.TemplateService>();
     builder.Services.AddScoped<wa_api.Features.Templates.IMetaTemplateClient, wa_api.Features.Templates.MetaTemplateClient>();
     builder.Services.AddScoped<wa_api.Features.Templates.IMetaMediaUploader, wa_api.Features.Templates.MetaMediaUploader>();
+    builder.Services.AddScoped<wa_api.Features.Templates.ITemplateMediaSampleStore, wa_api.Features.Templates.TemplateMediaSampleStore>();
     builder.Services.AddScoped<wa_api.Common.Subscriptions.ISubscriptionGate, wa_api.Common.Subscriptions.SubscriptionGate>();
     builder.Services.AddScoped<wa_api.Features.Campaigns.ICampaignService, wa_api.Features.Campaigns.CampaignService>();
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignLaunchJob>();

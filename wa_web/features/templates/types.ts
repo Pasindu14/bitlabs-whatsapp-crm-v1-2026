@@ -25,6 +25,8 @@ export interface TemplateHeader {
   text?: string | null;
   textExample?: string | null;
   mediaHandle?: string | null;
+  /** Id of the persisted sample-media copy (wa_api TemplateMediaSample) for rendering a real preview. */
+  mediaPreviewId?: string | null;
 }
 
 export interface TemplateBody {
