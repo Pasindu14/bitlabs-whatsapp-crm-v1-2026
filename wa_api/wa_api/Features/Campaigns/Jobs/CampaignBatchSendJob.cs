@@ -118,6 +118,8 @@ public class CampaignBatchSendJob(
                 logger.LogInformation("CampaignBatchSendJob: campaign {Id} completed.", campaignId);
             }
             await db.SaveChangesAsync(ct);
+            if (campaign.Status == CampaignStatus.Completed)
+                await NotifyCompletedAsync(campaign, db, notifier, ct);
             return;
         }
 
@@ -381,11 +383,52 @@ public class CampaignBatchSendJob(
                 campaign.HangfireJobId = null;
                 await db.SaveChangesAsync(ct);
                 logger.LogInformation("CampaignBatchSendJob: campaign {Id} completed all recipients.", campaignId);
+                await NotifyCompletedAsync(campaign, db, notifier, ct);
             }
         }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Emits the one-time "campaign completed" notification with a delivery summary. Idempotent: the
+    /// unique index on (CampaignId, Type) means at most one CampaignCompleted per campaign, so it is safe
+    /// to call from either completion path.
+    /// </summary>
+    private static async Task NotifyCompletedAsync(
+        Campaign campaign, AppDbContext db, Notifications.INotificationService notifier, CancellationToken ct)
+    {
+        var counts = await db.CampaignRecipients
+            .IgnoreQueryFilters()
+            .Where(r => r.CampaignId == campaign.Id)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Sent = g.Count(r => r.Status == RecipientStatus.Sent
+                                    || r.Status == RecipientStatus.Delivered
+                                    || r.Status == RecipientStatus.Read),
+                Failed = g.Count(r => r.Status == RecipientStatus.Failed),
+                Skipped = g.Count(r => r.Status == RecipientStatus.Skipped),
+                Total = g.Count(),
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var sent = counts?.Sent ?? 0;
+        var failed = counts?.Failed ?? 0;
+        var skipped = counts?.Skipped ?? 0;
+        var total = counts?.Total ?? 0;
+
+        var body = $"\"{campaign.Name}\" finished: {sent} sent"
+                 + (failed > 0 ? $", {failed} failed" : string.Empty)
+                 + (skipped > 0 ? $", {skipped} skipped" : string.Empty)
+                 + $" of {total} recipients.";
+
+        await notifier.CreateAsync(
+            campaign.CompanyId, campaign.Id, null,
+            Notifications.Entities.NotificationType.CampaignCompleted,
+            "Campaign completed",
+            body, ct);
+    }
 
     /// <summary>
     /// Throttled mid-batch: persist progress and re-schedule the next batch instead of throwing. A

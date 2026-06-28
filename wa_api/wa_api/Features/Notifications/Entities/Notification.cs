@@ -15,6 +15,8 @@ public enum NotificationType
     TemplateApproved,
     /// <summary>A campaign hit its WABA number's 24-hour messaging tier cap and was paused until reset.</summary>
     CampaignThrottled,
+    /// <summary>A campaign finished processing all its recipients (one per campaign, via the unique index).</summary>
+    CampaignCompleted,
 }
 
 /// <summary>

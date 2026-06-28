@@ -25,7 +25,7 @@ import type { Notification, NotificationType } from "@/features/notifications/ty
 const PAGE_SIZE = 20;
 
 function typeIcon(type: NotificationType) {
-  if (type === "TemplateApproved")
+  if (type === "TemplateApproved" || type === "CampaignCompleted")
     return <CheckCircle2 className="size-5 text-green-500 shrink-0" />;
   if (type === "CampaignFailed")
     return <AlertTriangle className="size-5 text-red-500 shrink-0" />;
@@ -37,6 +37,7 @@ function typeLabel(type: NotificationType): string {
     TemplateApproved: "Template",
     CampaignFailed: "Campaign",
     CampaignThrottled: "Campaign",
+    CampaignCompleted: "Campaign",
     QuotaWarning3Days: "Quota",
     QuotaWarning2Days: "Quota",
     QuotaWarning1Day: "Quota",

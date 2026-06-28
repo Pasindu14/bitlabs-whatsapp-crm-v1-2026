@@ -12,7 +12,8 @@ import { useNotificationBell, useMarkNotificationRead, useMarkAllNotificationsRe
 import type { Notification, NotificationType } from "@/features/notifications/types";
 
 function typeIcon(type: NotificationType) {
-  if (type === "TemplateApproved") return <CheckCircle2 className="size-4 text-green-500 shrink-0" />;
+  if (type === "TemplateApproved" || type === "CampaignCompleted")
+    return <CheckCircle2 className="size-4 text-green-500 shrink-0" />;
   if (type === "CampaignFailed") return <AlertTriangle className="size-4 text-red-500 shrink-0" />;
   return <Clock className="size-4 text-amber-500 shrink-0" />;
 }
