@@ -29,6 +29,19 @@ const dateTimeFmt = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
+// Campaign schedules are entered + stored in UTC (the form labels the input "UTC"), so render the
+// schedule in UTC too — otherwise the browser's local timezone shifts the displayed time (e.g.
+// 3:22 PM UTC would show as 8:52 PM in UTC+5:30). The "UTC" suffix makes the zone explicit.
+const scheduleUtcFmt = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "UTC",
+  timeZoneName: "short",
+});
+
 const STATUS_VARIANT: Record<CampaignStatus, "default" | "secondary" | "destructive" | "outline"> =
   {
     Draft: "secondary",
@@ -101,7 +114,7 @@ export function getCampaignColumns(actions: CampaignColumnActions): ColumnDef<Ca
         if (c.scheduleType === "OneTime" && c.scheduledAt) {
           return (
             <span className="text-sm text-muted-foreground">
-              {dateTimeFmt.format(new Date(c.scheduledAt))}
+              {scheduleUtcFmt.format(new Date(c.scheduledAt))}
             </span>
           );
         }
