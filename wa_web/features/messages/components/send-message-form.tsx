@@ -103,7 +103,7 @@ export function SendMessageForm({ preselectedContactId, onSubmit, isLoading }: S
           control={control}
           render={({ field }) => (
             <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
-              <SelectTrigger id="wabaConnectionId">
+              <SelectTrigger id="wabaConnectionId" className="w-full">
                 <SelectValue placeholder={
                   loadingConnections ? "Loading connections…" :
                   connectionsError ? "Failed to load connections" :

@@ -172,7 +172,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
                 name="wabaConnectionId"
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
-                    <SelectTrigger id="wabaConnectionId">
+                    <SelectTrigger id="wabaConnectionId" className="w-full">
                       <SelectValue
                         placeholder={
                           loadingConnections
@@ -220,7 +220,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
                   name="language"
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
-                      <SelectTrigger id="language">
+                      <SelectTrigger id="language" className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -244,7 +244,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
               name="headerType"
               render={({ field }) => (
                 <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
