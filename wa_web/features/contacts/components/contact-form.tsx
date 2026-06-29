@@ -11,13 +11,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   createContactSchema,
   updateContactSchema,
-  type CreateContactInput,
+  type UpdateContactInput,
 } from "@/features/contacts/schema/contact-schema";
+
+const optedOutDateFmt = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
 interface ContactFormProps {
   mode: "create" | "edit";
-  defaultValues?: Partial<CreateContactInput>;
-  onSubmit: (data: CreateContactInput) => void;
+  defaultValues?: Partial<UpdateContactInput>;
+  /** Opt-out timestamp, shown as context on the edit screen (display only). */
+  optedOutAt?: string | null;
+  onSubmit: (data: UpdateContactInput) => void;
   isLoading: boolean;
   fieldErrors?: Record<string, string> | null;
 }
@@ -25,6 +33,7 @@ interface ContactFormProps {
 export function ContactForm({
   mode,
   defaultValues,
+  optedOutAt,
   onSubmit,
   isLoading,
   fieldErrors,
@@ -35,14 +44,15 @@ export function ContactForm({
     control,
     setError,
     formState: { errors },
-  } = useForm<CreateContactInput>({
+  } = useForm<UpdateContactInput>({
     resolver: zodResolver(
       mode === "create" ? createContactSchema : updateContactSchema
-    ) as Resolver<CreateContactInput>,
+    ) as Resolver<UpdateContactInput>,
     defaultValues: {
       name: "",
       phone: "",
       hasOptedIn: false,
+      isOptedOut: false,
       ...defaultValues,
     },
   });
@@ -51,7 +61,7 @@ export function ContactForm({
   useEffect(() => {
     if (fieldErrors) {
       for (const [field, message] of Object.entries(fieldErrors)) {
-        setError(field as keyof CreateContactInput, { message });
+        setError(field as keyof UpdateContactInput, { message });
       }
     }
   }, [fieldErrors, setError]);
@@ -96,6 +106,38 @@ export function ContactForm({
           </label>
         )}
       />
+
+      {/* Opt-out is webhook-driven (customer replies STOP). The edit screen is the only place a
+          company admin can lift or apply that suppression by hand. */}
+      {mode === "edit" && (
+        <Controller
+          control={control}
+          name="isOptedOut"
+          render={({ field }) => (
+            <label
+              className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer ${
+                field.value ? "border-destructive/50 bg-destructive/5" : ""
+              }`}
+            >
+              <Checkbox
+                className="mt-0.5"
+                checked={field.value ?? false}
+                onCheckedChange={(v) => field.onChange(v === true)}
+              />
+              <div className="space-y-1">
+                <div className="text-sm font-medium">Opted out — suppress all sending</div>
+                <p className="text-xs text-muted-foreground">
+                  When on, this contact replied STOP (or was suppressed) and is never messaged. Untick
+                  to re-enable sending.
+                  {field.value && optedOutAt
+                    ? ` Opted out on ${optedOutDateFmt.format(new Date(optedOutAt))}.`
+                    : ""}
+                </p>
+              </div>
+            </label>
+          )}
+        />
+      )}
 
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (

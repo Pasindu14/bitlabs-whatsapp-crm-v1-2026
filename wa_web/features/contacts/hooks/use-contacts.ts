@@ -29,6 +29,7 @@ import type {
   CreateContactInput,
   UpdateContactInput,
 } from "@/features/contacts/schema/contact-schema";
+import type { Contact } from "@/features/contacts/types";
 
 // ── DataTable source ─────────────────────────────────────────────────────
 // A useQuery hook (NOT a plain fn) so mutations can invalidate contacts.all and the
@@ -170,5 +171,33 @@ export function useDeactivateContact() {
       toast.success("Contact deactivated successfully");
     },
     onError: (error: ActionFailure) => handleErrorToast(error, "Contact", "deactivate"),
+  });
+}
+
+// ── Opt-out override (row quick-action) ──────────────────────────────────
+// Company-admin one-click suppress / re-enable, the sanctioned way to lift a STOP. Reuses the update
+// endpoint (which requires name+phone) by echoing the row's current values alongside the flipped flag.
+export function useSetContactOptOut() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ contact, isOptedOut }: { contact: Contact; isOptedOut: boolean }) => {
+      const res = await updateContactAction(contact.id, {
+        name: contact.name,
+        phone: contact.phone,
+        isOptedOut,
+      });
+      if (!res.success) throw res;
+      return isOptedOut;
+    },
+    onSuccess: (isOptedOut) => {
+      qc.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      toast.success(
+        isOptedOut
+          ? "Contact opted out — sending suppressed"
+          : "Sending re-enabled for this contact"
+      );
+    },
+    onError: (error: ActionFailure) => handleErrorToast(error, "Contact", "update"),
   });
 }

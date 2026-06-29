@@ -80,13 +80,34 @@ public sealed class WebhookInboundMessage
     [JsonPropertyName("from")] public string? From { get; set; }
     [JsonPropertyName("id")] public string? Id { get; set; }            // wamid
     [JsonPropertyName("timestamp")] public string? Timestamp { get; set; }
-    [JsonPropertyName("type")] public string? Type { get; set; }
+    [JsonPropertyName("type")] public string? Type { get; set; }        // "text" | "button" | "interactive" | ...
     [JsonPropertyName("text")] public WebhookText? Text { get; set; }
+    [JsonPropertyName("button")] public WebhookButton? Button { get; set; }            // tap on a template quick-reply button
+    [JsonPropertyName("interactive")] public WebhookInteractive? Interactive { get; set; } // reply to an interactive message
 }
 
 public sealed class WebhookText
 {
     [JsonPropertyName("body")] public string? Body { get; set; }
+}
+
+public sealed class WebhookButton
+{
+    [JsonPropertyName("text")] public string? Text { get; set; }        // the button's display label, e.g. "Stop"
+    [JsonPropertyName("payload")] public string? Payload { get; set; }  // dev-defined payload (if set at send time)
+}
+
+public sealed class WebhookInteractive
+{
+    [JsonPropertyName("type")] public string? Type { get; set; }        // "button_reply" | "list_reply"
+    [JsonPropertyName("button_reply")] public WebhookButtonReply? ButtonReply { get; set; }
+    [JsonPropertyName("list_reply")] public WebhookButtonReply? ListReply { get; set; }
+}
+
+public sealed class WebhookButtonReply
+{
+    [JsonPropertyName("id")] public string? Id { get; set; }
+    [JsonPropertyName("title")] public string? Title { get; set; }
 }
 
 public sealed class WebhookContact

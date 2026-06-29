@@ -25,10 +25,11 @@ public class ContactsController(IContactService service) : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortOrder = null,
+        [FromQuery] bool? isOptedOut = null,
         [FromQuery] Guid? listId = null,
         CancellationToken ct = default)
     {
-        var (items, total) = await service.GetPagedAsync(page, pageSize, search, sortBy, sortOrder, listId, ct);
+        var (items, total) = await service.GetPagedAsync(page, pageSize, search, sortBy, sortOrder, isOptedOut, listId, ct);
         return Ok(ResponseHelper.Paged(items, page, pageSize, total, CorrelationId));
     }
 

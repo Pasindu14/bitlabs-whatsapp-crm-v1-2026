@@ -19,8 +19,14 @@ export const createContactSchema = z.object({
   hasOptedIn: z.boolean().optional(),
 });
 
-/** Update schema — same shape as create (kept separate so the two can diverge later). */
-export const updateContactSchema = createContactSchema;
+/**
+ * Update schema — create fields plus a company-admin opt-out override.
+ * `isOptedOut`: true = suppress ALL sending (mirrors a customer STOP), false = re-enable.
+ * Omitted = leave unchanged. This is the only sanctioned way to lift a STOP.
+ */
+export const updateContactSchema = createContactSchema.extend({
+  isOptedOut: z.boolean().optional(),
+});
 
 export type CreateContactInput = z.infer<typeof createContactSchema>;
 export type UpdateContactInput = z.infer<typeof updateContactSchema>;

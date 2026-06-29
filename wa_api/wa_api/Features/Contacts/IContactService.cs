@@ -7,7 +7,7 @@ public interface IContactService
     /// <summary>Paged, searchable list of the caller's contacts (newest first by default).</summary>
     Task<(IReadOnlyList<ContactResponse> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, string? sortBy, string? sortOrder,
-        Guid? listId = null, CancellationToken ct = default);
+        bool? isOptedOut = null, Guid? listId = null, CancellationToken ct = default);
 
     /// <summary>Loads a single contact by id. Throws if not found / not in the caller's company.</summary>
     Task<ContactResponse> GetByIdAsync(Guid id, CancellationToken ct = default);

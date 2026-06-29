@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table/data-table";
 import type { Contact } from "@/features/contacts/types";
-import { useContactDataTable } from "@/features/contacts/hooks/use-contacts";
+import { useContactDataTable, useSetContactOptOut } from "@/features/contacts/hooks/use-contacts";
 import {
   useContactDialogStore,
   useEditContactDialog,
@@ -23,10 +23,16 @@ export function ContactTable() {
   const { open: openActivate } = useActivateContactDialog();
   const { open: openDeactivate } = useDeactivateContactDialog();
   const { open: openSendMessage } = useSendMessageDialog();
+  const { mutate: setContactOptOut } = useSetContactOptOut();
+
+  const toggleOptOut = useCallback(
+    (contact: Contact) => setContactOptOut({ contact, isOptedOut: !contact.isOptedOut }),
+    [setContactOptOut]
+  );
 
   const getColumns = useCallback(
-    () => getContactColumns({ openEdit, openActivate, openDeactivate, openSendMessage }),
-    [openEdit, openActivate, openDeactivate, openSendMessage]
+    () => getContactColumns({ openEdit, openActivate, openDeactivate, openSendMessage, toggleOptOut }),
+    [openEdit, openActivate, openDeactivate, openSendMessage, toggleOptOut]
   );
 
   return (

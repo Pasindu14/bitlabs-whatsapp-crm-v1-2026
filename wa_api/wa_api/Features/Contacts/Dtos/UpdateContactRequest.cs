@@ -6,5 +6,6 @@ namespace wa_api.Features.Contacts.Dtos;
 public record UpdateContactRequest(
     [Required, StringLength(20, MinimumLength = 5)] string Phone,
     [Required, StringLength(200, MinimumLength = 1)] string Name,
-    bool? HasOptedIn = null
+    bool? HasOptedIn = null,
+    bool? IsOptedOut = null   // null = leave unchanged. Company-admin override for a STOP.
 );

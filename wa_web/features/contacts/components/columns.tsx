@@ -32,10 +32,12 @@ export interface ContactColumnActions {
   openActivate: (id: string) => void;
   openDeactivate: (id: string) => void;
   openSendMessage: (id: string, name: string, phone: string) => void;
+  /** One-click suppress / re-enable sending (flips IsOptedOut). */
+  toggleOptOut: (contact: Contact) => void;
 }
 
 export function getContactColumns(actions: ContactColumnActions): ColumnDef<Contact>[] {
-  const { openEdit, openActivate, openDeactivate, openSendMessage } = actions;
+  const { openEdit, openActivate, openDeactivate, openSendMessage, toggleOptOut } = actions;
 
   return [
     {
@@ -133,6 +135,16 @@ export function getContactColumns(actions: ContactColumnActions): ColumnDef<Cont
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => openEdit(c.id)}>Edit</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {c.isOptedOut ? (
+                <DropdownMenuItem onClick={() => toggleOptOut(c)}>
+                  Re-enable sending
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem variant="destructive" onClick={() => toggleOptOut(c)}>
+                  Suppress (opt out)
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               {c.isActive ? (
                 <DropdownMenuItem variant="destructive" onClick={() => openDeactivate(c.id)}>

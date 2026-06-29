@@ -32,10 +32,7 @@ import {
   useDeactivateContact,
 } from "@/features/contacts/hooks/use-contacts";
 import { ContactForm } from "./contact-form";
-import type {
-  CreateContactInput,
-  UpdateContactInput,
-} from "@/features/contacts/schema/contact-schema";
+import type { CreateContactInput } from "@/features/contacts/schema/contact-schema";
 
 function CreateContactDialog() {
   const { isOpen, close } = useCreateContactDialog();
@@ -96,12 +93,18 @@ function EditContactDialog() {
             mode="edit"
             defaultValues={
               contact
-                ? { name: contact.name, phone: contact.phone, hasOptedIn: contact.hasOptedIn }
+                ? {
+                    name: contact.name,
+                    phone: contact.phone,
+                    hasOptedIn: contact.hasOptedIn,
+                    isOptedOut: contact.isOptedOut,
+                  }
                 : undefined
             }
+            optedOutAt={contact?.optedOutAt ?? null}
             onSubmit={(data) => {
               if (!selectedId) return;
-              mutate({ id: selectedId, data: data as UpdateContactInput });
+              mutate({ id: selectedId, data });
             }}
             isLoading={isPending}
             fieldErrors={fieldErrors}

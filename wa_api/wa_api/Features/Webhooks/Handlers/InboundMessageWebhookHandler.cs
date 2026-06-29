@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using wa_api.Common.OptOut;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.Conversations.Dtos;
 using wa_api.Features.Conversations.Entities;
@@ -31,17 +32,6 @@ public sealed class InboundMessageWebhookHandler(
     : IWebhookEventHandler
 {
     private const int PreviewLength = 200;
-
-    // Exact-match only — broad verbs like "cancel", "end", "remove" fire on normal conversation
-    // ("cancel my order", "end of month works") and would silently suppress active customers.
-    // WhatsApp's convention is STOP / UNSUBSCRIBE; stick to that minimal, unambiguous set.
-    private static readonly HashSet<string> StopKeywords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "stop", "stopall", "stop all", "unsubscribe", "optout", "opt out"
-    };
-
-    private static bool IsStopIntent(string body) =>
-        StopKeywords.Contains(body.Trim());
 
     public bool CanHandle(string field, WebhookChange change)
         => field == "messages" && change.Value?.Messages is { Count: > 0 };
@@ -83,19 +73,27 @@ public sealed class InboundMessageWebhookHandler(
             var conversation = await FindOrCreateOpenAsync(companyId, wabaId, contact, ct);
 
             var now = DateTime.UtcNow;
-            var body = !string.IsNullOrWhiteSpace(m.Text?.Body) ? m.Text!.Body! : $"[{m.Type ?? "message"}]";
+            // Prefer the human-readable text of whatever the customer sent — free text, a tapped
+            // template quick-reply ("button"), or an interactive reply — falling back to the type tag.
+            var body = FirstNonBlank(
+                m.Text?.Body,
+                m.Button?.Text,
+                m.Interactive?.ButtonReply?.Title,
+                m.Interactive?.ListReply?.Title) ?? $"[{m.Type ?? "message"}]";
             if (body.Length > 4096) body = body[..4096];
 
-            // Opt-out detection: if the contact sends a stop-intent keyword, suppress all future sends.
-            if (!string.IsNullOrWhiteSpace(m.Text?.Body) && IsStopIntent(m.Text.Body) && !contact.IsOptedOut)
+            // Opt-out detection: a Stop can arrive as free text, a tapped template quick-reply button
+            // (type:"button", which carries NO text.body), or an interactive reply — check every channel.
+            // Suppression is a hard stop; only a company admin can lift it from the contact screen.
+            if (!contact.IsOptedOut && HasStopIntent(m))
             {
                 contact.IsOptedOut = true;
                 contact.OptedOutAt = now;
                 contact.HasOptedIn = false;
                 contact.ConsentSource = ConsentSource.None;
                 logger.LogInformation(
-                    "Contact {Phone} sent opt-out intent (\"{Body}\") — suppressed from future outbound sends.",
-                    phone, m.Text.Body.Trim());
+                    "Contact {Phone} opted out via {Type} — suppressed from future outbound sends.",
+                    phone, m.Type ?? "message");
             }
 
             var message = new Message
@@ -210,4 +208,22 @@ public sealed class InboundMessageWebhookHandler(
     }
 
     private static string Truncate(string s) => s.Length <= PreviewLength ? s : s[..PreviewLength];
+
+    /// <summary>The first non-blank candidate, or null when all are blank.</summary>
+    private static string? FirstNonBlank(params string?[] candidates) =>
+        candidates.FirstOrDefault(s => !string.IsNullOrWhiteSpace(s));
+
+    /// <summary>
+    /// True when any channel of the inbound message carries an opt-out keyword. A tapped template
+    /// quick-reply button arrives as type:"button" with <c>button.text</c>/<c>button.payload</c> and no
+    /// <c>text.body</c>, and an interactive reply carries its label/id — so all of them are checked.
+    /// </summary>
+    private static bool HasStopIntent(WebhookInboundMessage m) =>
+        OptOutKeywords.IsStopIntent(m.Text?.Body)
+        || OptOutKeywords.IsStopIntent(m.Button?.Text)
+        || OptOutKeywords.IsStopIntent(m.Button?.Payload)
+        || OptOutKeywords.IsStopIntent(m.Interactive?.ButtonReply?.Title)
+        || OptOutKeywords.IsStopIntent(m.Interactive?.ButtonReply?.Id)
+        || OptOutKeywords.IsStopIntent(m.Interactive?.ListReply?.Title)
+        || OptOutKeywords.IsStopIntent(m.Interactive?.ListReply?.Id);
 }

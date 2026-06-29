@@ -10,7 +10,7 @@ public class ContactService(AppDbContext db) : IContactService
 {
     public async Task<(IReadOnlyList<ContactResponse> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, string? sortBy, string? sortOrder,
-        Guid? listId = null, CancellationToken ct = default)
+        bool? isOptedOut = null, Guid? listId = null, CancellationToken ct = default)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -21,6 +21,10 @@ public class ContactService(AppDbContext db) : IContactService
         // Optional: only contacts that are members of the given list.
         if (listId is { } lid)
             query = query.Where(c => db.ContactListMembers.Any(m => m.ContactListId == lid && m.ContactId == c.Id));
+
+        // Optional: filter by opt-out (suppression) status.
+        if (isOptedOut is { } optedOut)
+            query = query.Where(c => c.IsOptedOut == optedOut);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -109,6 +113,27 @@ public class ContactService(AppDbContext db) : IContactService
             {
                 contact.HasOptedIn = false;
                 contact.ConsentSource = ConsentSource.None;
+            }
+        }
+
+        // Company admin can manually flip suppression — the only sanctioned way to lift a STOP. Applied
+        // AFTER HasOptedIn so that if both arrive in one request, opt-out wins (a suppressed contact is
+        // never messaged regardless of consent).
+        if (request.IsOptedOut.HasValue && request.IsOptedOut.Value != contact.IsOptedOut)
+        {
+            if (request.IsOptedOut.Value)
+            {
+                // Mirror the webhook STOP path exactly.
+                contact.IsOptedOut = true;
+                contact.OptedOutAt = DateTime.UtcNow;
+                contact.HasOptedIn = false;
+                contact.ConsentSource = ConsentSource.None;
+            }
+            else
+            {
+                // Lift a mistaken opt-out: re-enable sending. Does NOT by itself grant consent.
+                contact.IsOptedOut = false;
+                contact.OptedOutAt = null;
             }
         }
 

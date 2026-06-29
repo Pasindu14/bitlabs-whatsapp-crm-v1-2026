@@ -176,7 +176,11 @@ export function emptyBuilderValues(): BuilderFormValues {
     bodyExamples: [],
     footerEnabled: false,
     footer: "",
-    buttons: [],
+    // Seed a one-tap opt-out by default (Meta best practice). Editable/removable here; the API also
+    // guarantees a "Stop" quick-reply on every marketing template at submit time, so it can't be lost.
+    buttons: [
+      { type: "quick_reply", text: "Stop", url: "", urlExample: "", phoneNumber: "", example: "" },
+    ],
   };
 }
 

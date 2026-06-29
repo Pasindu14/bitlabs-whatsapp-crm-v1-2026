@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Errors;
+using wa_api.Common.OptOut;
 using wa_api.Features.Notifications;
 using wa_api.Features.Notifications.Entities;
 using wa_api.Features.Templates.Dtos;
@@ -162,6 +163,10 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
         if (!conn.IsActive || conn.Status != WabaConnectionStatus.Connected)
             throw new BusinessRuleException("WABA_INACTIVE",
                 "The WhatsApp connection for this template is inactive.");
+
+        // Guarantee a one-tap opt-out on every marketing template before it goes to Meta. Mutating the
+        // jsonb Components tree is picked up by its deep ValueComparer, so the SaveChanges below persists it.
+        EnsureOptOutButton(template);
 
         // Re-validate the structure before spending a network call.
         Validate(template.Name, template.Components);
@@ -365,6 +370,23 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
             if (b.Type == "phone_number" && !string.IsNullOrWhiteSpace(b.PhoneNumber))
                 b.PhoneNumber = NormalizePhone(b.PhoneNumber);
         return c;
+    }
+
+    /// <summary>
+    /// Guarantees a one-tap opt-out on every MARKETING template before submission: if no quick-reply
+    /// button already carries an opt-out keyword and there's room under Meta's 10-button cap, append a
+    /// "Stop" quick-reply. Utility/auth templates are transactional and left untouched. Idempotent —
+    /// re-submitting a template that already has the button is a no-op.
+    /// </summary>
+    private static void EnsureOptOutButton(Template t)
+    {
+        if (t.Category != TemplateCategory.Marketing) return;
+
+        var buttons = t.Components.Buttons;
+        if (buttons.Count >= 10) return; // no room; let the operator manage buttons manually
+        if (buttons.Any(b => b.Type == "quick_reply" && OptOutKeywords.IsStopIntent(b.Text))) return;
+
+        buttons.Add(new TemplateButton { Type = "quick_reply", Text = OptOutKeywords.StopButtonText });
     }
 
     private static TemplateResponse Map(Template t, string? displayPhoneNumber)
