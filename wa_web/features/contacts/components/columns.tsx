@@ -1,7 +1,16 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { User, MoreHorizontal, MessageSquare } from "lucide-react";
+import {
+  User,
+  MoreHorizontal,
+  MessageSquare,
+  Pencil,
+  Ban,
+  RotateCcw,
+  PowerOff,
+  Power,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -134,24 +143,33 @@ export function getContactColumns(actions: ContactColumnActions): ColumnDef<Cont
                 Send Message
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openEdit(c.id)}>Edit</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => openEdit(c.id)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {c.isOptedOut ? (
                 <DropdownMenuItem onClick={() => toggleOptOut(c)}>
+                  <RotateCcw className="mr-2 h-4 w-4" />
                   Re-enable sending
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem variant="destructive" onClick={() => toggleOptOut(c)}>
+                  <Ban className="mr-2 h-4 w-4" />
                   Suppress (opt out)
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
               {c.isActive ? (
                 <DropdownMenuItem variant="destructive" onClick={() => openDeactivate(c.id)}>
+                  <PowerOff className="mr-2 h-4 w-4" />
                   Deactivate
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem onClick={() => openActivate(c.id)}>Activate</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openActivate(c.id)}>
+                  <Power className="mr-2 h-4 w-4" />
+                  Activate
+                </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
