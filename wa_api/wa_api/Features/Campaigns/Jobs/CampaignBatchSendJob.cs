@@ -8,6 +8,7 @@ using wa_api.Features.Campaigns.Entities;
 using wa_api.Features.Messages;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Notifications.Entities;
+using wa_api.Features.Templates.Entities;
 using wa_api.Infrastructure.Persistence;
 using wa_api.Infrastructure.RateLimiting;
 
@@ -136,6 +137,37 @@ public class CampaignBatchSendJob(
                 .Select(m => m.ContactId)
                 .ToListAsync(ct));
 
+        // ── Resolve a media (image/video/document) header ONCE per batch ──────────────────────
+        // A template with a media header must re-supply the actual media on EVERY send. The template's
+        // stored MediaHandle is a resumable-upload handle valid only for template creation, not for
+        // message sends — so we upload the persisted sample bytes to the phone number's /media endpoint
+        // and reuse the returned media id across this batch's recipients.
+        // headerMediaRequired with a null headerMedia means resolution failed: every send would 400, so
+        // we fail those recipients locally instead of burning Meta round-trips.
+        var header = campaign.Template.Components?.Header;
+        var headerMediaRequired = header is not null && header.Type is "image" or "video" or "document";
+        (string Type, string MediaId)? headerMedia = null;
+        if (headerMediaRequired)
+        {
+            var sample = header!.MediaPreviewId is { } sampleId
+                ? await db.TemplateMediaSamples.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(s => s.Id == sampleId, ct)
+                : null;
+
+            if (sample is null)
+            {
+                logger.LogError(
+                    "Campaign {Id}: template header is '{Type}' but no stored media sample was found — cannot send.",
+                    campaignId, header.Type);
+            }
+            else
+            {
+                var mediaId = await UploadHeaderMediaAsync(waba.PhoneNumberId, waba.EncryptedAccessToken, sample, ct);
+                if (mediaId is not null)
+                    headerMedia = (header.Type, mediaId);
+            }
+        }
+
         foreach (var recipient in batch)
         {
             // Re-check campaign status inside loop — pause/cancel can arrive mid-batch.
@@ -209,6 +241,15 @@ public class CampaignBatchSendJob(
                 return;
             }
 
+            // The template needs a media header but we couldn't obtain a send-time media id — every send
+            // would fail at Meta with HTTP 400. Fail this recipient locally with a clear cause.
+            if (headerMediaRequired && headerMedia is null)
+            {
+                recipient.Status = RecipientStatus.Failed;
+                recipient.ErrorCode = "HEADER_MEDIA_MISSING";
+                continue;
+            }
+
             try
             {
                 var resolvedVars = BuildResolvedVariables(resolvedMapping, recipient.Contact);
@@ -216,7 +257,7 @@ public class CampaignBatchSendJob(
                     waba.PhoneNumberId, waba.EncryptedAccessToken,
                     recipient.Contact.Phone,
                     campaign.Template.Name, campaign.Template.Language,
-                    resolvedVars, ct);
+                    resolvedVars, headerMedia, ct);
 
                 if (externalId is not null)
                 {
@@ -528,11 +569,57 @@ public class CampaignBatchSendJob(
         return result.Length > 4096 ? result[..4096] : result;
     }
 
+    /// <summary>
+    /// Upload the stored sample media bytes to the phone number's <c>/media</c> endpoint and return the
+    /// resulting media id, to be referenced from a template message's media header. Returns null on
+    /// failure (logged) so the caller can fail the affected recipients without throwing the whole batch.
+    /// </summary>
+    private async Task<string?> UploadHeaderMediaAsync(
+        string phoneNumberId, string accessToken, TemplateMediaSample sample, CancellationToken ct)
+    {
+        var client = httpClientFactory.CreateClient("MetaGraph");
+
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent("whatsapp"), "messaging_product");
+        form.Add(new StringContent(sample.ContentType), "type");
+
+        var fileContent = new ByteArrayContent(sample.Data);
+        if (MediaTypeHeaderValue.TryParse(sample.ContentType, out var parsedType))
+            fileContent.Headers.ContentType = parsedType;
+        form.Add(fileContent, "file", sample.FileName ?? "header");
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"v19.0/{phoneNumberId}/media") { Content = form };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        try
+        {
+            var res = await client.SendAsync(req, ct);
+            var json = await res.Content.ReadAsStringAsync(ct);
+
+            if (!res.IsSuccessStatusCode)
+            {
+                logger.LogError(
+                    "Header media upload failed ({Status}) for phone {Phone}: {Json}",
+                    (int)res.StatusCode, phoneNumberId, json);
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogError(ex, "HTTP error uploading header media for phone {Phone}.", phoneNumberId);
+            return null;
+        }
+    }
+
     /// <summary>Call Meta's template message send endpoint.</summary>
     private async Task<(string? ExternalId, string? ErrorCode)> SendTemplateMessageAsync(
         string phoneNumberId, string accessToken, string toPhone,
         string templateName, string language,
         Dictionary<string, string> resolvedVars,
+        (string Type, string MediaId)? headerMedia,
         CancellationToken ct)
     {
         var client = httpClientFactory.CreateClient("MetaGraph");
@@ -552,8 +639,21 @@ public class CampaignBatchSendJob(
             .ToArray();
 
         var componentList = new List<object>();
-        if (headerParams.Length > 0)
+        // A header is either media OR text params — never both. Media takes precedence.
+        if (headerMedia is { } hm)
+        {
+            object mediaParam = hm.Type switch
+            {
+                "video" => new { type = "video", video = new { id = hm.MediaId } },
+                "document" => new { type = "document", document = new { id = hm.MediaId } },
+                _ => new { type = "image", image = new { id = hm.MediaId } },
+            };
+            componentList.Add(new { type = "header", parameters = new[] { mediaParam } });
+        }
+        else if (headerParams.Length > 0)
+        {
             componentList.Add(new { type = "header", parameters = headerParams });
+        }
         if (bodyParams.Length > 0)
             componentList.Add(new { type = "body", parameters = bodyParams });
 

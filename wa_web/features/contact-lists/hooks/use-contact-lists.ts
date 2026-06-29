@@ -33,6 +33,11 @@ import type {
   CreateContactListInput,
   UpdateContactListInput,
 } from "@/features/contact-lists/schema/contact-list-schema";
+import type { Contact } from "@/features/contacts/types";
+
+/** Members query key for a list — kept under contactLists.detail so it survives table-only invalidations. */
+const membersKey = (listId: string) =>
+  [...queryKeys.contactLists.detail(listId), "members"] as const;
 
 // ── DataTable source ─────────────────────────────────────────────────────
 export function useContactListDataTable(
@@ -89,7 +94,7 @@ export function useContactList(id: string | null) {
 // Keyed under contactLists.detail so add/remove invalidation (contactLists.all) refreshes it.
 export function useListMembers(listId: string | null) {
   return useQuery({
-    queryKey: [...queryKeys.contactLists.detail(listId ?? ""), "members"] as const,
+    queryKey: membersKey(listId ?? ""),
     queryFn: async () => {
       const res = await getContactsAction({ page: 1, pageSize: 100, listId: listId! });
       if (!res.success) throw new Error(res.error);
@@ -201,22 +206,40 @@ export function useDeactivateContactList() {
   });
 }
 
+// Add/remove are optimistic: the members cache is mutated instantly so the dialog reacts
+// with zero latency and multiple contacts can be added back-to-back. We only refresh the
+// contact-lists *table* (for its contactCount badge) in the background — never the members
+// query (would clobber the optimistic state / flicker) nor the search picker (must stay put).
 export function useAddContactsToList() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ listId, contactIds }: { listId: string; contactIds: string[] }) => {
-      const res = await addContactsToListAction(listId, contactIds);
+    mutationFn: async ({ listId, contacts }: { listId: string; contacts: Contact[] }) => {
+      const res = await addContactsToListAction(
+        listId,
+        contacts.map((c) => c.id)
+      );
       if (!res.success) throw res;
       return res.data;
     },
-    onSuccess: () => {
-      // contactLists.all is a prefix of the members query key, so this refreshes counts + members.
-      qc.invalidateQueries({ queryKey: queryKeys.contactLists.all });
-      qc.invalidateQueries({ queryKey: queryKeys.contacts.all });
-      toast.success("Added to list");
+    onMutate: async ({ listId, contacts }) => {
+      const key = membersKey(listId);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<Contact[]>(key);
+      qc.setQueryData<Contact[]>(key, (old) => {
+        const existing = new Set((old ?? []).map((m) => m.id));
+        const additions = contacts.filter((c) => !existing.has(c.id));
+        return [...additions, ...(old ?? [])];
+      });
+      return { key, previous };
     },
-    onError: (error: ActionFailure) => handleErrorToast(error, "Contact", "update"),
+    onError: (error: ActionFailure, _vars, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(context.key, context.previous);
+      handleErrorToast(error, "Contact", "update");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.contactLists.lists() });
+    },
   });
 }
 
@@ -228,12 +251,20 @@ export function useRemoveContactFromList() {
       const res = await removeContactFromListAction(listId, contactId);
       if (!res.success) throw res;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.contactLists.all });
-      qc.invalidateQueries({ queryKey: queryKeys.contacts.all });
-      toast.success("Removed from list");
+    onMutate: async ({ listId, contactId }) => {
+      const key = membersKey(listId);
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<Contact[]>(key);
+      qc.setQueryData<Contact[]>(key, (old) => (old ?? []).filter((m) => m.id !== contactId));
+      return { key, previous };
     },
-    onError: (error: ActionFailure) => handleErrorToast(error, "Contact", "update"),
+    onError: (error: ActionFailure, _vars, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(context.key, context.previous);
+      handleErrorToast(error, "Contact", "update");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.contactLists.lists() });
+    },
   });
 }
 

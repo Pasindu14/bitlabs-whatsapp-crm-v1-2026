@@ -120,9 +120,9 @@ export function ManageContactsDialog() {
                       <Button
                         size="sm"
                         variant={inList ? "ghost" : "secondary"}
-                        disabled={inList || add.isPending}
+                        disabled={inList}
                         className="shrink-0"
-                        onClick={() => selectedId && add.mutate({ listId: selectedId, contactIds: [c.id] })}
+                        onClick={() => selectedId && add.mutate({ listId: selectedId, contacts: [c] })}
                       >
                         {inList ? (
                           <>
@@ -179,7 +179,6 @@ export function ManageContactsDialog() {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        disabled={remove.isPending}
                         onClick={() => selectedId && remove.mutate({ listId: selectedId, contactId: m.id })}
                       >
                         <X className="h-4 w-4" />
