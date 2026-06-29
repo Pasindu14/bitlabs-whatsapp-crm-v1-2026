@@ -457,3 +457,11 @@ Each phase depends only on phases above it. Do not start a phase until its depen
 ## 12. Definition of Done (platform v1)
 
 Once **provisioned by the platform owner**, a company can: subscribe via Stripe → connect its WABA (manual credentials) → import contacts → create + get a template approved → run a throttled bulk campaign → receive replies in a live inbox within the 24-hour window → see delivery + cost reporting — all fully isolated from other companies, with the platform owner able to provision and oversee everything.
+
+---
+
+## 13. Dev Login Credentials (moved out of the login form)
+
+These were previously hardcoded as default values in `wa_web/features/auth/components/forms/login-form.tsx`. Removed from the UI; kept here for local development only. **Do not ship to production / rotate the seeded super-admin password before go-live.**
+
+- **Super admin** — email: `superadmin@btilabs.com` · password: `ChangeMe123!`
