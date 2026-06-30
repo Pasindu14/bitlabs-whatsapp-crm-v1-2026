@@ -79,7 +79,7 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
             throw new ConflictException("WABA_PHONE_NUMBER_DUPLICATE",
                 "A connection with this phone number id already exists.");
 
-        await metaValidator.ValidateAsync(phoneNumberId, request.AccessToken.Trim(), ct);
+        await metaValidator.ValidateAsync(phoneNumberId, wabaId, request.AccessToken.Trim(), ct);
 
         var conn = new WabaConnection
         {
@@ -116,19 +116,23 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
             throw new ConflictException("WABA_PHONE_NUMBER_DUPLICATE",
                 "A connection with this phone number id already exists.");
 
+        var wabaId = request.WabaId.Trim();
+
+        // Validate the FINAL combination that will be stored — phone id, WABA id, and the token that
+        // will be in effect (the new one if supplied, otherwise the existing stored token). This catches
+        // a WABA-id-only edit (the typo that motivated this guard) even when the token is left unchanged.
+        var newToken = Normalize(request.AccessToken);
+        var effectiveToken = newToken ?? conn.EncryptedAccessToken;
+        await metaValidator.ValidateAsync(phoneNumberId, wabaId, effectiveToken, ct);
+
         conn.CompanyId = company.Id;
         conn.PhoneNumberId = phoneNumberId;
-        conn.WabaId = request.WabaId.Trim();
+        conn.WabaId = wabaId;
         conn.DisplayPhoneNumber = Normalize(request.DisplayPhoneNumber) ?? string.Empty;
         conn.Status = request.Status ?? conn.Status;
 
-        // Replace the token only when a new (non-blank) one is supplied.
-        var newToken = Normalize(request.AccessToken);
         if (newToken is not null)
-        {
-            await metaValidator.ValidateAsync(conn.PhoneNumberId, newToken, ct);
             conn.EncryptedAccessToken = newToken;
-        }
 
         var newSecret = Normalize(request.AppSecret);
         if (newSecret is not null)
