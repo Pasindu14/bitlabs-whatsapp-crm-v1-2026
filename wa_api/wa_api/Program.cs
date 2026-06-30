@@ -4,6 +4,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using wa_api.Features.Admin.Logs;
 using StackExchange.Redis;
 using wa_api.Common.Audit;
 using wa_api.Common.Errors;
@@ -25,7 +26,10 @@ try
     builder.Host.UseSerilog((context, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .Enrich.FromLogContext()
-        .WriteTo.Console());
+        .WriteTo.Console()
+        .WriteTo.Sink(new InMemoryLogSink(InMemoryLogBuffer.Instance)));
+
+    builder.Services.AddSingleton(InMemoryLogBuffer.Instance);
 
     // ── Database (Supabase Postgres via Supavisor pooler) ──────────────────
     builder.Services.AddHttpContextAccessor();
