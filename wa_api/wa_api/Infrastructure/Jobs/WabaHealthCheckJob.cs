@@ -50,7 +50,7 @@ public class WabaHealthCheckJob(
 
     private async Task CheckConnectionAsync(HttpClient client, WabaConnection conn, DateTime checkedAt)
     {
-        var url = $"{MetaApiVersion}/{conn.PhoneNumberId}?fields=verified_name,quality_rating,messaging_limit_tier,code_verification_status";
+        var url = $"{MetaApiVersion}/{conn.PhoneNumberId}?fields=id,quality_rating,messaging_limit_tier,code_verification_status";
 
         try
         {
