@@ -62,7 +62,7 @@ const navConfig: NavGroup[] = [
       { title: "Users", url: "/superadmin/users" },
       { title: "Monitoring", url: "/superadmin/monitoring" },
       { title: "Reports", url: "/superadmin/reports" },
-      { title: "Logs", url: "/superadmin/logs" },
+      { title: "Logs", url: "/superadmin/server-logs" },
     ],
   },
   // ── Company workspace (CompanyAdmin / Agent) ───────────────────

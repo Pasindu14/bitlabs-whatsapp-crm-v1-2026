@@ -4,7 +4,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using wa_api.Features.Admin.Logs;
+using wa_api.Features.Admin.Logging;
 using StackExchange.Redis;
 using wa_api.Common.Audit;
 using wa_api.Common.Errors;
