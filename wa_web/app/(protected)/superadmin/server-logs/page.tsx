@@ -13,7 +13,7 @@ export default async function LogsPage() {
       <div className="rounded-2xl border bg-muted/40 px-8 py-10">
         <h1 className="text-3xl font-bold tracking-tight">Live Logs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Real-time API log stream — last 1 000 entries, refreshed every 2 s.
+          Real-time API log stream — last 100 entries, refreshed every 2 s.
         </p>
       </div>
 

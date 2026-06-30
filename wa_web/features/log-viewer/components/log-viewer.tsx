@@ -29,7 +29,7 @@ function formatTs(ts: string) {
 export function LogViewer() {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [filter, setFilter] = useState("");
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(false);
   const [paused, setPaused] = useState(false);
   const sinceRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -46,7 +46,7 @@ export function LogViewer() {
         const result = await getLogsAction(sinceRef.current);
         if (result.success && result.data.length > 0) {
           sinceRef.current = result.data[result.data.length - 1].timestamp;
-          setEntries((prev) => [...prev, ...result.data].slice(-1000));
+          setEntries((prev) => [...prev, ...result.data].slice(-100));
         }
       }
       if (active) setTimeout(poll, 2000);

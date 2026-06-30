@@ -13,7 +13,7 @@ export interface LogEntry {
 export const getLogsAction = createAction(
   { name: "getLogsAction", requireAuth: true, requiredRole: "SuperAdmin" },
   async (since: string | null) => {
-    const params: Record<string, string | number> = { tail: 200 };
+    const params: Record<string, string | number> = { tail: 100 };
     if (since) params.since = since;
 
     const res = await client.get<ApiSuccessBody<LogEntry[]>>("/api/v1/admin/logs", { params });
