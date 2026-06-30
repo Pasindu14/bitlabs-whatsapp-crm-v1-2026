@@ -55,6 +55,7 @@ export function WabaConnectionForm({
       wabaId: "",
       displayPhoneNumber: "",
       accessToken: "",
+      appSecret: "",
       status: "Connected",
       ...defaultValues,
     },
@@ -137,6 +138,22 @@ export function WabaConnectionForm({
         />
         {errors.accessToken && (
           <p className="text-xs text-destructive">{errors.accessToken.message}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="appSecret">
+          App Secret{mode === "edit" ? " (leave blank to keep current)" : ""}
+        </Label>
+        <Input
+          id="appSecret"
+          type="password"
+          autoComplete="off"
+          placeholder={mode === "edit" ? "••••••••" : "Meta App Secret"}
+          {...register("appSecret")}
+        />
+        {errors.appSecret && (
+          <p className="text-xs text-destructive">{errors.appSecret.message}</p>
         )}
       </div>
 

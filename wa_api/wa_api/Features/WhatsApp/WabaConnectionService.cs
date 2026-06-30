@@ -88,6 +88,7 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
             WabaId = wabaId,
             DisplayPhoneNumber = Normalize(request.DisplayPhoneNumber) ?? string.Empty,
             EncryptedAccessToken = request.AccessToken.Trim(),
+            AppSecret = request.AppSecret.Trim(),
             Status = request.Status ?? WabaConnectionStatus.Connected,
         };
         db.WabaConnections.Add(conn);
@@ -128,6 +129,10 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
             await metaValidator.ValidateAsync(conn.PhoneNumberId, newToken, ct);
             conn.EncryptedAccessToken = newToken;
         }
+
+        var newSecret = Normalize(request.AppSecret);
+        if (newSecret is not null)
+            conn.AppSecret = newSecret;
 
         await db.SaveChangesAsync(ct);
 

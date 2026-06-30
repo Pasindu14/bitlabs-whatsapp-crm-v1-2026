@@ -10,5 +10,6 @@ public record CreateWabaConnectionRequest(
     [Required, StringLength(64, MinimumLength = 1)] string WabaId,
     [StringLength(32)] string? DisplayPhoneNumber,
     [Required, StringLength(2048, MinimumLength = 1)] string AccessToken,
+    [Required, StringLength(512, MinimumLength = 1)] string AppSecret,
     WabaConnectionStatus? Status
 );

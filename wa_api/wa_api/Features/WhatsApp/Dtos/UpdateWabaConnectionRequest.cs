@@ -14,5 +14,7 @@ public record UpdateWabaConnectionRequest(
     [StringLength(32)] string? DisplayPhoneNumber,
     // Blank = keep the existing token; non-blank = replace it.
     [StringLength(2048)] string? AccessToken,
+    // Blank = keep the existing secret; non-blank = replace it.
+    [StringLength(512)] string? AppSecret,
     WabaConnectionStatus? Status
 );

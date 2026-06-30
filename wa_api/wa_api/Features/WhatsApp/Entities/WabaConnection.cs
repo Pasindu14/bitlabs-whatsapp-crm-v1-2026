@@ -71,6 +71,12 @@ public class WabaConnection : BaseEntity, ITenantEntity
     /// <summary>Last error message returned by Meta's API during a health check. Null when healthy.</summary>
     public string? HealthCheckErrorMessage { get; set; }
 
+    /// <summary>
+    /// Meta App Secret used to verify the X-Hub-Signature-256 HMAC on incoming webhooks.
+    /// Each company registers their own Meta App, so secrets differ per connection.
+    /// </summary>
+    public string AppSecret { get; set; } = string.Empty;
+
     /// <summary>Owning company navigation.</summary>
     public Company Company { get; set; } = null!;
 }

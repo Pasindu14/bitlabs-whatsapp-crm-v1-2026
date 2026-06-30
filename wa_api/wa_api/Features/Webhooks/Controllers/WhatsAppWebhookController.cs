@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using wa_api.Features.Webhooks.Ingestion;
 using wa_api.Features.Webhooks.Processing;
 using wa_api.Features.Webhooks.Signature;
+using wa_api.Features.WhatsApp;
 
 namespace wa_api.Features.Webhooks.Controllers;
 
@@ -20,6 +21,7 @@ namespace wa_api.Features.Webhooks.Controllers;
 [AllowAnonymous]
 public sealed class WhatsAppWebhookController(
     IMetaSignatureVerifier verifier,
+    IWabaConnectionService connections,
     IWebhookInboxService inbox,
     IBackgroundJobClient jobs,
     IConfiguration config,
@@ -52,13 +54,32 @@ public sealed class WhatsAppWebhookController(
         Request.Body.Position = 0;
 
         var signature = Request.Headers["X-Hub-Signature-256"].ToString();
-        if (!verifier.Verify(rawBody, signature))
+
+        // Extract phone_number_id first so we can look up the per-connection App Secret.
+        var phoneNumberId = TryExtractPhoneNumberId(rawBody);
+
+        bool verified;
+        if (phoneNumberId is not null)
+        {
+            var conn = await connections.GetConnectionByPhoneNumberIdAsync(phoneNumberId, ct);
+            if (conn is null || string.IsNullOrWhiteSpace(conn.AppSecret))
+            {
+                logger.LogWarning("Rejected webhook — no active connection found for phone_number_id {Id}.", phoneNumberId);
+                return Unauthorized();
+            }
+            verified = verifier.Verify(rawBody, signature, conn.AppSecret);
+        }
+        else
+        {
+            // No phone_number_id extractable — fall back to global secret (template status updates, etc.)
+            verified = verifier.Verify(rawBody, signature);
+        }
+
+        if (!verified)
         {
             logger.LogWarning("Rejected webhook with invalid/missing X-Hub-Signature-256.");
             return Unauthorized();
         }
-
-        var phoneNumberId = TryExtractPhoneNumberId(rawBody);
 
         try
         {

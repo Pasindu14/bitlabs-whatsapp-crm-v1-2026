@@ -31,6 +31,11 @@ export const createWabaConnectionSchema = z.object({
     .trim()
     .min(1, "Access token is required")
     .max(2048, "Access token is too long"),
+  appSecret: z
+    .string()
+    .trim()
+    .min(1, "App secret is required")
+    .max(512, "App secret is too long"),
   status: z.enum(WABA_CONNECTION_STATUSES).optional(),
 });
 
@@ -43,6 +48,12 @@ export const updateWabaConnectionSchema = createWabaConnectionSchema.extend({
     .string()
     .trim()
     .max(2048, "Access token is too long")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  appSecret: z
+    .string()
+    .trim()
+    .max(512, "App secret is too long")
     .optional()
     .or(z.literal("").transform(() => undefined)),
 });

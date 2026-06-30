@@ -13,6 +13,24 @@ public sealed class MetaSignatureVerifier(IConfiguration config, ILogger<MetaSig
 {
     private const string Prefix = "sha256=";
 
+    public bool Verify(string rawBody, string? signatureHeader, string secret)
+    {
+        if (string.IsNullOrWhiteSpace(secret)) return false;
+
+        if (string.IsNullOrWhiteSpace(signatureHeader)
+            || !signatureHeader.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var providedHex = signatureHeader[Prefix.Length..].Trim().ToLowerInvariant();
+        var computedHex = Convert.ToHexString(
+                HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(rawBody)))
+            .ToLowerInvariant();
+
+        var computed = Encoding.ASCII.GetBytes(computedHex);
+        var provided = Encoding.ASCII.GetBytes(providedHex);
+        return computed.Length == provided.Length && CryptographicOperations.FixedTimeEquals(computed, provided);
+    }
+
     public bool Verify(string rawBody, string? signatureHeader)
     {
         var secret = config["Meta:AppSecret"];
@@ -21,20 +39,6 @@ public sealed class MetaSignatureVerifier(IConfiguration config, ILogger<MetaSig
             logger.LogError("Meta:AppSecret is not configured — rejecting webhook (fail closed).");
             return false;
         }
-
-        if (string.IsNullOrWhiteSpace(signatureHeader)
-            || !signatureHeader.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        var providedHex = signatureHeader[Prefix.Length..].Trim().ToLowerInvariant();
-
-        var computedHex = Convert.ToHexString(
-                HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(rawBody)))
-            .ToLowerInvariant();
-
-        // Constant-time comparison over the hex strings (FixedTimeEquals requires equal length).
-        var computed = Encoding.ASCII.GetBytes(computedHex);
-        var provided = Encoding.ASCII.GetBytes(providedHex);
-        return computed.Length == provided.Length && CryptographicOperations.FixedTimeEquals(computed, provided);
+        return Verify(rawBody, signatureHeader, secret);
     }
 }
