@@ -21,7 +21,7 @@ public class MetaCredentialValidator(IHttpClientFactory httpClientFactory) : IMe
     public async Task ValidateAsync(string phoneNumberId, string accessToken, CancellationToken ct = default)
     {
         var client = httpClientFactory.CreateClient("MetaGraph");
-        var url = $"{MetaApiVersion}/{phoneNumberId}?fields=display_phone_number,verified_name";
+        var url = $"{MetaApiVersion}/{phoneNumberId}?fields=verified_name";
 
         try
         {
