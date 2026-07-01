@@ -373,20 +373,35 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
     }
 
     /// <summary>
-    /// Guarantees a one-tap opt-out on every MARKETING template before submission: if no quick-reply
-    /// button already carries an opt-out keyword and there's room under Meta's 10-button cap, append a
-    /// "Stop" quick-reply. Utility/auth templates are transactional and left untouched. Idempotent —
-    /// re-submitting a template that already has the button is a no-op.
+    /// Guarantees a one-tap opt-out on every MARKETING template before submission and pins it to the
+    /// BOTTOM of the button stack. If no quick-reply button already carries an opt-out keyword and
+    /// there's room under Meta's 10-button cap, a "Stop" quick-reply is added. Buttons are then
+    /// reordered so call-to-action buttons stay on top and every quick-reply sits below them, with the
+    /// opt-out button last — Meta requires quick-reply buttons to be a contiguous group and renders
+    /// buttons in array order, so this keeps "Stop" as the final button rather than above a CTA.
+    /// Utility/auth templates are transactional and left untouched. Idempotent.
     /// </summary>
     private static void EnsureOptOutButton(Template t)
     {
         if (t.Category != TemplateCategory.Marketing) return;
 
         var buttons = t.Components.Buttons;
-        if (buttons.Count >= 10) return; // no room; let the operator manage buttons manually
-        if (buttons.Any(b => b.Type == "quick_reply" && OptOutKeywords.IsStopIntent(b.Text))) return;
 
-        buttons.Add(new TemplateButton { Type = "quick_reply", Text = OptOutKeywords.StopButtonText });
+        var stop = buttons.FirstOrDefault(b => b.Type == "quick_reply" && OptOutKeywords.IsStopIntent(b.Text));
+        if (stop is null)
+        {
+            if (buttons.Count >= 10) return; // no room; let the operator manage buttons manually
+            stop = new TemplateButton { Type = "quick_reply", Text = OptOutKeywords.StopButtonText };
+        }
+
+        // Rebuild in place: CTAs first (stable order), then any other quick-replies, then the opt-out last.
+        var ctas = buttons.Where(b => b.Type != "quick_reply").ToList();
+        var quickReplies = buttons.Where(b => b.Type == "quick_reply" && !ReferenceEquals(b, stop)).ToList();
+
+        buttons.Clear();
+        buttons.AddRange(ctas);
+        buttons.AddRange(quickReplies);
+        buttons.Add(stop);
     }
 
     private static TemplateResponse Map(Template t, string? displayPhoneNumber)
