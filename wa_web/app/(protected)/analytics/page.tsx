@@ -13,7 +13,7 @@ export default async function AnalyticsPage() {
       <div className="rounded-2xl border bg-muted/40 px-8 py-10">
         <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Message delivery metrics, campaign performance, and billable usage breakdown.
+          Message delivery metrics and campaign performance.
         </p>
       </div>
 

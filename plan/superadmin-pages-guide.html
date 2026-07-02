@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SuperAdmin Pages — Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --primary:#ff4d00;
+    --primary-soft:#fff1ec;
+    --primary-line:#ffd8ca;
+    --ink:#1c1917;
+    --muted:#78716c;
+    --line:#ececec;
+    --bg:#faf9f7;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;font-family:'Jost',system-ui,sans-serif;color:var(--ink);
+    background:var(--bg);line-height:1.55;font-weight:400;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 96px;}
+  header.hero{
+    background:linear-gradient(135deg,#fff 0%,var(--primary-soft) 100%);
+    border-bottom:1px solid var(--primary-line);
+    padding:56px 24px 40px;margin-bottom:8px;
+  }
+  header.hero .inner{max-width:1080px;margin:0 auto;}
+  .badge{
+    display:inline-block;font-size:12px;font-weight:600;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--primary);background:#fff;
+    border:1px solid var(--primary-line);padding:4px 12px;border-radius:999px;margin-bottom:16px;
+  }
+  h1{font-size:40px;font-weight:700;margin:0 0 10px;letter-spacing:-.02em;}
+  .sub{color:var(--muted);font-size:17px;max-width:640px;}
+  nav.toc{
+    display:flex;flex-wrap:wrap;gap:8px;margin-top:28px;
+  }
+  nav.toc a{
+    font-size:13px;font-weight:500;text-decoration:none;color:var(--ink);
+    background:#fff;border:1px solid var(--line);padding:6px 14px;border-radius:8px;
+    transition:.15s;
+  }
+  nav.toc a:hover{border-color:var(--primary);color:var(--primary);}
+  section{margin-top:52px;scroll-margin-top:24px;}
+  .sec-head{display:flex;align-items:center;gap:14px;margin-bottom:6px;}
+  .sec-num{
+    flex:none;width:34px;height:34px;border-radius:9px;background:var(--primary);
+    color:#fff;font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;
+  }
+  h2{font-size:26px;font-weight:600;margin:0;letter-spacing:-.01em;}
+  .route{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+    color:var(--primary);background:var(--primary-soft);border:1px solid var(--primary-line);
+    padding:2px 8px;border-radius:6px;display:inline-block;margin:10px 0 4px;
+  }
+  .lead{color:var(--muted);font-size:15.5px;margin:8px 0 20px;}
+  h3{font-size:16px;font-weight:600;margin:26px 0 10px;display:flex;align-items:center;gap:8px;}
+  h3::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--primary);}
+  table{
+    width:100%;border-collapse:collapse;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px;
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+  }
+  thead th{
+    text-align:left;background:#fbfbfa;color:var(--muted);font-weight:600;
+    font-size:12px;text-transform:uppercase;letter-spacing:.04em;
+    padding:11px 16px;border-bottom:1px solid var(--line);
+  }
+  tbody td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#fdfcfb;}
+  .fld{font-weight:600;white-space:nowrap;}
+  .fld code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+    color:var(--ink);background:#f4f3f1;padding:1px 6px;border-radius:5px;font-weight:500;
+  }
+  .tag{
+    display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;
+    background:var(--primary-soft);color:var(--primary);border:1px solid var(--primary-line);
+    vertical-align:middle;
+  }
+  .callout{
+    background:var(--primary-soft);border:1px solid var(--primary-line);border-left:3px solid var(--primary);
+    border-radius:10px;padding:14px 18px;margin:18px 0;font-size:14.5px;
+  }
+  .callout b{color:var(--primary);}
+  .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px;}
+  .pill{
+    font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:8px;
+    padding:5px 11px;color:var(--muted);
+  }
+  .pill b{color:var(--ink);}
+  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;text-align:center;}
+  .muted{color:var(--muted);}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="inner">
+    <span class="badge">Growchat · SuperAdmin</span>
+    <h1>SuperAdmin Pages — Field Guide</h1>
+    <p class="sub">What every page and column in the platform admin panel means, and exactly how each number is calculated on the backend.</p>
+    <nav class="toc">
+      <a href="#reports">Reports</a>
+      <a href="#companies">Companies</a>
+      <a href="#waba">WABA Connections</a>
+      <a href="#plans">Plans</a>
+      <a href="#packages">Packages</a>
+      <a href="#subscriptions">Subscriptions</a>
+      <a href="#users">Users</a>
+      <a href="#monitoring">Monitoring</a>
+      <a href="#logs">Server Logs</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ REPORTS ============ -->
+  <section id="reports">
+    <div class="sec-head"><span class="sec-num">1</span><h2>Admin Reports</h2></div>
+    <span class="route">/superadmin/reports</span>
+    <p class="lead">Platform-wide, cross-tenant reporting. All numbers ignore the per-company data filter so they span <em>every</em> tenant. Four tabs: Dashboard, Packages, Balances, Usage.</p>
+
+    <div class="callout">
+      <b>Key concept — "Billable":</b> WhatsApp charges per message/conversation. Each <b>outbound</b> message is flagged <code>Billable = true</code> when it counts against paid usage (a service/marketing message that WhatsApp bills for). Free-tier or non-chargeable sends are <code>Billable = false</code>. So <b>Total Billable</b> = the number of outbound messages you can actually bill the customer for, which is usually less than Total Sent.
+    </div>
+
+    <h3>Tab: Dashboard — the 8 KPI cards</h3>
+    <table>
+      <thead><tr><th>Card</th><th>Meaning</th><th>How it's computed</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Total Companies</td><td>Every tenant on the platform, active or not.</td><td>Count of all rows in <code>Companies</code>.</td></tr>
+        <tr><td class="fld">Active Companies</td><td>Tenants that are enabled (not deactivated).</td><td>Count of <code>Companies</code> where <code>IsActive = true</code>.</td></tr>
+        <tr><td class="fld">Active Subscriptions</td><td>Companies currently on a live paid plan.</td><td>Count of subscriptions where <code>IsActive</code> and <code>Status = Active</code>.</td></tr>
+        <tr><td class="fld">Packages Sold (mo)</td><td>New plan purchases this calendar month.</td><td>Count of subscriptions with <code>CreatedAt ≥ 1st of this month</code>. Every subscription created = one purchase.</td></tr>
+        <tr><td class="fld">Revenue (mo)</td><td>Estimated revenue booked this month.</td><td>Sum of the <code>Plan.Price</code> of every subscription created this month. <span class="muted">(Derived from plan price — Stripe isn't live yet, so this is list-price, not collected cash.)</span></td></tr>
+        <tr><td class="fld">New Signups (mo)</td><td>Companies that joined this month.</td><td>Count of <code>Companies</code> with <code>CreatedAt ≥ 1st of this month</code>.</td></tr>
+        <tr><td class="fld">Messages Sent (30d)</td><td>Outbound message volume, last 30 days.</td><td>Count of <code>Messages</code> where <code>Direction = Outbound</code> and <code>CreatedAt ≥ now − 30 days</code>.</td></tr>
+        <tr><td class="fld">Low Balance Companies</td><td>Tenants about to run out of message quota.</td><td>Count of active subscriptions whose <code>Remaining &lt; 10%</code> of effective quota. Turns amber when &gt; 0.</td></tr>
+      </tbody>
+    </table>
+    <p class="pill-row"><span class="pill"><b>Note:</b> the DTO also carries <b>Billable Messages (30d)</b>, but the dashboard grid currently renders 8 cards and doesn't surface it.</span></p>
+
+    <h3>Tab: Packages — purchases by date range</h3>
+    <p class="lead">Filterable by date range (default: last 30 days). Two summary cards + a per-plan table.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Total Packages</td><td>Count of all subscriptions created inside the selected range (each = one package purchased).</td></tr>
+        <tr><td class="fld">Total Revenue</td><td>Sum of <code>plan price × purchases</code> across all plans in the range.</td></tr>
+        <tr><td class="fld">Plan</td><td>Plan name. Shows <code>(deleted plan)</code> if the plan was later removed but the purchase still happened.</td></tr>
+        <tr><td class="fld">Price</td><td>Current list price of that plan, in its currency.</td></tr>
+        <tr><td class="fld">Packages</td><td>How many times that plan was purchased in the range.</td></tr>
+        <tr><td class="fld">Revenue</td><td><code>Price × Packages</code> for that plan.</td></tr>
+        <tr><td class="fld">Share</td><td>Bar showing that plan's revenue relative to the top-earning plan.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Tab: Balances — remaining quota per company</h3>
+    <p class="lead">One row per active subscription. Low-balance rows are highlighted amber and sorted to the top. No date filter (it's a live snapshot).</p>
+    <table>
+      <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Company</td><td>Tenant name. Amber ⚠ icon if it's low on balance.</td></tr>
+        <tr><td class="fld">Plan</td><td>The plan the company is subscribed to.</td></tr>
+        <tr><td class="fld">Quota</td><td>Effective quota = <code>plan monthly quota + purchased extra credits</code>.</td></tr>
+        <tr><td class="fld">Used</td><td>Messages consumed in the current billing period (<code>MessagesUsedThisPeriod</code>).</td></tr>
+        <tr><td class="fld">Remaining</td><td><code>Quota − Used</code>. Shown amber when low, otherwise orange.</td></tr>
+        <tr><td class="fld">Usage</td><td>Progress bar of <code>Used / Quota</code>.</td></tr>
+        <tr><td class="fld">Period Ends</td><td>When the current billing period resets (<code>CurrentPeriodEnd</code>).</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>Low balance rule:</b> a company is flagged when <code>Remaining &lt; 10% of Quota</code> (and quota &gt; 0). This is the same rule that feeds the "Low Balance Companies" dashboard card.</div>
+
+    <h3>Tab: Usage — message analytics per company</h3>
+    <p class="lead">Filterable by date range. Two summary cards + a per-company breakdown, sorted by most sent. Counts <b>outbound</b> messages only.</p>
+    <table>
+      <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Total Sent</td><td>All outbound messages across all tenants in the range.</td></tr>
+        <tr><td class="fld">Total Billable</td><td>Of those, how many are chargeable (<code>Billable = true</code>) — the ones you actually bill for.</td></tr>
+        <tr><td class="fld">Company</td><td>Tenant name.</td></tr>
+        <tr><td class="fld">Sent</td><td>Outbound messages this company sent in the range.</td></tr>
+        <tr><td class="fld">Delivered</td><td>Of those, how many reached the handset (<code>Status = Delivered</code>).</td></tr>
+        <tr><td class="fld">Read</td><td>How many were opened/read by the recipient (<code>Status = Read</code>).</td></tr>
+        <tr><td class="fld">Failed</td><td>How many failed to send (<code>Status = Failed</code>) — shown in red.</td></tr>
+        <tr><td class="fld">Billable</td><td>How many of this company's sends were chargeable.</td></tr>
+      </tbody>
+    </table>
+    <p class="pill-row">
+      <span class="pill"><b>Delivered/Read/Failed</b> are message <i>statuses</i>, so they don't have to add up to Sent (some are still "sent/pending").</span>
+      <span class="pill"><b>Every tab</b> is exportable to CSV.</span>
+    </p>
+  </section>
+
+  <!-- ============ COMPANIES ============ -->
+  <section id="companies">
+    <div class="sec-head"><span class="sec-num">2</span><h2>Companies</h2></div>
+    <span class="route">/superadmin/companies</span>
+    <p class="lead">The master tenant list — every business using the platform. Create, edit, activate/deactivate. (There is no hard delete from the UI.)</p>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Name</td><td>Company / tenant display name.</td></tr>
+        <tr><td class="fld">Slug</td><td>URL-safe short identifier for the company.</td></tr>
+        <tr><td class="fld">Email</td><td>Primary contact email for the company.</td></tr>
+        <tr><td class="fld">Phone</td><td>Contact phone number.</td></tr>
+        <tr><td class="fld">Active <span class="tag">status</span></td><td>Whether the tenant is enabled. Deactivating blocks its users from working without deleting data.</td></tr>
+        <tr><td class="fld">Created At</td><td>When the company was onboarded.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ WABA ============ -->
+  <section id="waba">
+    <div class="sec-head"><span class="sec-num">3</span><h2>WABA Connections</h2></div>
+    <span class="route">/superadmin/waba-connections</span>
+    <p class="lead">WhatsApp Business Account links per company — the phone numbers each tenant sends from and their Meta credentials.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Company</td><td>Which tenant this WhatsApp number belongs to.</td></tr>
+        <tr><td class="fld">Display Phone Number</td><td>The human-readable sending number (e.g. +971…).</td></tr>
+        <tr><td class="fld">Phone Number ID</td><td>Meta's internal ID for the number — used in API calls to send messages.</td></tr>
+        <tr><td class="fld">WABA ID</td><td>The WhatsApp Business Account ID from Meta.</td></tr>
+        <tr><td class="fld">Status <span class="tag">enum</span></td><td>Connection health with Meta (e.g. connected / pending / disconnected).</td></tr>
+        <tr><td class="fld">Has Access Token</td><td>Whether a valid Meta access token is stored (needed to actually send). The token itself is never shown.</td></tr>
+        <tr><td class="fld">Active</td><td>Whether this connection is enabled for sending.</td></tr>
+        <tr><td class="fld">Created At</td><td>When the connection was added.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ PLANS ============ -->
+  <section id="plans">
+    <div class="sec-head"><span class="sec-num">4</span><h2>Plans</h2></div>
+    <span class="route">/superadmin/plans</span>
+    <p class="lead">The recurring subscription tiers you sell. A company subscribes to exactly one plan, which sets its monthly message allowance.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Name</td><td>Plan tier name (e.g. Starter, Pro).</td></tr>
+        <tr><td class="fld">Monthly Message Quota</td><td>Messages included per billing period. Feeds "Quota" on the Balances report.</td></tr>
+        <tr><td class="fld">Price</td><td>Recurring price of the plan.</td></tr>
+        <tr><td class="fld">Currency</td><td>Currency the price is in (e.g. USD, AED).</td></tr>
+        <tr><td class="fld">Feature Flags</td><td>List of capabilities the plan unlocks.</td></tr>
+        <tr><td class="fld">Active</td><td>Whether the plan can be newly subscribed to.</td></tr>
+        <tr><td class="fld">Created At</td><td>When the plan was created.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ PACKAGES ============ -->
+  <section id="packages">
+    <div class="sec-head"><span class="sec-num">5</span><h2>Packages</h2></div>
+    <span class="route">/superadmin/packages</span>
+    <p class="lead">One-off <b>message-credit top-ups</b>. Unlike plans, these are bought as needed to add extra messages on top of the plan quota (the "extra credits" in Balances).</p>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Name</td><td>Package name (e.g. "10k Messages").</td></tr>
+        <tr><td class="fld">Description</td><td>Optional detail about the package.</td></tr>
+        <tr><td class="fld">Extra Messages</td><td>How many message credits this package adds to a company's balance.</td></tr>
+        <tr><td class="fld">Price</td><td>One-time price of the top-up.</td></tr>
+        <tr><td class="fld">Currency</td><td>Currency of the price.</td></tr>
+        <tr><td class="fld">Active</td><td>Whether the package is available for purchase.</td></tr>
+        <tr><td class="fld">Created At</td><td>When the package was created.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ SUBSCRIPTIONS ============ -->
+  <section id="subscriptions">
+    <div class="sec-head"><span class="sec-num">6</span><h2>Subscriptions</h2></div>
+    <span class="route">/superadmin/subscriptions</span>
+    <p class="lead">The live link between a company and its plan — current status, quota, and consumption. Also tracks package-purchase history.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Company</td><td>The subscribed tenant.</td></tr>
+        <tr><td class="fld">Plan</td><td>The plan they're on.</td></tr>
+        <tr><td class="fld">Status <span class="tag">enum</span></td><td>Active · Inactive · Trialing · Cancelled.</td></tr>
+        <tr><td class="fld">Monthly Message Quota</td><td>Base allowance from the plan.</td></tr>
+        <tr><td class="fld">Extra Message Credits</td><td>Credits added from purchased packages.</td></tr>
+        <tr><td class="fld">Effective Message Quota</td><td><code>Monthly quota + extra credits</code> — the real usable total.</td></tr>
+        <tr><td class="fld">Messages Used This Period</td><td>Consumed so far this billing period.</td></tr>
+        <tr><td class="fld">Messages Remaining</td><td><code>Effective quota − used</code>.</td></tr>
+        <tr><td class="fld">Current Period Start / End</td><td>The active billing window; usage resets at period end.</td></tr>
+        <tr><td class="fld">Has Subscription</td><td>Whether the company has any subscription at all (vs. none).</td></tr>
+      </tbody>
+    </table>
+    <h3>Package purchase history (per subscription)</h3>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Package Name</td><td>Which top-up was bought.</td></tr>
+        <tr><td class="fld">Messages Added</td><td>Credits that purchase added.</td></tr>
+        <tr><td class="fld">Price / Currency</td><td>What it cost.</td></tr>
+        <tr><td class="fld">Created At</td><td>When the top-up was purchased.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ USERS ============ -->
+  <section id="users">
+    <div class="sec-head"><span class="sec-num">7</span><h2>Users</h2></div>
+    <span class="route">/superadmin/users</span>
+    <p class="lead">Every user account across all tenants. Passwords are never returned by the API.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Full Name</td><td>User's display name.</td></tr>
+        <tr><td class="fld">Email</td><td>Login email.</td></tr>
+        <tr><td class="fld">Company</td><td>Tenant the user belongs to (SuperAdmins may have none).</td></tr>
+        <tr><td class="fld">Role <span class="tag">enum</span></td><td>SuperAdmin · CompanyAdmin · Agent — controls what they can access.</td></tr>
+        <tr><td class="fld">Active</td><td>Whether the account can log in.</td></tr>
+        <tr><td class="fld">Last Login At</td><td>Timestamp of their most recent sign-in (blank if never).</td></tr>
+        <tr><td class="fld">Created At</td><td>When the account was created.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ MONITORING ============ -->
+  <section id="monitoring">
+    <div class="sec-head"><span class="sec-num">8</span><h2>Monitoring</h2></div>
+    <span class="route">/superadmin/monitoring</span>
+    <p class="lead">Per-company health for the last 30 days — designed to spot tenants at risk of a WhatsApp ban (high failure rates, quality drops).</p>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="fld">Company</td><td>Tenant name, plus active/inactive.</td></tr>
+        <tr><td class="fld">Total Sent (30d)</td><td>Outbound messages in the last 30 days.</td></tr>
+        <tr><td class="fld">Failed (30d)</td><td>How many failed in that window.</td></tr>
+        <tr><td class="fld">Billable (30d)</td><td>Chargeable sends in that window.</td></tr>
+        <tr><td class="fld">Failure Rate</td><td><code>Failed / Sent</code>. High rates risk account bans.</td></tr>
+        <tr><td class="fld">Flagged</td><td>True when the failure rate crosses the risk threshold — needs attention.</td></tr>
+        <tr><td class="fld">Active Campaigns</td><td>Campaigns currently running for the company.</td></tr>
+        <tr><td class="fld">Last Message At</td><td>When the company last sent anything.</td></tr>
+        <tr><td class="fld">Quality Rating</td><td>Meta's quality rating for the number (Green / Yellow / Red), if available.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ LOGS ============ -->
+  <section id="logs">
+    <div class="sec-head"><span class="sec-num">9</span><h2>Server Logs</h2></div>
+    <span class="route">/superadmin/server-logs</span>
+    <p class="lead">A live viewer streaming the backend's log output — for debugging in real time. Auto-scroll is off by default and the view is capped at the latest 100 entries.</p>
+    <p class="pill-row">
+      <span class="pill"><b>Each entry:</b> timestamp · level (Info/Warn/Error) · message</span>
+      <span class="pill"><b>Use it for:</b> watching webhook + campaign activity as it happens</span>
+    </p>
+  </section>
+
+  <footer>
+    Growchat · SuperAdmin field guide · figures computed by <code>AdminReportsService</code> and the per-feature APIs.
+  </footer>
+
+</div>
+</body>
+</html>

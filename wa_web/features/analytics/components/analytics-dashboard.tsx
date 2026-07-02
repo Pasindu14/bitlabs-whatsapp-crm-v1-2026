@@ -5,9 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageStatsCards } from "@/features/analytics/components/message-stats-cards";
 import { MessageMetricsChart } from "@/features/analytics/components/message-metrics-chart";
 import { CampaignPerformanceTable } from "@/features/analytics/components/campaign-performance-table";
-import { CostBreakdownChart } from "@/features/analytics/components/cost-breakdown-chart";
 import { AnalyticsDateRangePicker } from "@/features/analytics/components/date-range-picker";
-import { useMessageMetrics, useCampaignPerformance, useCostAnalytics } from "@/features/analytics/hooks/use-analytics";
+import { useMessageMetrics, useCampaignPerformance } from "@/features/analytics/hooks/use-analytics";
 
 function defaultRange() {
   const to = new Date();
@@ -24,7 +23,6 @@ export function AnalyticsDashboard() {
 
   const messages = useMessageMetrics(range.from, range.to);
   const campaigns = useCampaignPerformance(range.from, range.to);
-  const costs = useCostAnalytics(range.from, range.to);
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,7 +38,6 @@ export function AnalyticsDashboard() {
         <TabsList className="mb-4">
           <TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-          <TabsTrigger value="costs">Costs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="messages" className="flex flex-col gap-6">
@@ -53,10 +50,6 @@ export function AnalyticsDashboard() {
             data={campaigns.data}
             isLoading={campaigns.isLoading}
           />
-        </TabsContent>
-
-        <TabsContent value="costs">
-          <CostBreakdownChart data={costs.data} isLoading={costs.isLoading} />
         </TabsContent>
       </Tabs>
     </div>

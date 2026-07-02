@@ -125,7 +125,6 @@ export function CompanyHealthTable() {
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sent (30d)</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Failed</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Fail Rate</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Billable</th>
                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Active Campaigns</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Last Activity</th>
               </tr>
@@ -167,9 +166,6 @@ export function CompanyHealthTable() {
                       ? `${(company.failureRate * 100).toFixed(1)}%`
                       : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-primary">
-                    {numFmt.format(company.billable30d)}
-                  </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {company.activeCampaigns > 0 ? (
                       <Badge variant="secondary">{company.activeCampaigns}</Badge>
@@ -186,7 +182,7 @@ export function CompanyHealthTable() {
               ))}
               {sorted.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                     No companies found.
                   </td>
                 </tr>

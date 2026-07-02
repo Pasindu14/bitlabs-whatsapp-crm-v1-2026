@@ -28,8 +28,8 @@ export function UsageReport() {
   const handleExport = () => {
     exportCsv(
       `usage_${from}_to_${to}.csv`,
-      ["Company", "Sent", "Delivered", "Read", "Failed", "Billable"],
-      companies.map((c) => [c.companyName, c.sent, c.delivered, c.read, c.failed, c.billable])
+      ["Company", "Sent", "Delivered", "Read", "Failed"],
+      companies.map((c) => [c.companyName, c.sent, c.delivered, c.read, c.failed])
     );
   };
 
@@ -50,12 +50,6 @@ export function UsageReport() {
             {isLoading ? "—" : numFmt.format(data?.totalSent ?? 0)}
           </p>
         </div>
-        <div className="rounded-xl border bg-card p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Billable</p>
-          <p className="mt-2 text-3xl font-bold tabular-nums text-primary">
-            {isLoading ? "—" : numFmt.format(data?.totalBillable ?? 0)}
-          </p>
-        </div>
       </div>
 
       {isLoading ? (
@@ -71,7 +65,6 @@ export function UsageReport() {
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">Delivered</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">Read</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">Failed</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Billable</th>
                 </tr>
               </thead>
               <tbody>
@@ -84,14 +77,11 @@ export function UsageReport() {
                     <td className="px-4 py-3 text-right tabular-nums text-destructive">
                       {numFmt.format(c.failed)}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-primary">
-                      {numFmt.format(c.billable)}
-                    </td>
                   </tr>
                 ))}
                 {companies.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                       No outbound messages in this range.
                     </td>
                   </tr>
