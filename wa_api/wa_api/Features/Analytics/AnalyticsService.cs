@@ -115,6 +115,11 @@ public class AnalyticsService(AppDbContext db)
         var start = (from ?? end.Date.AddDays(-29));
         if ((end - start).TotalDays > 365)
             start = end.Date.AddDays(-365);
-        return (start, end);
+        // Query-string dates arrive as Kind=Unspecified; the CreatedAt column is
+        // timestamptz, so Npgsql rejects non-UTC parameters. Stamp them UTC.
+        return (AsUtc(start), AsUtc(end));
     }
+
+    private static DateTime AsUtc(DateTime d) =>
+        d.Kind == DateTimeKind.Utc ? d : DateTime.SpecifyKind(d, DateTimeKind.Utc);
 }
