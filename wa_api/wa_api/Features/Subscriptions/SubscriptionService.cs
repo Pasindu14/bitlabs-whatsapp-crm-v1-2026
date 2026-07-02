@@ -105,6 +105,8 @@ public class SubscriptionService(AppDbContext db, ITenantContext tenant) : ISubs
             // balance rises by exactly the new quota (remaining = base + credits - used).
             existing.ExtraMessageCredits += plan.MonthlyMessageQuota;
             existing.CurrentPeriodEnd = existing.CurrentPeriodEnd.AddDays(periodDays);
+            db.SubscriptionPurchases.Add(
+                BuildPurchase(company.Id, existing, plan, SubscriptionPurchaseMode.Stack, periodDays));
             await db.SaveChangesAsync(ct);
             return Map(existing);
         }
@@ -123,10 +125,12 @@ public class SubscriptionService(AppDbContext db, ITenantContext tenant) : ISubs
             MessagesUsedThisPeriod = 0,
         };
         db.Subscriptions.Add(sub);
+        sub.Plan = plan;   // set nav so BuildPurchase can read the plan's quota (and Map below)
+        db.SubscriptionPurchases.Add(
+            BuildPurchase(company.Id, sub, plan, SubscriptionPurchaseMode.Fresh, periodDays));
         await db.SaveChangesAsync(ct);
 
         sub.Company = company;
-        sub.Plan = plan;
         return Map(sub);
     }
 
@@ -139,6 +143,33 @@ public class SubscriptionService(AppDbContext db, ITenantContext tenant) : ISubs
         var effective = (sub.Plan?.MonthlyMessageQuota ?? 0) + sub.ExtraMessageCredits;
         var remaining = effective - sub.MessagesUsedThisPeriod;
         return sub.CurrentPeriodEnd > now && remaining > 0;
+    }
+
+    /// <summary>
+    /// Builds an audit row for a single subscribe. <paramref name="sub"/> supplies the resulting
+    /// balance/expiry (its <c>Plan</c> nav must be loaded); <paramref name="subscribedPlan"/> is the
+    /// plan chosen in this purchase (snapshotted for name/quota/price).
+    /// </summary>
+    private static SubscriptionPurchase BuildPurchase(
+        Guid companyId, Subscription sub, Plan subscribedPlan,
+        SubscriptionPurchaseMode mode, int periodDays)
+    {
+        var baseQuota = sub.Plan?.MonthlyMessageQuota ?? 0;
+        var balanceAfter = Math.Max(0, baseQuota + sub.ExtraMessageCredits - sub.MessagesUsedThisPeriod);
+        return new SubscriptionPurchase
+        {
+            CompanyId = companyId,          // explicit — SuperAdmin scope has no tenant context
+            SubscriptionId = sub.Id,
+            PlanId = subscribedPlan.Id,
+            PlanName = subscribedPlan.Name,
+            Mode = mode,
+            MessagesAdded = subscribedPlan.MonthlyMessageQuota,
+            PeriodDays = periodDays,
+            BalanceAfter = balanceAfter,
+            PeriodEndAfter = sub.CurrentPeriodEnd,
+            Price = subscribedPlan.Price,
+            Currency = subscribedPlan.Currency,
+        };
     }
 
     public async Task<SubscriptionResponse> ChangePlanAsync(Guid companyId, ChangePlanRequest request, CancellationToken ct = default)
@@ -230,6 +261,20 @@ public class SubscriptionService(AppDbContext db, ITenantContext tenant) : ISubs
             .ToListAsync(ct);
 
         return rows.Select(PackagePurchaseResponse.From).ToList();
+    }
+
+    public async Task<IReadOnlyList<SubscriptionPurchaseResponse>> GetSubscriptionHistoryAsync(Guid companyId, CancellationToken ct = default)
+    {
+        _ = await db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == companyId, ct)
+            ?? throw new NotFoundException("Company", companyId);
+
+        // SuperAdmin path: query filter bypassed, so scope by the explicit CompanyId predicate.
+        var rows = await db.SubscriptionPurchases.AsNoTracking()
+            .Where(p => p.CompanyId == companyId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(ct);
+
+        return rows.Select(SubscriptionPurchaseResponse.From).ToList();
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import type {
   Subscription,
   SubscriptionListParams,
   PackagePurchase,
+  SubscriptionPurchase,
 } from "@/features/subscriptions/types";
 import type {
   AssignSubscriptionInput,
@@ -129,6 +130,18 @@ export const SubscriptionService = {
       async () => {
         const res = await client.get<ApiSuccessBody<PackagePurchase[]>>(
           `/api/v1/subscriptions/company/${companyId}/packages`
+        );
+        return res.data.data ?? [];
+      }
+    );
+  },
+
+  async getSubscriptionHistory(companyId: string): Promise<SubscriptionPurchase[]> {
+    return executeService(
+      { context: "SubscriptionService", method: "getSubscriptionHistory" },
+      async () => {
+        const res = await client.get<ApiSuccessBody<SubscriptionPurchase[]>>(
+          `/api/v1/subscriptions/company/${companyId}/history`
         );
         return res.data.data ?? [];
       }

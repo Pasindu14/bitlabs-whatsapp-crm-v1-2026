@@ -17,8 +17,10 @@ public interface ISubscriptionService
     Task<SubscriptionResponse> GetMineAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Places a company onto a plan (SuperAdmin). Cancels any existing active subscription
-    /// for that company, then creates a fresh active one. Throws on unknown company / plan.
+    /// Places a company onto a plan (SuperAdmin). Stacks onto a LIVE subscription (adds the new
+    /// plan's quota to the balance and extends the expiry) or starts a fresh period from today
+    /// when there is none / it is expired / exhausted. Records a <c>SubscriptionPurchase</c> either
+    /// way. Throws on unknown company / plan.
     /// </summary>
     Task<SubscriptionResponse> AssignAsync(AssignSubscriptionRequest request, CancellationToken ct = default);
 
@@ -37,4 +39,7 @@ public interface ISubscriptionService
 
     /// <summary>The package-purchase history for a company, newest first (SuperAdmin).</summary>
     Task<IReadOnlyList<PackagePurchaseResponse>> GetPackageHistoryAsync(Guid companyId, CancellationToken ct = default);
+
+    /// <summary>The subscribe (plan-assignment) history for a company, newest first (SuperAdmin).</summary>
+    Task<IReadOnlyList<SubscriptionPurchaseResponse>> GetSubscriptionHistoryAsync(Guid companyId, CancellationToken ct = default);
 }

@@ -77,4 +77,12 @@ public class SubscriptionsController(ISubscriptionService service) : ControllerB
         var result = await service.GetPackageHistoryAsync(companyId, ct);
         return Ok(ResponseHelper.Ok(result, CorrelationId));
     }
+
+    /// <summary>GET /api/v1/subscriptions/company/{companyId}/history — a company's subscribe history.</summary>
+    [HttpGet("company/{companyId:guid}/history")]
+    public async Task<IActionResult> GetSubscriptionHistory(Guid companyId, CancellationToken ct)
+    {
+        var result = await service.GetSubscriptionHistoryAsync(companyId, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
 }

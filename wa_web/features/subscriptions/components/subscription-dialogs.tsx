@@ -33,6 +33,7 @@ import {
 import { AssignSubscriptionForm } from "./assign-subscription-form";
 import { ChangePlanForm } from "./change-plan-form";
 import { AddPackageForm } from "./add-package-form";
+import { SubscriptionHistoryDialog } from "./subscription-history-dialog";
 
 function AssignSubscriptionDialog() {
   const { isOpen, close } = useAssignSubscriptionDialog();
@@ -52,7 +53,8 @@ function AssignSubscriptionDialog() {
         <DialogHeader>
           <DialogTitle>Assign Subscription</DialogTitle>
           <DialogDescription>
-            Place a company on a plan. Any existing active subscription is replaced.
+            Place a company on a plan. If they already have a live subscription the messages are
+            added to their balance and the expiry is extended; otherwise a fresh period starts today.
           </DialogDescription>
         </DialogHeader>
         <AssignSubscriptionForm
@@ -172,6 +174,7 @@ export function SubscriptionDialogs() {
       <ChangePlanDialog />
       <CancelSubscriptionDialog />
       <AddPackageDialog />
+      <SubscriptionHistoryDialog />
     </>
   );
 }

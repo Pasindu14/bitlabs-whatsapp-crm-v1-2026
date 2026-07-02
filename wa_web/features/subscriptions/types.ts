@@ -36,6 +36,26 @@ export interface PackagePurchase {
   createdAt: string;
 }
 
+/** How a subscribe was applied — mirrors wa_api SubscriptionPurchaseMode. */
+export type SubscriptionPurchaseMode = "Fresh" | "Stack";
+
+/** A subscribe (plan-assignment) audit row (mirrors wa_api SubscriptionPurchaseResponse). */
+export interface SubscriptionPurchase {
+  id: string;
+  companyId: string;
+  subscriptionId: string;
+  planId: string;
+  planName: string;
+  mode: SubscriptionPurchaseMode;
+  messagesAdded: number;
+  periodDays: number;
+  balanceAfter: number;
+  periodEndAfter: string;
+  price: number;
+  currency: string;
+  createdAt: string;
+}
+
 /** Filters/pagination the list endpoint accepts. */
 export interface SubscriptionListParams {
   page: number;

@@ -90,6 +90,8 @@ export const queryKeys = {
       [...queryKeys.subscriptions.all, 'company', companyId] as const,
     packageHistory: (companyId: string) =>
       [...queryKeys.subscriptions.all, 'package-history', companyId] as const,
+    subscriptionHistory: (companyId: string) =>
+      [...queryKeys.subscriptions.all, 'subscription-history', companyId] as const,
   },
 
   // My subscription (tenant — the caller's own plan + usage)

@@ -145,6 +145,36 @@ public class SubscriptionServiceAssignTests
     }
 
     [Fact]
+    public async Task RecordsHistory_FreshThenStack_NewestFirst()
+    {
+        await using var db = NewDb();
+        var company = Company();
+        var planA = Plan(10_000);
+        var planB = Plan(5_000);
+        db.Companies.Add(company);
+        db.Plans.AddRange(planA, planB);
+        await db.SaveChangesAsync();
+
+        var svc = new SubscriptionService(db, new SuperAdminTenant());
+        await svc.AssignAsync(new AssignSubscriptionRequest(company.Id, planA.Id, 30)); // fresh
+        await svc.AssignAsync(new AssignSubscriptionRequest(company.Id, planB.Id, 15)); // stack (still live)
+
+        var history = await svc.GetSubscriptionHistoryAsync(company.Id);
+
+        Assert.Equal(2, history.Count);
+        // Both subscribes are recorded (look up by mode — the two rows can share a timestamp in
+        // this fast in-memory test, so index order isn't asserted here).
+        var stack = Assert.Single(history, h => h.Mode == SubscriptionPurchaseMode.Stack);
+        Assert.Equal(5_000, stack.MessagesAdded);
+        Assert.Equal(15, stack.PeriodDays);
+        Assert.Equal(15_000, stack.BalanceAfter);   // 10,000 + 5,000
+
+        var fresh = Assert.Single(history, h => h.Mode == SubscriptionPurchaseMode.Fresh);
+        Assert.Equal(10_000, fresh.MessagesAdded);
+        Assert.Equal(10_000, fresh.BalanceAfter);
+    }
+
+    [Fact]
     public async Task Exhausted_ButNotExpired_StartsFresh()
     {
         await using var db = NewDb();

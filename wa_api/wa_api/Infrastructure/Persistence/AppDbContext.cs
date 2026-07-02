@@ -51,6 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<MessagePackage> MessagePackages => Set<MessagePackage>();
     public DbSet<PackagePurchase> PackagePurchases => Set<PackagePurchase>();
+    public DbSet<SubscriptionPurchase> SubscriptionPurchases => Set<SubscriptionPurchase>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<TemplateMediaSample> TemplateMediaSamples => Set<TemplateMediaSample>();
@@ -381,6 +382,32 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.HasOne(x => x.Package)
                 .WithMany()
                 .HasForeignKey(x => x.PackageId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Tenant-scoped audit history — same filter as Subscription.
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<SubscriptionPurchase>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.PlanName).IsRequired().HasMaxLength(120);
+            e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(16).IsRequired();
+            e.Property(x => x.Price).HasColumnType("numeric(12,2)");
+            e.Property(x => x.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("USD");
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => new { x.CompanyId, x.CreatedAt });   // history list, newest first
+            e.HasOne(x => x.Company)
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Subscription)
+                .WithMany()
+                .HasForeignKey(x => x.SubscriptionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Plan)
+                .WithMany()
+                .HasForeignKey(x => x.PlanId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Tenant-scoped audit history — same filter as Subscription.

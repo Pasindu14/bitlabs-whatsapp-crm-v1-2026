@@ -18,6 +18,7 @@ import {
   cancelSubscriptionAction,
   addPackageAction,
   getPackageHistoryAction,
+  getSubscriptionHistoryAction,
 } from "@/features/subscriptions/actions/subscription-actions";
 import { getCompaniesAction } from "@/features/companies/actions/company-actions";
 import { getPlansAction } from "@/features/plans/actions/plan-actions";
@@ -143,6 +144,19 @@ export function usePackageHistory(companyId: string | null) {
     queryKey: queryKeys.subscriptions.packageHistory(companyId ?? ""),
     queryFn: async () => {
       const res = await getPackageHistoryAction(companyId!);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: !!companyId,
+  });
+}
+
+// ── Subscription (subscribe) history (read) ───────────────────────────────
+export function useSubscriptionHistory(companyId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.subscriptions.subscriptionHistory(companyId ?? ""),
+    queryFn: async () => {
+      const res = await getSubscriptionHistoryAction(companyId!);
       if (!res.success) throw new Error(res.error);
       return res.data;
     },

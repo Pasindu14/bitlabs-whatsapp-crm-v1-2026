@@ -33,12 +33,13 @@ export interface SubscriptionColumnActions {
   openChange: (companyId: string) => void;
   openCancel: (companyId: string) => void;
   openAddPackage: (companyId: string) => void;
+  openHistory: (companyId: string) => void;
 }
 
 export function getSubscriptionColumns(
   actions: SubscriptionColumnActions
 ): ColumnDef<Subscription>[] {
-  const { openChange, openCancel, openAddPackage } = actions;
+  const { openChange, openCancel, openAddPackage, openHistory } = actions;
 
   return [
     {
@@ -107,7 +108,7 @@ export function getSubscriptionColumns(
     },
     {
       accessorKey: "currentPeriodEnd",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Renews" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Expires" />,
       cell: ({ row }) => {
         const end = row.original.currentPeriodEnd;
         return (
@@ -134,6 +135,9 @@ export function getSubscriptionColumns(
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => openHistory(s.companyId)}>
+                View history
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => openChange(s.companyId)}>
                 Change plan
               </DropdownMenuItem>

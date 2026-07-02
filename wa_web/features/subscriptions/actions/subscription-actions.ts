@@ -57,3 +57,10 @@ export const getPackageHistoryAction = createAction(
     return SubscriptionService.getPackageHistory(companyId);
   }
 );
+
+export const getSubscriptionHistoryAction = createAction(
+  { name: "getSubscriptionHistoryAction", requireAuth: true, requiredRole: SUPERADMIN },
+  async (companyId: string) => {
+    return SubscriptionService.getSubscriptionHistory(companyId);
+  }
+);
