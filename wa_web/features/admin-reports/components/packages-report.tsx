@@ -80,11 +80,11 @@ export function PackagesReport() {
                   <tr key={r.planId} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3 font-medium">{r.planName}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                      {money(r.price, r.currency)}
+                      {money(r.price)}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{numFmt.format(r.count)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-primary">
-                      {money(r.revenue, r.currency)}
+                      {money(r.revenue)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="h-2 rounded-full bg-muted">

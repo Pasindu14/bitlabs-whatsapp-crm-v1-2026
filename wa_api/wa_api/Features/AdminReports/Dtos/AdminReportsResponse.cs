@@ -20,9 +20,9 @@ public record DailyPackageRow(
 );
 
 /// <summary>
-/// Packages (subscriptions) purchased in a date range. Revenue is derived from
-/// <c>Plan.Price</c> for now (Stripe not live); swap to invoice totals later without
-/// changing this shape.
+/// Packages (subscribes) purchased in a date range. Sourced from the
+/// <c>SubscriptionPurchase</c> audit trail — one row per subscribe including STACK
+/// re-subscribes — with price/currency snapshotted at purchase time.
 /// </summary>
 public record PackagesReportResponse(
     DateTime From,

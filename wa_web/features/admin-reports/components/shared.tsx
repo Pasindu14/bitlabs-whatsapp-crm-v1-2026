@@ -10,7 +10,7 @@ export const dateFmt = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
 });
 
-export function money(amount: number, currency = "USD") {
+export function money(amount: number, currency = "AED") {
   try {
     return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
   } catch {

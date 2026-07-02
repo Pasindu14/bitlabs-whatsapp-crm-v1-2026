@@ -26,34 +26,32 @@ public class AdminReportsService(AppDbContext db)
     {
         var (rangeFrom, rangeTo) = NormalizeRange(from, to);
 
-        // Every subscription created in the window = one package purchased. Counts all rows
-        // regardless of current status (a later plan change soft-deletes the old row, but the
-        // purchase still happened).
-        var purchases = await db.Subscriptions
+        // One SubscriptionPurchase row per subscribe (the Assign action) — including STACK
+        // re-subscribes, which mutate the existing Subscription row rather than creating a new
+        // one and would otherwise be invisible. Price/Currency/PlanName are SNAPSHOTTED at
+        // purchase time, so this is the source of truth for revenue (immune to later catalog
+        // price changes), not the plan's current Plan.Price.
+        var purchases = await db.SubscriptionPurchases
             .IgnoreQueryFilters()
-            .Where(s => s.CreatedAt >= rangeFrom && s.CreatedAt <= rangeTo)
-            .Select(s => new { s.PlanId, s.CreatedAt })
+            .Where(p => p.CreatedAt >= rangeFrom && p.CreatedAt <= rangeTo)
+            .Select(p => new { p.PlanId, p.PlanName, p.Price, p.Currency, p.CreatedAt })
             .ToListAsync(ct);
-
-        var plans = await db.Plans
-            .Select(p => new { p.Id, p.Name, p.Price, p.Currency })
-            .ToListAsync(ct);
-        var planById = plans.ToDictionary(p => p.Id);
 
         var byPlan = purchases
             .GroupBy(p => p.PlanId)
             .Select(g =>
             {
-                planById.TryGetValue(g.Key, out var plan);
-                var price = plan?.Price ?? 0m;
-                var count = g.Count();
+                // Snapshots can differ across purchases of the same plan (e.g. a mid-range
+                // price change); show the most recent snapshot as the representative unit
+                // price and sum the actual paid prices for revenue.
+                var latest = g.OrderByDescending(x => x.CreatedAt).First();
                 return new PlanPackageRow(
                     g.Key,
-                    plan?.Name ?? "(deleted plan)",
-                    price,
-                    plan?.Currency ?? "USD",
-                    count,
-                    price * count
+                    latest.PlanName,
+                    latest.Price,
+                    latest.Currency,
+                    g.Count(),
+                    g.Sum(x => x.Price)
                 );
             })
             .OrderByDescending(r => r.Revenue)
@@ -64,7 +62,7 @@ public class AdminReportsService(AppDbContext db)
             .Select(g => new DailyPackageRow(
                 g.Key,
                 g.Count(),
-                g.Sum(x => planById.TryGetValue(x.PlanId, out var pl) ? pl.Price : 0m)
+                g.Sum(x => x.Price)
             ))
             .OrderBy(r => r.Date)
             .ToList();
@@ -153,18 +151,14 @@ public class AdminReportsService(AppDbContext db)
             .IgnoreQueryFilters()
             .CountAsync(s => s.IsActive && s.Status == SubscriptionStatus.Active, ct);
 
-        var monthPurchases = await db.Subscriptions
+        // Count/revenue from the subscribe audit trail (includes STACK re-subscribes and uses
+        // snapshotted prices), consistent with GetPackagesAsync.
+        var monthPurchases = await db.SubscriptionPurchases
             .IgnoreQueryFilters()
-            .Where(s => s.CreatedAt >= monthStart)
-            .Select(s => s.PlanId)
+            .Where(p => p.CreatedAt >= monthStart)
+            .Select(p => p.Price)
             .ToListAsync(ct);
-
-        var planPrices = await db.Plans
-            .Select(p => new { p.Id, p.Price })
-            .ToListAsync(ct);
-        var priceById = planPrices.ToDictionary(p => p.Id, p => p.Price);
-        var revenueThisMonth = monthPurchases
-            .Sum(planId => priceById.TryGetValue(planId, out var pr) ? pr : 0m);
+        var revenueThisMonth = monthPurchases.Sum();
 
         var newSignupsThisMonth = await db.Companies
             .CountAsync(c => c.CreatedAt >= monthStart, ct);

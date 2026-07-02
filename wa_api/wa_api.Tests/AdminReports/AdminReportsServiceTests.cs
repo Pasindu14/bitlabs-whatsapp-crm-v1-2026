@@ -65,6 +65,27 @@ public class AdminReportsServiceTests
         IsActive = true,
     };
 
+    private static SubscriptionPurchase Purchase(
+        Guid companyId, Plan plan, DateTime createdAt,
+        SubscriptionPurchaseMode mode = SubscriptionPurchaseMode.Fresh) => new()
+    {
+        Id = Guid.NewGuid(),
+        CompanyId = companyId,
+        SubscriptionId = Guid.NewGuid(),
+        PlanId = plan.Id,
+        PlanName = plan.Name,
+        Mode = mode,
+        MessagesAdded = plan.MonthlyMessageQuota,
+        PeriodDays = 30,
+        BalanceAfter = plan.MonthlyMessageQuota,
+        PeriodEndAfter = createdAt.AddDays(30),
+        Price = plan.Price,
+        Currency = plan.Currency,
+        CreatedAt = createdAt,
+        UpdatedAt = createdAt,
+        IsActive = true,
+    };
+
     private static Message Msg(
         Guid companyId, DateTime createdAt,
         MessageStatus status = MessageStatus.Sent, bool? billable = null,
@@ -93,12 +114,14 @@ public class AdminReportsServiceTests
         var inRange = new DateTime(2026, 6, 10, 0, 0, 0, DateTimeKind.Utc);
         var outOfRange = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         db.AddRange(
-            Sub(co.Id, planA.Id, inRange),
-            Sub(co.Id, planA.Id, inRange),
-            Sub(co.Id, planA.Id, inRange),
-            Sub(co.Id, planB.Id, inRange),
-            Sub(co.Id, planB.Id, inRange),
-            Sub(co.Id, planA.Id, outOfRange) // excluded by range
+            Purchase(co.Id, planA, inRange),
+            Purchase(co.Id, planA, inRange),
+            // A STACK re-subscribe mutates the existing Subscription row but still records a
+            // purchase — must be counted (the old Subscriptions-based report missed these).
+            Purchase(co.Id, planA, inRange, SubscriptionPurchaseMode.Stack),
+            Purchase(co.Id, planB, inRange),
+            Purchase(co.Id, planB, inRange),
+            Purchase(co.Id, planA, outOfRange) // excluded by range
         );
         await db.SaveChangesAsync();
 
@@ -184,6 +207,12 @@ public class AdminReportsServiceTests
         db.AddRange(
             Sub(c1.Id, plan.Id, now, used: 950),   // active + low balance
             Sub(c2.Id, plan.Id, now, used: 100)    // active
+        );
+
+        // Purchases drive PackagesSoldThisMonth / RevenueThisMonth (subscribe audit trail).
+        db.AddRange(
+            Purchase(c1.Id, plan, now),
+            Purchase(c2.Id, plan, now)
         );
 
         db.AddRange(
