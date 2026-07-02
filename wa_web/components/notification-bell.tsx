@@ -6,7 +6,6 @@ import { Bell, CheckCheck, Megaphone, AlertTriangle, Clock, CheckCircle2 } from 
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useNotificationBell, useMarkNotificationRead, useMarkAllNotificationsRead } from "@/features/notifications/hooks/use-notifications";
 import type { Notification, NotificationType } from "@/features/notifications/types";
@@ -85,7 +84,7 @@ export function NotificationBell() {
         </div>
 
         {/* Body */}
-        <ScrollArea className="max-h-[360px]">
+        <div className="max-h-[360px] overflow-y-auto overscroll-contain">
           {isLoading ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               Loading…
@@ -102,7 +101,7 @@ export function NotificationBell() {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
         <div className="border-t px-4 py-2">

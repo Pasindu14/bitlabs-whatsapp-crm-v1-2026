@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 import NextTopLoader from "nextjs-toploader";
 
 export const metadata: Metadata = {
-  title: "Bitlabs Enterprise",
-  description: "Bitlabs Enterprise",
+  title: "Growchat",
+  description: "Growchat",
 };
 
 const jost = Jost({ subsets: ['latin'], variable: '--font-sans' });
