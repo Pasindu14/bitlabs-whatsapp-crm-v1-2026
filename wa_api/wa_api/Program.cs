@@ -287,7 +287,9 @@ try
     });
     RecurringJob.AddOrUpdate<HeartbeatJob>("heartbeat", j => j.Run(), Cron.Hourly);
     RecurringJob.AddOrUpdate<WabaHealthCheckJob>("waba-health-check", j => j.RunAsync(), Cron.MinuteInterval(15));
-    RecurringJob.AddOrUpdate<SubscriptionPeriodResetJob>("subscription-period-reset", j => j.RunAsync(), Cron.Daily);
+    // Retired: the balance now runs continuously until expiry (accumulate-until-expiry model),
+    // so there is no monthly usage reset. RemoveIfExists cleans up any schedule left in Hangfire.
+    RecurringJob.RemoveIfExists("subscription-period-reset");
     RecurringJob.AddOrUpdate<TemplateStatusSyncJob>("template-status-sync", j => j.RunAsync(), Cron.MinuteInterval(15));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>("webhook-sweeper", j => j.RunAsync(), Cron.MinuteInterval(5));
     RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.CampaignSchedulerJob>("campaign-scheduler", j => j.RunAsync(), Cron.Minutely);

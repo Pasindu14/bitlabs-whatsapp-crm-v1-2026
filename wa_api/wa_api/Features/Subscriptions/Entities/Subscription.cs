@@ -35,19 +35,23 @@ public class Subscription : BaseEntity, ITenantEntity
     /// <summary>UTC start of the current usage period.</summary>
     public DateTime CurrentPeriodStart { get; set; }
 
-    /// <summary>UTC end of the current usage period; quota resets when this passes.</summary>
+    /// <summary>
+    /// UTC end of the current usage period. Once this passes the subscription is expired and
+    /// sending is blocked until the company subscribes again. There is no automatic monthly
+    /// reset — the balance runs continuously until this date (accumulate-until-expiry model).
+    /// </summary>
     public DateTime CurrentPeriodEnd { get; set; }
 
     /// <summary>Messages consumed against the effective quota in the current period.</summary>
     public int MessagesUsedThisPeriod { get; set; }
 
     /// <summary>
-    /// Remaining balance of extra message credits purchased via add-on
-    /// <see cref="Packages.Entities.MessagePackage"/>s. Stacks on top of the plan's
-    /// <see cref="Plans.Entities.Plan.MonthlyMessageQuota"/> to form the effective quota.
-    /// Unlike the monthly quota these are a one-time top-up: the period-reset job carries the
-    /// unused remainder forward and only deducts what was actually consumed (see
-    /// <c>SubscriptionPeriodResetJob</c>).
+    /// Extra message credits stacked on top of the plan's
+    /// <see cref="Plans.Entities.Plan.MonthlyMessageQuota"/> to form the effective quota. Grows
+    /// when a company re-subscribes onto a LIVE subscription (the new plan's quota is folded in
+    /// here so the running balance rises by exactly the new quota) and when SuperAdmin adds an
+    /// add-on <see cref="Packages.Entities.MessagePackage"/>. There is no monthly reset — the
+    /// balance runs continuously until <see cref="CurrentPeriodEnd"/>.
     /// </summary>
     public int ExtraMessageCredits { get; set; }
 

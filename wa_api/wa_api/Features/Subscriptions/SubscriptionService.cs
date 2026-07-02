@@ -88,12 +88,31 @@ public class SubscriptionService(AppDbContext db, ITenantContext tenant) : ISubs
 
         var plan = await RequireAssignablePlanAsync(request.PlanId, ct);
 
-        // Cancel any existing active subscription FIRST (own SaveChanges) so the unique
+        var now = DateTime.UtcNow;
+        var periodDays = request.PeriodDays ?? DefaultPeriodDays;
+
+        // Re-subscribe is "stack or fresh" (no monthly reset — the balance runs until expiry):
+        //  • STACK  — if the company already has a LIVE subscription (not expired AND messages
+        //             remaining), the new plan's quota is added to the running balance and the
+        //             expiry is extended from the CURRENT expiry. The existing row is kept.
+        //  • FRESH  — otherwise (no sub, expired, or balance exhausted) any leftover is forfeited
+        //             and a brand-new period starts from today.
+        var existing = await LoadActiveAsync(company.Id, asNoTracking: false, ct);
+        if (existing is not null && IsLive(existing, now))
+        {
+            // Stack the new plan's quota onto the running balance. We keep the existing PlanId as
+            // the base and fold the purchased quota into ExtraMessageCredits so the remaining
+            // balance rises by exactly the new quota (remaining = base + credits - used).
+            existing.ExtraMessageCredits += plan.MonthlyMessageQuota;
+            existing.CurrentPeriodEnd = existing.CurrentPeriodEnd.AddDays(periodDays);
+            await db.SaveChangesAsync(ct);
+            return Map(existing);
+        }
+
+        // FRESH: cancel any existing active subscription FIRST (own SaveChanges) so the unique
         // filtered index on (CompanyId WHERE Status='Active') never sees two active rows.
         await CancelExistingActiveAsync(company.Id, ct);
 
-        var now = DateTime.UtcNow;
-        var periodDays = request.PeriodDays ?? DefaultPeriodDays;
         var sub = new Subscription
         {
             CompanyId = company.Id,        // explicit — interceptor leaves SuperAdmin-set CompanyId alone
@@ -109,6 +128,17 @@ public class SubscriptionService(AppDbContext db, ITenantContext tenant) : ISubs
         sub.Company = company;
         sub.Plan = plan;
         return Map(sub);
+    }
+
+    /// <summary>
+    /// A subscription is "live" (and therefore stackable) when it has not expired AND still has
+    /// messages remaining. If either is false the customer must start a fresh period.
+    /// </summary>
+    private static bool IsLive(Subscription sub, DateTime now)
+    {
+        var effective = (sub.Plan?.MonthlyMessageQuota ?? 0) + sub.ExtraMessageCredits;
+        var remaining = effective - sub.MessagesUsedThisPeriod;
+        return sub.CurrentPeriodEnd > now && remaining > 0;
     }
 
     public async Task<SubscriptionResponse> ChangePlanAsync(Guid companyId, ChangePlanRequest request, CancellationToken ct = default)
