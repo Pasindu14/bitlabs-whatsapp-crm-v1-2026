@@ -103,6 +103,14 @@ public class CampaignsController(ICampaignService service) : ControllerBase
         return Ok(ResponseHelper.Ok(result, CorrelationId));
     }
 
+    /// <summary>GET /api/v1/campaigns/{id}/audience-health — pre-send audience breakdown.</summary>
+    [HttpGet("{id:guid}/audience-health")]
+    public async Task<IActionResult> GetAudienceHealth(Guid id, CancellationToken ct)
+    {
+        var result = await service.GetAudienceHealthAsync(id, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
     /// <summary>GET /api/v1/campaigns/{id}/recipients — paged per-recipient status.</summary>
     [HttpGet("{id:guid}/recipients")]
     public async Task<IActionResult> GetRecipients(

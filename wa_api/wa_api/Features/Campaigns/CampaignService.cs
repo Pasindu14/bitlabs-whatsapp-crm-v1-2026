@@ -454,6 +454,49 @@ public class CampaignService(
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task<CampaignAudienceHealthResponse> GetAudienceHealthAsync(Guid campaignId, CancellationToken ct = default)
+    {
+        var campaign = await db.Campaigns.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == campaignId, ct)
+            ?? throw new NotFoundException("Campaign", campaignId);
+
+        // Resolve the distinct audience (lists ∪ individual contacts), same as the launch job.
+        var listIds = await db.CampaignContactLists
+            .Where(x => x.CampaignId == campaignId).Select(x => x.ContactListId).ToListAsync(ct);
+        var individualIds = await db.CampaignContacts
+            .Where(x => x.CampaignId == campaignId).Select(x => x.ContactId).ToListAsync(ct);
+        var fromLists = listIds.Count > 0
+            ? await db.ContactListMembers
+                .Where(m => listIds.Contains(m.ContactListId) && m.IsActive)
+                .Select(m => m.ContactId).Distinct().ToListAsync(ct)
+            : new List<Guid>();
+        var contactIds = fromLists.Concat(individualIds).Distinct().ToList();
+
+        // Pull only the flags that drive the send-time gates for the distinct set.
+        var flags = contactIds.Count > 0
+            ? await db.Contacts
+                .Where(c => contactIds.Contains(c.Id))
+                .Select(c => new { c.HasOptedIn, c.IsOptedOut, c.IsWhatsAppValid })
+                .ToListAsync(ct)
+            : new();
+
+        var ov = campaign.OverrideConsentGate;
+        int noConsent = 0, optedOut = 0, invalid = 0, sendable = 0, noConsentOverridden = 0;
+
+        // Precedence must match CampaignBatchSendJob exactly: no-consent → opted-out → not-on-WhatsApp.
+        foreach (var f in flags)
+        {
+            if (!f.HasOptedIn && !ov) { noConsent++; continue; }
+            if (f.IsOptedOut) { optedOut++; continue; }
+            if (!f.IsWhatsAppValid) { invalid++; continue; }
+            sendable++;
+            if (!f.HasOptedIn) noConsentOverridden++; // sending without recorded consent (override on)
+        }
+
+        return new CampaignAudienceHealthResponse(
+            flags.Count, sendable, noConsent, optedOut, invalid, noConsentOverridden, ov);
+    }
+
     private async Task<int> EstimateRecipientCountAsync(Guid campaignId, CancellationToken ct)
     {
         var listIds = await db.CampaignContactLists

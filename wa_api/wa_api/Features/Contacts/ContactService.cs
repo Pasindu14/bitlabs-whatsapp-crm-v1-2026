@@ -66,6 +66,7 @@ public class ContactService(AppDbContext db) : IContactService
         var phone = NormalizePhone(request.Phone);
 
         // The query filter scopes this to the caller's company, so uniqueness is per-company.
+        // (phone is already validated by NormalizePhone below.)
         if (await db.Contacts.AnyAsync(c => c.Phone == phone, ct))
             throw new ConflictException("CONTACT_PHONE_DUPLICATE",
                 "A contact with this phone number already exists.");
@@ -157,9 +158,89 @@ public class ContactService(AppDbContext db) : IContactService
         return Map(contact);
     }
 
-    /// <summary>Digits only — strips '+', spaces and separators (e.g. "+94 77 123 4567" → "94771234567").</summary>
+    public async Task<ImportContactsResult> ImportAsync(ImportContactsRequest request, CancellationToken ct = default)
+    {
+        var skipped = new List<ImportSkippedRow>();
+        int duplicateInFile = 0, duplicateExisting = 0, invalid = 0;
+
+        // 1. Normalize + validate each row; drop invalids and in-file duplicates (first wins).
+        var seenInFile = new HashSet<string>(StringComparer.Ordinal);
+        var candidates = new List<(string Phone, string Name)>();
+        foreach (var row in request.Contacts)
+        {
+            if (!PhoneNumber.TryNormalize(row.Phone, out var phone))
+            {
+                invalid++;
+                skipped.Add(new ImportSkippedRow(row.Phone, "Invalid phone number (needs country code, E.164 format)."));
+                continue;
+            }
+            if (!seenInFile.Add(phone))
+            {
+                duplicateInFile++;
+                skipped.Add(new ImportSkippedRow(phone, "Duplicate within the imported list."));
+                continue;
+            }
+            candidates.Add((phone, string.IsNullOrWhiteSpace(row.Name) ? phone : row.Name.Trim()));
+        }
+
+        // 2. Drop numbers that already exist for this company (query filter scopes to the caller).
+        if (candidates.Count > 0)
+        {
+            var phones = candidates.Select(c => c.Phone).ToList();
+            var existing = await db.Contacts
+                .Where(c => phones.Contains(c.Phone))
+                .Select(c => c.Phone)
+                .ToListAsync(ct);
+            var existingSet = existing.ToHashSet(StringComparer.Ordinal);
+
+            var toInsert = new List<(string Phone, string Name)>();
+            foreach (var c in candidates)
+            {
+                if (existingSet.Contains(c.Phone))
+                {
+                    duplicateExisting++;
+                    skipped.Add(new ImportSkippedRow(c.Phone, "Already in your contacts."));
+                }
+                else
+                {
+                    toInsert.Add(c);
+                }
+            }
+
+            // 3. Insert the survivors. CompanyId is auto-stamped by the AuditInterceptor.
+            if (toInsert.Count > 0)
+            {
+                var now = DateTime.UtcNow;
+                db.Contacts.AddRange(toInsert.Select(c => new Contact
+                {
+                    Phone = c.Phone,
+                    Name = c.Name,
+                    HasOptedIn = request.MarkOptedIn,
+                    OptedInAt = request.MarkOptedIn ? now : null,
+                    ConsentSource = request.MarkOptedIn ? ConsentSource.Import : ConsentSource.None,
+                }));
+                await db.SaveChangesAsync(ct);
+            }
+
+            return new ImportContactsResult(
+                request.Contacts.Count, toInsert.Count, duplicateInFile, duplicateExisting, invalid, skipped);
+        }
+
+        return new ImportContactsResult(
+            request.Contacts.Count, 0, duplicateInFile, duplicateExisting, invalid, skipped);
+    }
+
+    /// <summary>Normalizes to E.164 digits-only and validates. Throws a field-level ValidationException
+    /// (surfaced as VALIDATION_FAILED on <c>phone</c>) when the number isn't a valid E.164 number.</summary>
     private static string NormalizePhone(string phone)
-        => new(phone.Where(char.IsDigit).ToArray());
+    {
+        if (!PhoneNumber.TryNormalize(phone, out var normalized))
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["phone"] = ["Enter a valid phone number in international format with country code (e.g. 971501234567)."]
+            });
+        return normalized;
+    }
 
     private static ContactResponse Map(Contact c)
         => new(c.Id, c.Phone, c.Name, c.IsActive, c.IsOptedOut, c.OptedOutAt, c.HasOptedIn, c.OptedInAt, c.ConsentSource, c.CreatedAt);

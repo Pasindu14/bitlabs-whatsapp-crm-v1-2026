@@ -7,6 +7,7 @@ import { useShallow } from "zustand/react/shallow";
  */
 interface ContactDialogState {
   isCreateOpen: boolean;
+  isImportOpen: boolean;
   isEditOpen: boolean;
   isActivateOpen: boolean;
   isDeactivateOpen: boolean;
@@ -14,6 +15,8 @@ interface ContactDialogState {
 
   openCreate: () => void;
   closeCreate: () => void;
+  openImport: () => void;
+  closeImport: () => void;
   openEdit: (id: string) => void;
   closeEdit: () => void;
   openActivate: (id: string) => void;
@@ -24,6 +27,7 @@ interface ContactDialogState {
 
 export const useContactDialogStore = create<ContactDialogState>((set) => ({
   isCreateOpen: false,
+  isImportOpen: false,
   isEditOpen: false,
   isActivateOpen: false,
   isDeactivateOpen: false,
@@ -31,6 +35,8 @@ export const useContactDialogStore = create<ContactDialogState>((set) => ({
 
   openCreate: () => set({ isCreateOpen: true }),
   closeCreate: () => set({ isCreateOpen: false }),
+  openImport: () => set({ isImportOpen: true }),
+  closeImport: () => set({ isImportOpen: false }),
   openEdit: (id) => set({ isEditOpen: true, selectedContactId: id }),
   closeEdit: () => set({ isEditOpen: false, selectedContactId: null }),
   openActivate: (id) => set({ isActivateOpen: true, selectedContactId: id }),
@@ -44,6 +50,11 @@ export const useContactDialogStore = create<ContactDialogState>((set) => ({
 export const useCreateContactDialog = () =>
   useContactDialogStore(
     useShallow((s) => ({ isOpen: s.isCreateOpen, open: s.openCreate, close: s.closeCreate }))
+  );
+
+export const useImportContactsDialog = () =>
+  useContactDialogStore(
+    useShallow((s) => ({ isOpen: s.isImportOpen, open: s.openImport, close: s.closeImport }))
   );
 
 export const useEditContactDialog = () =>

@@ -15,6 +15,10 @@ public interface IContactService
     /// <summary>Creates a contact. Throws on duplicate phone within the company.</summary>
     Task<ContactResponse> CreateAsync(CreateContactRequest request, CancellationToken ct = default);
 
+    /// <summary>Bulk-imports contacts: normalizes to E.164, validates, de-dupes (in-file + existing),
+    /// inserts the survivors, and returns a summary of what was imported vs skipped.</summary>
+    Task<ImportContactsResult> ImportAsync(ImportContactsRequest request, CancellationToken ct = default);
+
     /// <summary>Updates name/phone. Throws on duplicate phone (excluding self).</summary>
     Task<ContactResponse> UpdateAsync(Guid id, UpdateContactRequest request, CancellationToken ct = default);
 

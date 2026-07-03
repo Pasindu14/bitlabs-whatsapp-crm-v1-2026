@@ -25,6 +25,9 @@ public interface ICampaignService
 
     Task<CampaignStatsResponse> GetStatsAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Pre-send breakdown of the target audience (sendable / no-consent / opted-out / invalid).</summary>
+    Task<CampaignAudienceHealthResponse> GetAudienceHealthAsync(Guid id, CancellationToken ct = default);
+
     Task<(IReadOnlyList<CampaignRecipientResponse> Items, int Total)> GetRecipientsAsync(
         Guid id, int page, int pageSize, string? statusFilter, CancellationToken ct = default);
 

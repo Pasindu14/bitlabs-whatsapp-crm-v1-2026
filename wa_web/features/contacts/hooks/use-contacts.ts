@@ -15,6 +15,7 @@ import {
   getContactsAction,
   getContactByIdAction,
   createContactAction,
+  importContactsAction,
   updateContactAction,
   activateContactAction,
   deactivateContactAction,
@@ -29,7 +30,7 @@ import type {
   CreateContactInput,
   UpdateContactInput,
 } from "@/features/contacts/schema/contact-schema";
-import type { Contact } from "@/features/contacts/types";
+import type { Contact, ImportContactsInput } from "@/features/contacts/types";
 
 // ── DataTable source ─────────────────────────────────────────────────────
 // A useQuery hook (NOT a plain fn) so mutations can invalidate contacts.all and the
@@ -110,6 +111,25 @@ export function useCreateContact() {
   });
 
   return { ...mutation, fieldErrors, clearFieldErrors: () => setFieldErrors(null) };
+}
+
+export function useImportContacts() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: ImportContactsInput) => {
+      const res = await importContactsAction(data);
+      if (!res.success) throw res;
+      return res.data;
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: queryKeys.contacts.all });
+      if (result.imported > 0)
+        toast.success(`Imported ${result.imported} contact${result.imported === 1 ? "" : "s"}`);
+      else toast.info("No new contacts were imported");
+    },
+    onError: (error: ActionFailure) => handleErrorToast(error, "Contact", "import"),
+  });
 }
 
 export function useUpdateContact() {

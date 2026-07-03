@@ -1,7 +1,12 @@
 import client, { type ApiSuccessBody, createIdempotencyKey } from "@/lib/api/client";
 import { executeService } from "@/lib/services/wrapper";
 import type { PaginatedResponse } from "@/lib/types/actions";
-import type { Contact, ContactListParams } from "@/features/contacts/types";
+import type {
+  Contact,
+  ContactListParams,
+  ImportContactsInput,
+  ImportContactsResult,
+} from "@/features/contacts/types";
 import type {
   CreateContactInput,
   UpdateContactInput,
@@ -66,6 +71,20 @@ export const ContactService = {
         const res = await client.post<ApiSuccessBody<Contact>>("/api/v1/contacts", input, {
           headers: { "X-Idempotency-Key": createIdempotencyKey() },
         });
+        return res.data.data;
+      }
+    );
+  },
+
+  async import(input: ImportContactsInput): Promise<ImportContactsResult> {
+    return executeService(
+      { context: "ContactService", method: "import" },
+      async () => {
+        const res = await client.post<ApiSuccessBody<ImportContactsResult>>(
+          "/api/v1/contacts/import",
+          input,
+          { headers: { "X-Idempotency-Key": createIdempotencyKey() } }
+        );
         return res.data.data;
       }
     );

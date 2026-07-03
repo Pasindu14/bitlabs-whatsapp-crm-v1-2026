@@ -22,6 +22,7 @@ import {
   resumeCampaignAction,
   cancelCampaignAction,
   getCampaignStatsAction,
+  getCampaignAudienceHealthAction,
   getCampaignRecipientsAction,
   duplicateCampaignAction,
 } from "@/features/campaigns/actions/campaign-actions";
@@ -95,6 +96,18 @@ export function useCampaignStats(id: string | null) {
       if (!stats) return 4_000;
       return stats.queued > 0 ? 4_000 : false;
     },
+  });
+}
+
+export function useCampaignAudienceHealth(id: string | null) {
+  return useQuery({
+    queryKey: [...queryKeys.campaigns.detail(id ?? ""), "audience-health"] as const,
+    queryFn: async () => {
+      const res = await getCampaignAudienceHealthAction(id!);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    enabled: !!id,
   });
 }
 

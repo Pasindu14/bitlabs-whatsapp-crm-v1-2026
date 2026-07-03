@@ -52,6 +52,18 @@ export interface CampaignStats {
   readRate: number;
 }
 
+/** Pre-send audience breakdown (mirrors wa_api CampaignAudienceHealthResponse). Buckets are mutually
+ *  exclusive and sum to `total`, matching the send-time skip precedence. */
+export interface CampaignAudienceHealth {
+  total: number;
+  sendable: number;
+  noConsent: number;
+  optedOut: number;
+  invalid: number;
+  noConsentOverridden: number;
+  consentOverride: boolean;
+}
+
 export interface CampaignRecipient {
   id: string;
   contactId: string;

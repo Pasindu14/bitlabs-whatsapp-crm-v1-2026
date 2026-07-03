@@ -26,6 +26,7 @@ import {
 import {
   useCampaign,
   useCampaignStats,
+  useCampaignAudienceHealth,
   useCampaignRecipients,
 } from "@/features/campaigns/hooks/use-campaigns";
 import type { CampaignStatus } from "@/features/campaigns/types";
@@ -184,6 +185,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
 
   const { data: campaign } = useCampaign(campaignId);
   const { data: stats } = useCampaignStats(campaignId);
+  const { data: health } = useCampaignAudienceHealth(campaignId);
 
   // "Live" while recipients remain queued — drives polling for both stats and the recipient list.
   const isLive = stats ? stats.queued > 0 : false;
@@ -250,6 +252,49 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           </p>
         )}
       </div>
+
+      {/* Audience health — pre-send breakdown of who will actually be messaged */}
+      {health && health.total > 0 && (
+        <div className="rounded-2xl border p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Audience health</h2>
+            <span className="text-xs text-muted-foreground">
+              {health.total.toLocaleString()} targeted
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
+              <div className="text-xs text-muted-foreground">Will send</div>
+              <div className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-500">
+                {health.sendable.toLocaleString()}
+              </div>
+            </div>
+            <div className="rounded-lg border p-3">
+              <div className="text-xs text-muted-foreground">No consent</div>
+              <div className="mt-1 text-xl font-bold">{health.noConsent.toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border p-3">
+              <div className="text-xs text-muted-foreground">Opted out</div>
+              <div className="mt-1 text-xl font-bold">{health.optedOut.toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border p-3">
+              <div className="text-xs text-muted-foreground">Not on WhatsApp</div>
+              <div className="mt-1 text-xl font-bold">{health.invalid.toLocaleString()}</div>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {health.sendable.toLocaleString()} of {health.total.toLocaleString()} contacts will be
+            messaged; the rest are skipped (no opt-in, opted out, or not reachable on WhatsApp).
+            {health.noConsentOverridden > 0 && (
+              <span className="text-destructive">
+                {" "}
+                {health.noConsentOverridden.toLocaleString()} will be sent without recorded consent
+                (override on).
+              </span>
+            )}
+          </p>
+        </div>
+      )}
 
       {/* Progress + stats */}
       {stats && (

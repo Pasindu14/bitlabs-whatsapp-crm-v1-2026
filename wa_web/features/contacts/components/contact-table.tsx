@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/data-table/data-table";
 import type { Contact } from "@/features/contacts/types";
@@ -15,10 +15,12 @@ import {
 import { useSendMessageDialog } from "@/features/messages/store/message-store";
 import { getContactColumns } from "./columns";
 import { ContactDialogs } from "./contact-dialogs";
+import { ContactImportDialog } from "./contact-import-dialog";
 import { SendMessageDialog } from "@/features/messages/components/send-message-dialog";
 
 export function ContactTable() {
   const openCreate = useContactDialogStore((s) => s.openCreate);
+  const openImport = useContactDialogStore((s) => s.openImport);
   const { open: openEdit } = useEditContactDialog();
   const { open: openActivate } = useActivateContactDialog();
   const { open: openDeactivate } = useDeactivateContactDialog();
@@ -58,14 +60,21 @@ export function ContactTable() {
           headers: [],
         }}
         renderToolbarContent={() => (
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="mr-1 h-4 w-4" />
-            Add Contact
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={openImport}>
+              <Upload className="mr-1 h-4 w-4" />
+              Import
+            </Button>
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add Contact
+            </Button>
+          </div>
         )}
       />
 
       <ContactDialogs />
+      <ContactImportDialog />
       <SendMessageDialog />
     </>
   );

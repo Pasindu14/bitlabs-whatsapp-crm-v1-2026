@@ -49,6 +49,14 @@ public class ContactsController(IContactService service) : ControllerBase
         return StatusCode(StatusCodes.Status201Created, ResponseHelper.Created(result, CorrelationId));
     }
 
+    /// <summary>POST /api/v1/contacts/import — bulk import contacts (E.164 normalize + dedup).</summary>
+    [HttpPost("import")]
+    public async Task<IActionResult> Import(ImportContactsRequest request, CancellationToken ct)
+    {
+        var result = await service.ImportAsync(request, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
     /// <summary>PUT /api/v1/contacts/{id} — edit a contact.</summary>
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, UpdateContactRequest request, CancellationToken ct)

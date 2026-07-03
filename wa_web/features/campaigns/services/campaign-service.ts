@@ -6,6 +6,7 @@ import type {
   CampaignStats,
   CampaignRecipient,
   CampaignListParams,
+  CampaignAudienceHealth,
 } from "@/features/campaigns/types";
 import type {
   CreateCampaignInput,
@@ -134,6 +135,18 @@ export const CampaignService = {
       { context: "CampaignService", method: "getStats" },
       async () => {
         const res = await client.get<ApiSuccessBody<CampaignStats>>(`/api/v1/campaigns/${id}/stats`);
+        return res.data.data;
+      }
+    );
+  },
+
+  async getAudienceHealth(id: string): Promise<CampaignAudienceHealth> {
+    return executeService(
+      { context: "CampaignService", method: "getAudienceHealth" },
+      async () => {
+        const res = await client.get<ApiSuccessBody<CampaignAudienceHealth>>(
+          `/api/v1/campaigns/${id}/audience-health`
+        );
         return res.data.data;
       }
     );

@@ -66,6 +66,11 @@ export const getCampaignStatsAction = createAction(
   async (id: string) => CampaignService.getStats(id)
 );
 
+export const getCampaignAudienceHealthAction = createAction(
+  { name: "getCampaignAudienceHealthAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async (id: string) => CampaignService.getAudienceHealth(id)
+);
+
 export const getCampaignRecipientsAction = createAction(
   { name: "getCampaignRecipientsAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
   async (id: string, page: number, pageSize: number, status?: string) =>

@@ -6,7 +6,7 @@ import {
   createContactSchema,
   updateContactSchema,
 } from "@/features/contacts/schema/contact-schema";
-import type { ContactListParams } from "@/features/contacts/types";
+import type { ContactListParams, ImportContactsInput } from "@/features/contacts/types";
 
 // Contacts are owned by a company; only its CompanyAdmin manages them. The wrapper
 // enforces auth + role BEFORE the handler runs (defense-in-depth on top of the API's
@@ -32,6 +32,13 @@ export const createContactAction = createAction(
   async (raw: unknown) => {
     const input = createContactSchema.parse(raw);
     return ContactService.create(input);
+  }
+);
+
+export const importContactsAction = createAction(
+  { name: "importContactsAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async (input: ImportContactsInput) => {
+    return ContactService.import(input);
   }
 );
 

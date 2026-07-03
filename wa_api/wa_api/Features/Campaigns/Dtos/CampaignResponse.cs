@@ -56,3 +56,24 @@ public record CampaignRecipientResponse(
     Guid? MessageId,
     DateTime CreatedAt
 );
+
+/// <summary>
+/// Pre-send breakdown of a campaign's target audience, mirroring the send-time skip precedence
+/// (no-consent → opted-out → not-on-WhatsApp). Buckets are mutually exclusive and sum to Total, so the
+/// operator sees exactly how many messages will actually go out before launching.
+/// </summary>
+public record CampaignAudienceHealthResponse(
+    int Total,
+    /// <summary>Will actually be sent given the campaign's consent-override setting.</summary>
+    int Sendable,
+    /// <summary>Skipped: no recorded opt-in (0 when the consent override is on).</summary>
+    int NoConsent,
+    /// <summary>Skipped: opted out (STOP) — a hard suppression the override never bypasses.</summary>
+    int OptedOut,
+    /// <summary>Skipped: a prior send proved the number isn't on WhatsApp (131026).</summary>
+    int Invalid,
+    /// <summary>Subset of Sendable that has no recorded consent but will send because the override is on.</summary>
+    int NoConsentOverridden,
+    /// <summary>Whether the campaign's consent override is enabled.</summary>
+    bool ConsentOverride
+);
