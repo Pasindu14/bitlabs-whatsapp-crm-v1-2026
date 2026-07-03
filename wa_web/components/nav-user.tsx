@@ -1,6 +1,8 @@
 "use client";
-import { ChevronsUpDown, LogOut } from "lucide-react";
+import { useState } from "react";
+import { ChevronsUpDown, KeyRound, LogOut } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import { ChangePasswordDialog } from "@/features/account/components/change-password-dialog";
 import {
   Avatar,
   AvatarFallback,
@@ -23,6 +25,7 @@ import {
 export function NavUser() {
   const { data: session } = useSession();
   const { isMobile } = useSidebar();
+  const [changeOpen, setChangeOpen] = useState(false);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/sign-in" });
@@ -80,6 +83,11 @@ export function NavUser() {
 
             <DropdownMenuSeparator />
 
+            <DropdownMenuItem onClick={() => setChangeOpen(true)}>
+              <KeyRound />
+              Change password
+            </DropdownMenuItem>
+
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
               Log out
@@ -87,6 +95,8 @@ export function NavUser() {
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+
+      <ChangePasswordDialog open={changeOpen} onOpenChange={setChangeOpen} />
     </SidebarMenu>
   );
 }

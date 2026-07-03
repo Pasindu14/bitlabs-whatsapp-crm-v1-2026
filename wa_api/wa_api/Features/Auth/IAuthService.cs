@@ -15,4 +15,10 @@ public interface IAuthService
 
     /// <summary>Loads the current user by id (from the token's "sub" claim).</summary>
     Task<CurrentUserResponse> GetCurrentUserAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Self-service password change for the authenticated user: verifies the current password,
+    /// then replaces it with a freshly hashed new one. Throws if the current password is wrong.
+    /// </summary>
+    Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default);
 }

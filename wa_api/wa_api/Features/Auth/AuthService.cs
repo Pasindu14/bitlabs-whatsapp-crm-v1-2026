@@ -81,6 +81,23 @@ public class AuthService(AppDbContext db, IJwtTokenService tokenService, IOption
         return Map(user);
     }
 
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default)
+    {
+        var user = await db.Users
+            .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive, ct)
+            ?? throw new InvalidTokenException();
+
+        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            throw new AuthenticationException("AUTH_INVALID_CREDENTIALS", "Current password is incorrect.");
+
+        if (BCrypt.Net.BCrypt.Verify(request.NewPassword, user.PasswordHash))
+            throw new BusinessRuleException("PASSWORD_UNCHANGED",
+                "New password must be different from the current password.");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        await db.SaveChangesAsync(ct);
+    }
+
     private RefreshToken CreateRefreshTokenEntity(Guid userId) => new()
     {
         Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),

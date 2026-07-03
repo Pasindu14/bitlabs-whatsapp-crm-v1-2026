@@ -55,6 +55,18 @@ public class AuthController(IAuthService authService) : ControllerBase
         return Ok(ResponseHelper.Ok(new { loggedOut = true }, CorrelationId));
     }
 
+    /// <summary>
+    /// POST /api/v1/auth/change-password — the signed-in user changes their own password.
+    /// Requires the current password; the account is taken from the token, never the body.
+    /// </summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken ct)
+    {
+        await authService.ChangePasswordAsync(GetUserId(), request, ct);
+        return Ok(ResponseHelper.Ok(new { changed = true }, CorrelationId));
+    }
+
     private Guid GetUserId()
     {
         var sub = User.FindFirst("sub")?.Value;
