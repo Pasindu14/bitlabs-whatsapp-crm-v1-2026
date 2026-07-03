@@ -2,11 +2,18 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -72,16 +79,79 @@ const ERROR_LABELS: Record<string, string> = {
   "131056": "Rate limited to this number — will retry",
 };
 
-// Longer explanation shown on hover, so a raw code always has context for support.
-const ERROR_HINTS: Record<string, string> = {
-  "131049":
-    "WhatsApp error 131049: Meta declined delivery to keep marketing message frequency healthy for this recipient. Not a fault with your number — usually clears on its own; try again later.",
-  "131048": "WhatsApp error 131048: sending flagged as spam. Review message quality before resending.",
-  "131026": "WhatsApp error 131026: this number is not a reachable WhatsApp user.",
-  "131031": "WhatsApp error 131031: Meta has suspended this WhatsApp account.",
-  "368": "WhatsApp error 368: Meta has placed a restriction on this account.",
-  "130429": "WhatsApp error 130429: too many messages too fast. Transient — the system backs off and retries.",
-  "131056": "WhatsApp error 131056: too many messages to this one number. Transient — retried automatically.",
+// Plain-language explanation shown in the info popover, so a non-technical user understands what
+// happened and what (if anything) they should do — instead of a bare code.
+type ErrorDetail = { meaning: string; action: string };
+const ERROR_DETAILS: Record<string, ErrorDetail> = {
+  "131049": {
+    meaning:
+      "WhatsApp didn't deliver this marketing message because the recipient has already hit their limit of marketing messages recently. WhatsApp sets this limit per person — counting messages from all businesses, not just yours — to reduce spam.",
+    action:
+      "Nothing is wrong with your number, and you were not charged for it. Try again in a day or two, and avoid sending this contact many marketing messages close together.",
+  },
+  "131048": {
+    meaning:
+      "WhatsApp blocked this message because your number's recent sending was flagged as spam-like. This is a quality signal on your account.",
+    action:
+      "Slow down, message only contacts who expect to hear from you, and review your template content before resending.",
+  },
+  "131026": {
+    meaning:
+      "This number can't receive the message — it isn't a WhatsApp user, or the number is invalid.",
+    action:
+      "No action needed. The contact is automatically marked so future campaigns skip it.",
+  },
+  "131031": {
+    meaning: "Meta has suspended your WhatsApp Business account, so no messages can be sent.",
+    action:
+      "Open Meta Business Suite / WhatsApp Manager to see the reason and resolve the suspension. Sending stays blocked until it's lifted.",
+  },
+  "368": {
+    meaning: "Meta has placed a temporary restriction on your WhatsApp account.",
+    action:
+      "Check WhatsApp Manager for the restriction details. Sending resumes once Meta lifts it.",
+  },
+  "130429": {
+    meaning: "Messages were sent too fast and WhatsApp asked us to slow down. The message itself wasn't rejected.",
+    action: "No action needed — the system automatically backs off and retries.",
+  },
+  "131056": {
+    meaning:
+      "Too many messages were sent to this one number in a short time, so WhatsApp throttled it. The message wasn't rejected.",
+    action: "No action needed — the system automatically retries after a short delay.",
+  },
+  // Engine (our own) reasons
+  NO_CONSENT: {
+    meaning:
+      "This contact has no recorded opt-in, and the campaign's consent override was off, so we didn't send to them.",
+    action:
+      "Collect opt-in from the contact, or enable the consent override on the campaign if you have proof of consent on file.",
+  },
+  OPT_OUT: {
+    meaning: "This contact has opted out of your messages, so they are never sent to.",
+    action: "No action needed — opted-out contacts are always skipped to keep you compliant.",
+  },
+  NOT_ON_WHATSAPP: {
+    meaning: "This number isn't reachable on WhatsApp.",
+    action: "No action needed — the contact is marked so future campaigns skip it.",
+  },
+  HEADER_MEDIA_MISSING: {
+    meaning:
+      "The template's header image/video/document couldn't be attached at send time, so the message failed.",
+    action: "Re-upload the header media on the template, then resend.",
+  },
+  SEND_FAILED: {
+    meaning: "WhatsApp rejected the send for a reason we couldn't map to a specific cause.",
+    action: "Try resending. If it keeps failing, check the template and the contact's number.",
+  },
+  JOB_ERROR: {
+    meaning: "An unexpected internal error happened while sending to this contact.",
+    action: "Try resending. If it persists, contact support with the campaign link.",
+  },
+  CAMPAIGN_FAILED: {
+    meaning: "The campaign was stopped before this contact could be sent to.",
+    action: "Review why the campaign stopped, then relaunch.",
+  },
 };
 
 function errorLabel(code: string | null): string {
@@ -91,9 +161,14 @@ function errorLabel(code: string | null): string {
   return /^\d+$/.test(code) ? `WhatsApp error ${code}` : code;
 }
 
-function errorHint(code: string | null): string | undefined {
-  if (!code) return undefined;
-  return ERROR_HINTS[code] ?? `Meta Cloud API error code ${code}.`;
+function errorDetail(code: string | null): ErrorDetail {
+  if (code && ERROR_DETAILS[code]) return ERROR_DETAILS[code];
+  return {
+    meaning: /^\d+$/.test(code ?? "")
+      ? `WhatsApp reported error code ${code} for this contact.`
+      : "This message couldn't be delivered to this contact.",
+    action: "Try resending. If it keeps failing, contact support and share this campaign link.",
+  };
 }
 
 const dateTimeFmt = new Intl.DateTimeFormat(undefined, {
@@ -278,10 +353,44 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {r.errorCode ? (
-                        // An actual delivery/send failure — show the real reason, not the consent note.
-                        <span className="text-destructive" title={errorHint(r.errorCode)}>
-                          {errorLabel(r.errorCode)}
-                        </span>
+                        // An actual delivery/send failure — show the real reason plus a plain-language
+                        // explanation the user can read, instead of a bare code.
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-destructive">{errorLabel(r.errorCode)}</span>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="text-muted-foreground/70 transition-colors hover:text-foreground"
+                                aria-label="Why did this fail?"
+                              >
+                                <Info className="size-3.5" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="start" className="w-80 gap-3">
+                              <PopoverHeader>
+                                <PopoverTitle>{errorLabel(r.errorCode)}</PopoverTitle>
+                              </PopoverHeader>
+                              <div className="space-y-3">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-foreground">Why this happened</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {errorDetail(r.errorCode).meaning}
+                                  </p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-foreground">What to do</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {errorDetail(r.errorCode).action}
+                                  </p>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground/60">
+                                {/^\d+$/.test(r.errorCode) ? `WhatsApp error code ${r.errorCode}` : `Code: ${r.errorCode}`}
+                              </p>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       ) : r.sentWithoutConsent ? (
                         // Sent successfully, but without recorded opt-in — audit annotation only.
                         <span className="text-amber-600 dark:text-amber-500" title="Sent despite no recorded opt-in">
