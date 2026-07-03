@@ -2,6 +2,7 @@
 
 import { Check, CheckCheck, Clock, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { renderWhatsAppText } from "@/lib/whatsapp-text";
 import type { ConversationMessage, MessageStatus } from "@/features/conversations/types";
 import { formatMessageTime } from "./format";
 
@@ -35,7 +36,7 @@ export function MessageBubble({ message }: { message: ConversationMessage }) {
           failed && "ring-1 ring-destructive/40",
         )}
       >
-        <p className="whitespace-pre-wrap break-words">{message.body}</p>
+        <p className="whitespace-pre-wrap break-words">{renderWhatsAppText(message.body)}</p>
 
         {failed && message.errorMessage && (
           <p className="mt-1 text-[11px] text-primary-foreground/80">{message.errorMessage}</p>

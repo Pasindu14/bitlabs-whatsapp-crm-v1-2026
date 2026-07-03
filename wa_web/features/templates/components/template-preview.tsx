@@ -2,6 +2,7 @@
 
 import { FileText, Image as ImageIcon, ExternalLink, Phone, Copy, CornerUpLeft } from "lucide-react";
 import type { BuilderFormValues } from "@/features/templates/schema/template-schema";
+import { renderWhatsAppText } from "@/lib/whatsapp-text";
 
 function fill(text: string, examples: string[]): string {
   return text.replace(/\{\{(\d+)\}\}/g, (_, n) => examples[Number(n) - 1] || `{{${n}}}`);
@@ -46,7 +47,7 @@ export function TemplatePreview({ values }: { values: BuilderFormValues }) {
           {/* Body */}
           {hasBody ? (
             <p className="whitespace-pre-wrap break-words text-sm text-zinc-800 dark:text-zinc-100">
-              {fill(values.body, bodyExamples)}
+              {renderWhatsAppText(fill(values.body, bodyExamples))}
             </p>
           ) : (
             <p className="text-sm italic text-zinc-400">Your message body appears here…</p>
