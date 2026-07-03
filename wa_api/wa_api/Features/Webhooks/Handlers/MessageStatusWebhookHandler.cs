@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Campaigns.Entities;
 using wa_api.Features.Messages;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.Webhooks.Payloads;
 using wa_api.Infrastructure.Persistence;
 
@@ -32,6 +33,10 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
         // Collect (messageId → new status) for campaign messages so we can sync recipients in one pass.
         var campaignMessageUpdates = new Dictionary<Guid, (MessageStatus Status, string? ErrorCode)>();
 
+        // Accumulate quota to credit back per company: a message metered on accept that now fails/undelivered
+        // must be refunded (Meta doesn't bill undelivered messages). Applied once, atomically, at the end.
+        var refundsByCompany = new Dictionary<Guid, int>();
+
         foreach (var s in ctx.Change.Value!.Statuses!)
         {
             if (string.IsNullOrWhiteSpace(s.Id) || string.IsNullOrWhiteSpace(s.Status))
@@ -57,6 +62,15 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
 
             if (string.Equals(s.Status, "failed", StringComparison.OrdinalIgnoreCase))
             {
+                // Idempotent: Meta re-delivers callbacks. If this message is already Failed, do nothing —
+                // don't re-stamp and (crucially) don't refund a second time.
+                if (message.Status == MessageStatus.Failed)
+                    continue;
+
+                // Was this message metered? It's consumed on accept (created as Sent), so any message that
+                // is currently Sent/Delivered/Read drew down the quota and must be credited back now.
+                var wasCounted = message.Status is MessageStatus.Sent or MessageStatus.Delivered or MessageStatus.Read;
+
                 var err = s.Errors?.FirstOrDefault();
                 message.Status = MessageStatus.Failed;
                 message.ErrorCode = err?.Code?.ToString(CultureInfo.InvariantCulture);
@@ -68,6 +82,9 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
                 // it usually arrives here (async status webhook) rather than on the original send response.
                 if (MetaPolicyErrorCodes.IsUndeliverableRecipient(message.ErrorCode))
                     await MarkContactNotOnWhatsAppAsync(message.ContactId, ct);
+
+                if (wasCounted)
+                    refundsByCompany[message.CompanyId] = refundsByCompany.GetValueOrDefault(message.CompanyId) + 1;
 
                 if (message.CampaignId.HasValue)
                     campaignMessageUpdates[message.Id] = (MessageStatus.Failed, message.ErrorCode);
@@ -96,6 +113,38 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
         // Pass in-memory status so we don't re-read stale DB values.
         if (campaignMessageUpdates.Count > 0)
             await SyncCampaignRecipientsAsync(campaignMessageUpdates, ct);
+
+        // Credit failed/undelivered messages back to quota.
+        if (refundsByCompany.Count > 0)
+            await RefundQuotaAsync(refundsByCompany, ct);
+    }
+
+    /// <summary>
+    /// Credits failed/undelivered messages back to each company's active-subscription usage counter.
+    /// Uses a TRACKED update (not the ExecuteUpdate meter) on purpose: the change is flushed by the
+    /// dispatcher's single SaveChanges, in the SAME transaction as the message's Failed status. That makes
+    /// the refund exactly-once — a webhook retry sees the message already Failed and skips it (guard above),
+    /// and a failed batch commits nothing, so nothing is double-refunded. Floored at 0. Webhook scope has no
+    /// tenant context, so subscriptions are read across tenants with IgnoreQueryFilters.
+    /// </summary>
+    private async Task RefundQuotaAsync(Dictionary<Guid, int> refundsByCompany, CancellationToken ct)
+    {
+        foreach (var (companyId, count) in refundsByCompany)
+        {
+            if (count <= 0)
+                continue;
+
+            var sub = await db.Subscriptions
+                .IgnoreQueryFilters()
+                .Where(s => s.CompanyId == companyId && s.Status == SubscriptionStatus.Active)
+                .OrderByDescending(s => s.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (sub is null)
+                continue;
+
+            sub.MessagesUsedThisPeriod = Math.Max(0, sub.MessagesUsedThisPeriod - count);
+        }
     }
 
     private async Task SyncCampaignRecipientsAsync(
