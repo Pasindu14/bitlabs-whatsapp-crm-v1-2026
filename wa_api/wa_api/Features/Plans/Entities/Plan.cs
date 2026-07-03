@@ -27,7 +27,7 @@ public class Plan : BaseEntity
     public decimal Price { get; set; }
 
     /// <summary>ISO 4217 currency code for <see cref="Price"/>.</summary>
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "AED";
 
     /// <summary>
     /// Capability keys (from <see cref="Auth.Permission"/>) this plan unlocks. Stored as a
@@ -41,4 +41,11 @@ public class Plan : BaseEntity
     /// plans (assigned by SuperAdmin without Stripe). Required for <c>POST /my-subscription/checkout</c>.
     /// </summary>
     public string? StripePriceId { get; set; }
+
+    /// <summary>
+    /// Whether this plan is offered for self-service online payment. Surfaced to customers on the
+    /// online-payment/checkout flow once that is configured; until then it is SuperAdmin-only metadata.
+    /// Defaults to <c>false</c>.
+    /// </summary>
+    public bool IsOnline { get; set; }
 }

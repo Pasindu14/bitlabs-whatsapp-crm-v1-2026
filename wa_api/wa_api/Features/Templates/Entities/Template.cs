@@ -67,6 +67,10 @@ public class Template : BaseEntity, ITenantEntity
     /// <summary>UTC timestamp the template was submitted to Meta.</summary>
     public DateTime? SubmittedAt { get; set; }
 
+    /// <summary>UTC timestamp the template was first approved by Meta. Stamped once, on the
+    /// transition into <see cref="TemplateStatus.Approved"/> (never overwritten on re-approval).</summary>
+    public DateTime? ApprovedAt { get; set; }
+
     /// <summary>UTC timestamp of the last Meta status poll.</summary>
     public DateTime? LastSyncedAt { get; set; }
 

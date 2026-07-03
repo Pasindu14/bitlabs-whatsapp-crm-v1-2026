@@ -44,8 +44,9 @@ export function PlanForm({
       name: "",
       monthlyMessageQuota: 0,
       price: 0,
-      currency: "USD",
+      currency: "AED",
       featureFlags: [],
+      isOnline: false,
       ...defaultValues,
     },
   });
@@ -99,7 +100,7 @@ export function PlanForm({
 
       <div className="space-y-2">
         <Label htmlFor="currency">Currency</Label>
-        <Input id="currency" maxLength={3} placeholder="USD" {...register("currency")} />
+        <Input id="currency" maxLength={3} placeholder="AED" {...register("currency")} />
         {errors.currency && (
           <p className="text-xs text-destructive">{errors.currency.message}</p>
         )}
@@ -147,6 +148,27 @@ export function PlanForm({
           </p>
         )}
       </div>
+
+      <Controller
+        control={control}
+        name="isOnline"
+        render={({ field }) => (
+          <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+            <Checkbox
+              className="mt-0.5"
+              checked={field.value ?? false}
+              onCheckedChange={(c) => field.onChange(c === true)}
+            />
+            <div className="space-y-1">
+              <div className="text-sm font-medium">Available for online payment</div>
+              <p className="text-xs text-muted-foreground">
+                Offer this plan for self-service online payment. It becomes visible on the checkout
+                flow once online payments are configured.
+              </p>
+            </div>
+          </label>
+        )}
+      />
 
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (

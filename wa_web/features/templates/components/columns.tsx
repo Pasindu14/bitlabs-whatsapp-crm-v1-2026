@@ -14,7 +14,13 @@ import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import { TemplateStatusBadge } from "./template-status-badge";
 import type { TemplateRow } from "@/features/templates/types";
 
-const dateFmt = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+const dateTimeFmt = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 export interface TemplateColumnActions {
   onOpen: (id: string) => void;
@@ -72,9 +78,23 @@ export function getTemplateColumns(actions: TemplateColumnActions): ColumnDef<Te
       accessorKey: "createdAt",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Created" />,
       cell: ({ row }) => (
-        <span className="text-muted-foreground">{dateFmt.format(new Date(row.original.createdAt))}</span>
+        <span className="text-muted-foreground">{dateTimeFmt.format(new Date(row.original.createdAt))}</span>
       ),
-      size: 130,
+      size: 170,
+    },
+    {
+      accessorKey: "approvedAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Approved" />,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const approvedAt = row.original.approvedAt;
+        return (
+          <span className="text-muted-foreground">
+            {approvedAt ? dateTimeFmt.format(new Date(approvedAt)) : "—"}
+          </span>
+        );
+      },
+      size: 170,
     },
     {
       id: "actions",

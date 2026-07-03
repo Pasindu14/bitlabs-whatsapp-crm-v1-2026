@@ -27,6 +27,9 @@ export const createPlanSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   featureFlags: z.array(z.enum(PERMISSION_KEYS)).default([]),
+  // Marks the plan as available for self-service online payment. Shown on the checkout
+  // flow once online payments are configured; SuperAdmin-only metadata until then.
+  isOnline: z.boolean().default(false),
 });
 
 /** Update schema is identical to create. */

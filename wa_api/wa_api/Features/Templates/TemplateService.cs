@@ -408,6 +408,6 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
         => new(
             t.Id, t.WabaConnectionId, displayPhoneNumber, t.WabaId,
             t.Name, t.Language, t.Category, t.ParameterFormat, t.Components,
-            t.Status, t.MetaTemplateId, t.RejectionReason, t.SubmittedAt, t.LastSyncedAt,
+            t.Status, t.MetaTemplateId, t.RejectionReason, t.SubmittedAt, t.ApprovedAt, t.LastSyncedAt,
             t.IsActive, t.CreatedAt);
 }

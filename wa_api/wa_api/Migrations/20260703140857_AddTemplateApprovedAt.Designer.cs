@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using wa_api.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using wa_api.Infrastructure.Persistence;
 namespace wa_api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260703140857_AddTemplateApprovedAt")]
+    partial class AddTemplateApprovedAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -991,9 +994,6 @@ namespace wa_api.Migrations
                         .HasDefaultValueSql("'{}'::text[]");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsOnline")
                         .HasColumnType("boolean");
 
                     b.Property<int>("MonthlyMessageQuota")

@@ -83,7 +83,7 @@ export function CampaignForm({
         ? toLocalDatetimeInput(defaultValues.scheduledAt)
         : null,
       recurrenceCron: defaultValues?.recurrenceCron ?? null,
-      overrideConsentGate: defaultValues?.overrideConsentGate ?? false,
+      overrideConsentGate: defaultValues?.overrideConsentGate ?? true,
     },
   });
 

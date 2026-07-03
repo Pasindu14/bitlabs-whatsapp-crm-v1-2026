@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Send, Pause, Play, XCircle, Copy, Trash2, Users, BarChart3 } from "lucide-react";
+import { MoreHorizontal, Send, Pause, Play, XCircle, Copy, Trash2, Users, BarChart3, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -204,7 +204,10 @@ export function getCampaignColumns(actions: CampaignColumnActions): ColumnDef<Ca
                 Quick stats
               </DropdownMenuItem>
               {isDraft && (
-                <DropdownMenuItem onClick={() => openEdit(c.id)}>Edit</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openEdit(c.id)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={() => duplicate(c.id)}>
                 <Copy className="mr-2 h-4 w-4" />

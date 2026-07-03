@@ -70,6 +70,7 @@ export interface Template {
   metaTemplateId?: string | null;
   rejectionReason?: string | null;
   submittedAt?: string | null;
+  approvedAt?: string | null;
   lastSyncedAt?: string | null;
   isActive: boolean;
   createdAt: string;
@@ -86,6 +87,7 @@ export interface TemplateRow {
   rejectionReason: string | null;
   isActive: boolean;
   createdAt: string;
+  approvedAt: string | null;
   // Index signature required by the @data-table ExportableData constraint.
   [key: string]: string | number | boolean | null | undefined;
 }
@@ -119,5 +121,6 @@ export function toTemplateRow(t: Template): TemplateRow {
     rejectionReason: t.rejectionReason ?? null,
     isActive: t.isActive,
     createdAt: t.createdAt,
+    approvedAt: t.approvedAt ?? null,
   };
 }

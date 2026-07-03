@@ -105,6 +105,7 @@ function EditPlanDialog() {
                     price: plan.price,
                     currency: plan.currency,
                     featureFlags: plan.featureFlags as PermissionKey[],
+                    isOnline: plan.isOnline,
                   }
                 : undefined
             }

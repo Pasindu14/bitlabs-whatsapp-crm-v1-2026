@@ -20,12 +20,16 @@ public static class TemplateStatusMapper
     };
 
     /// <summary>Applies a polled status onto the template: maps status, captures/clears the
-    /// rejection reason, and stamps <c>LastSyncedAt</c>.</summary>
+    /// rejection reason, stamps <c>ApprovedAt</c> on first approval, and stamps <c>LastSyncedAt</c>.</summary>
     public static void Apply(Template t, MetaTemplateStatus status, DateTime now)
     {
         if (Parse(status.Status) is { } mapped)
             t.Status = mapped;
         t.RejectionReason = t.Status == TemplateStatus.Rejected ? status.RejectionReason : null;
+        // Record when Meta first approved it. Set once and never overwritten, so a later
+        // Paused→Approved cycle keeps the original approval time.
+        if (t.Status == TemplateStatus.Approved && t.ApprovedAt is null)
+            t.ApprovedAt = now;
         t.LastSyncedAt = now;
     }
 }

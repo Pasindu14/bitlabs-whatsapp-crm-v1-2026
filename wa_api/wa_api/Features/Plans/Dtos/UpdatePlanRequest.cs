@@ -8,5 +8,6 @@ public record UpdatePlanRequest(
     [Range(0, int.MaxValue)] int MonthlyMessageQuota,
     [Range(0, 1_000_000)] decimal Price,
     [StringLength(3, MinimumLength = 3)] string? Currency,
-    IReadOnlyList<string>? FeatureFlags
+    IReadOnlyList<string>? FeatureFlags,
+    bool IsOnline = false
 );

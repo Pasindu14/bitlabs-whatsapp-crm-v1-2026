@@ -6,6 +6,7 @@ export interface Plan {
   price: number;
   currency: string;
   featureFlags: string[];
+  isOnline: boolean;
   isActive: boolean;
   createdAt: string;
   // Index signature required by the @data-table ExportableData constraint.

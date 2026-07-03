@@ -97,6 +97,18 @@ export function getPlanColumns(actions: PlanColumnActions): ColumnDef<Plan>[] {
       size: 240,
     },
     {
+      accessorKey: "isOnline",
+      header: "Online",
+      enableSorting: false,
+      cell: ({ row }) =>
+        row.original.isOnline ? (
+          <Badge variant="default">Online</Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      size: 110,
+    },
+    {
       accessorKey: "isActive",
       header: "Active",
       enableSorting: false,

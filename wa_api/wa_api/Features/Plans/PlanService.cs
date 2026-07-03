@@ -65,6 +65,7 @@ public class PlanService(AppDbContext db) : IPlanService
             Price = request.Price,
             Currency = NormalizeCurrency(request.Currency),
             FeatureFlags = flags,
+            IsOnline = request.IsOnline,
         };
         db.Plans.Add(plan);
         await db.SaveChangesAsync(ct);
@@ -89,6 +90,7 @@ public class PlanService(AppDbContext db) : IPlanService
         plan.Price = request.Price;
         plan.Currency = NormalizeCurrency(request.Currency);
         plan.FeatureFlags = flags;
+        plan.IsOnline = request.IsOnline;
 
         await db.SaveChangesAsync(ct);
 
@@ -137,8 +139,8 @@ public class PlanService(AppDbContext db) : IPlanService
     }
 
     private static string NormalizeCurrency(string? currency)
-        => string.IsNullOrWhiteSpace(currency) ? "USD" : currency.Trim().ToUpperInvariant();
+        => string.IsNullOrWhiteSpace(currency) ? "AED" : currency.Trim().ToUpperInvariant();
 
     private static PlanResponse Map(Plan p)
-        => new(p.Id, p.Name, p.MonthlyMessageQuota, p.Price, p.Currency, p.FeatureFlags, p.IsActive, p.CreatedAt);
+        => new(p.Id, p.Name, p.MonthlyMessageQuota, p.Price, p.Currency, p.FeatureFlags, p.IsOnline, p.IsActive, p.CreatedAt);
 }

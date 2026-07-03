@@ -17,6 +17,7 @@ public record TemplateResponse(
     string? MetaTemplateId,
     string? RejectionReason,
     DateTime? SubmittedAt,
+    DateTime? ApprovedAt,
     DateTime? LastSyncedAt,
     bool IsActive,
     DateTime CreatedAt

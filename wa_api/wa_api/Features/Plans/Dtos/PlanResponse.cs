@@ -8,6 +8,7 @@ public record PlanResponse(
     decimal Price,
     string Currency,
     IReadOnlyList<string> FeatureFlags,
+    bool IsOnline,
     bool IsActive,
     DateTime CreatedAt
 );
