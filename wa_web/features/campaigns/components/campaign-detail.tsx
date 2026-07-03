@@ -50,19 +50,50 @@ const RECIPIENT_STATUS_VARIANT: Record<
   Skipped: "secondary",
 };
 
-// Human labels for the engine's own skip/fail codes; anything else (a raw Meta code) is shown as-is.
+// Human labels for the engine's own skip/fail codes AND the Meta Cloud API policy codes we know
+// about (mirrors wa_api MetaPolicyErrorCodes). Anything unmapped falls back to the raw code.
+// https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes
 const ERROR_LABELS: Record<string, string> = {
+  // Engine (our own) codes
   NOT_ON_WHATSAPP: "Not on WhatsApp",
   OPT_OUT: "Opted out",
   NO_CONSENT: "No consent",
   SEND_FAILED: "Send failed",
   JOB_ERROR: "Internal error",
   CAMPAIGN_FAILED: "Campaign failed",
+  HEADER_MEDIA_MISSING: "Template media missing",
+  // Meta Cloud API codes
+  "131049": "Not delivered — WhatsApp frequency cap",
+  "131048": "Blocked — spam rate limit",
+  "131026": "Undeliverable — not a WhatsApp user",
+  "131031": "Account suspended by Meta",
+  "368": "Account restricted by Meta",
+  "130429": "Rate limited — will retry",
+  "131056": "Rate limited to this number — will retry",
+};
+
+// Longer explanation shown on hover, so a raw code always has context for support.
+const ERROR_HINTS: Record<string, string> = {
+  "131049":
+    "WhatsApp error 131049: Meta declined delivery to keep marketing message frequency healthy for this recipient. Not a fault with your number — usually clears on its own; try again later.",
+  "131048": "WhatsApp error 131048: sending flagged as spam. Review message quality before resending.",
+  "131026": "WhatsApp error 131026: this number is not a reachable WhatsApp user.",
+  "131031": "WhatsApp error 131031: Meta has suspended this WhatsApp account.",
+  "368": "WhatsApp error 368: Meta has placed a restriction on this account.",
+  "130429": "WhatsApp error 130429: too many messages too fast. Transient — the system backs off and retries.",
+  "131056": "WhatsApp error 131056: too many messages to this one number. Transient — retried automatically.",
 };
 
 function errorLabel(code: string | null): string {
   if (!code) return "—";
-  return ERROR_LABELS[code] ?? code;
+  if (ERROR_LABELS[code]) return ERROR_LABELS[code];
+  // Numeric = an unmapped raw Meta code; non-numeric = an unmapped engine code (show as-is).
+  return /^\d+$/.test(code) ? `WhatsApp error ${code}` : code;
+}
+
+function errorHint(code: string | null): string | undefined {
+  if (!code) return undefined;
+  return ERROR_HINTS[code] ?? `Meta Cloud API error code ${code}.`;
 }
 
 const dateTimeFmt = new Intl.DateTimeFormat(undefined, {
@@ -246,12 +277,18 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {r.sentWithoutConsent ? (
-                        <span className="text-destructive" title="Sent despite no recorded opt-in">
+                      {r.errorCode ? (
+                        // An actual delivery/send failure — show the real reason, not the consent note.
+                        <span className="text-destructive" title={errorHint(r.errorCode)}>
+                          {errorLabel(r.errorCode)}
+                        </span>
+                      ) : r.sentWithoutConsent ? (
+                        // Sent successfully, but without recorded opt-in — audit annotation only.
+                        <span className="text-amber-600 dark:text-amber-500" title="Sent despite no recorded opt-in">
                           No consent (sent)
                         </span>
                       ) : (
-                        errorLabel(r.errorCode)
+                        "—"
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
