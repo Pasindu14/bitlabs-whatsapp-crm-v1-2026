@@ -65,6 +65,34 @@ public class CampaignBatchSendJob(
             return;
         }
 
+        // UAE quiet-hours gate: business-initiated sends are only permitted 08:00–20:00 Asia/Dubai.
+        // If we're outside the window, defer the whole batch to the next 08:00 UAE and return —
+        // recipients stay Queued so the resumed run continues exactly where this one stopped (no
+        // double-send). Same graceful shape as the throttle/daily-tier reschedule paths. This is the
+        // guarantee that a long send started before 20:00 never spills past it: each batch re-checks.
+        var nowUtc = DateTime.UtcNow;
+        if (!SendWindow.IsOpen(nowUtc))
+        {
+            var resumeJobId = jobClient.Schedule<CampaignBatchSendJob>(
+                j => j.RunAsync(campaignId, CancellationToken.None), SendWindow.NextOpen(nowUtc) - nowUtc);
+            campaign.HangfireJobId = resumeJobId;
+            await db.SaveChangesAsync(ct);
+
+            // Idempotent (unique index on CampaignId+Type) — at most one such notice per campaign.
+            await notifier.CreateAsync(
+                campaign.CompanyId, campaignId, null,
+                NotificationType.CampaignThrottled,
+                "Campaign paused — outside UAE sending hours",
+                $"\"{campaign.Name}\" is outside the permitted messaging window ({SendWindow.WindowText}) " +
+                "and will resume automatically at 8:00 AM.",
+                ct);
+
+            logger.LogInformation(
+                "CampaignBatchSendJob: campaign {Id} outside UAE send window — deferred to next 08:00 (job {JobId}).",
+                campaignId, resumeJobId);
+            return;
+        }
+
         var waba = campaign.Template.WabaConnection;
 
         // Quality rating gate: RED = stop all business-initiated sends; YELLOW = halve throughput.

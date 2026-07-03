@@ -166,6 +166,17 @@ public class CampaignService(
             throw new BusinessRuleException("NO_RECIPIENTS",
                 "Add at least one contact list or individual contact before launching.");
 
+        // UAE quiet-hours: if this launch sends immediately (Immediate, or a OneTime whose time has
+        // already passed) the send moment is *now*, so it must be inside the window. A future OneTime
+        // and Recurring were already window-validated at create/update; the batch job's runtime gate
+        // is the backstop that also stops a long send from spilling past 20:00.
+        var sendsNow = campaign.ScheduleType == ScheduleType.Immediate
+            || (campaign.ScheduleType == ScheduleType.OneTime
+                && campaign.ScheduledAt is { } at && at <= DateTime.UtcNow);
+        if (sendsNow && !SendWindow.IsOpen(DateTime.UtcNow))
+            throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",
+                $"Sends are only permitted between {SendWindow.WindowText}. Schedule this campaign for a time inside that window.");
+
         // Quota pre-check: skip for Recurring campaigns (fire at future times when quota may have reset).
         if (campaign.ScheduleType != ScheduleType.Recurring)
         {
@@ -484,6 +495,17 @@ public class CampaignService(
         if (type == ScheduleType.Recurring && string.IsNullOrWhiteSpace(cron))
             throw new BusinessRuleException("CRON_REQUIRED",
                 "RecurrenceCron is required for Recurring campaigns.");
+
+        // UAE quiet-hours: the start time must fall inside 08:00–20:00 UAE. (Immediate has no
+        // configured time — its window is checked at launch, against the actual send moment.)
+        if (type == ScheduleType.OneTime && scheduledAt is { } at
+            && !SendWindow.IsOpen(DateTime.SpecifyKind(at, DateTimeKind.Utc)))
+            throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",
+                $"Scheduled sends are only permitted between {SendWindow.WindowText}. Pick a time inside that window.");
+
+        if (type == ScheduleType.Recurring && cron is not null && SendWindow.CronStartsInWindow(cron) == false)
+            throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",
+                $"Recurring sends are only permitted between {SendWindow.WindowText}. Adjust the schedule to fire inside that window.");
     }
 
     private static CampaignResponse MapToResponse(Campaign c) => new(

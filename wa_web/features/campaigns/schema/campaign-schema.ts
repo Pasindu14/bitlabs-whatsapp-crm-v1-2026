@@ -1,5 +1,23 @@
 import { z } from "zod";
 
+// UAE marketing quiet-hours: sends are only permitted 08:00–20:00 Asia/Dubai (UTC+4, no DST).
+// The backend is authoritative; this mirrors it so a bad time is caught before submit.
+const UAE_OPEN_MIN = 8 * 60;
+const UAE_CLOSE_MIN = 20 * 60;
+
+/** Minutes-since-midnight of a UTC ISO instant in UAE local time. */
+function uaeMinutesOfDay(iso: string): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Dubai",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const hh = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const mm = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return hh * 60 + mm;
+}
+
 export const createCampaignSchema = z
   .object({
     name: z
@@ -42,6 +60,14 @@ export const createCampaignSchema = z
   .refine(
     (d) => d.scheduleType !== "Recurring" || !!d.recurrenceCron,
     { message: "Cron expression is required for recurring sends", path: ["recurrenceCron"] }
+  )
+  .refine(
+    (d) => {
+      if (d.scheduleType !== "OneTime" || !d.scheduledAt) return true;
+      const m = uaeMinutesOfDay(d.scheduledAt);
+      return m >= UAE_OPEN_MIN && m <= UAE_CLOSE_MIN;
+    },
+    { message: "Sends are only allowed between 8:00 AM and 8:00 PM UAE time", path: ["scheduledAt"] }
   );
 
 export const updateCampaignSchema = createCampaignSchema;

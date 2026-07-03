@@ -341,6 +341,12 @@ export function CampaignForm({
           )}
         />
 
+        {scheduleType === "Immediate" && (
+          <p className="text-xs text-muted-foreground">
+            Launch is only permitted between 8:00 AM and 8:00 PM UAE time (GST).
+          </p>
+        )}
+
         {scheduleType === "OneTime" && (
           <div className="space-y-1">
             <Label htmlFor="scheduledAt" className="text-xs text-muted-foreground">
@@ -351,6 +357,9 @@ export function CampaignForm({
               type="datetime-local"
               {...register("scheduledAt")}
             />
+            <p className="text-xs text-muted-foreground">
+              Sends are only permitted between 8:00 AM and 8:00 PM UAE time (GST).
+            </p>
             {errors.scheduledAt && (
               <p className="text-xs text-destructive">{errors.scheduledAt.message}</p>
             )}
