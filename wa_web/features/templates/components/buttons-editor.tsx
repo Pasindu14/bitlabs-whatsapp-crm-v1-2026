@@ -42,7 +42,18 @@ export function ButtonsEditor({
     watch,
     formState: { errors },
   } = form;
-  const { fields, append, remove } = useFieldArray({ control, name: "buttons" });
+  const { fields, append, insert, remove } = useFieldArray({ control, name: "buttons" });
+
+  // The seeded opt-out "Stop" quick-reply must always stay the last button, no matter how many
+  // buttons are added. So new buttons are inserted *before* it rather than appended after.
+  const addButton = (t: ButtonType) => {
+    const buttons = form.getValues("buttons");
+    const stopIdx = buttons.findIndex(
+      (b) => b.type === "quick_reply" && b.text.trim().toLowerCase() === "stop"
+    );
+    if (stopIdx >= 0) insert(stopIdx, emptyButton(t));
+    else append(emptyButton(t));
+  };
 
   return (
     <div className="space-y-3">
@@ -140,7 +151,7 @@ export function ButtonsEditor({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           {BUTTON_TYPES.map((t) => (
-            <DropdownMenuItem key={t} onClick={() => append(emptyButton(t))}>
+            <DropdownMenuItem key={t} onClick={() => addButton(t)}>
               {BUTTON_LABELS[t]}
             </DropdownMenuItem>
           ))}
