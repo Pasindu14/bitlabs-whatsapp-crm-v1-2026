@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.Messages.Entities;
-using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.WhatsApp.Entities;
 using wa_api.Infrastructure.Persistence;
 using wa_api.Infrastructure.RateLimiting;
@@ -22,6 +21,7 @@ public class WhatsAppMessageSender(
     IHttpClientFactory httpClientFactory,
     IWabaRateLimiter rateLimiter,
     IOptions<RateLimitOptions> rateOptions,
+    wa_api.Common.Subscriptions.ISubscriptionMeter meter,
     ILogger<WhatsAppMessageSender> logger)
     : IWhatsAppMessageSender
 {
@@ -55,29 +55,13 @@ public class WhatsAppMessageSender(
         db.Messages.Add(message);
         await db.SaveChangesAsync(ct);
 
-        // Best-effort quota metering against the active subscription — only successful sends count
-        // (mirrors the prior MessageService behavior). The caller surfaces a Failed status as an error.
+        // Quota metering against the active subscription — only successful sends count. CompanyId was
+        // auto-stamped by the AuditInterceptor on SaveChanges above. Shared with the campaign sender via
+        // ISubscriptionMeter so every send moves the counter through one atomic path.
         if (message.Status == MessageStatus.Sent)
-            await IncrementSubscriptionUsageAsync(ct);
+            await meter.ConsumeAsync(message.CompanyId, 1, ct);
 
         return message;
-    }
-
-    /// <summary>
-    /// Increments the caller company's active-subscription usage counter by one. The EF global query
-    /// filter scopes the lookup to the JWT company. No-op when no active subscription exists.
-    /// </summary>
-    private async Task IncrementSubscriptionUsageAsync(CancellationToken ct)
-    {
-        var sub = await db.Subscriptions
-            .Where(s => s.Status == SubscriptionStatus.Active)
-            .OrderByDescending(s => s.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-
-        if (sub is null) return;
-
-        sub.MessagesUsedThisPeriod++;
-        await db.SaveChangesAsync(ct);
     }
 
     private async Task<(string? ExternalId, string? Error)> CallMetaApiAsync(

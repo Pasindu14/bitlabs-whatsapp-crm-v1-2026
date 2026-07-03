@@ -44,6 +44,7 @@ public class CampaignBatchSendJob(
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rateLimiter = scope.ServiceProvider.GetRequiredService<IWabaRateLimiter>();
         var notifier = scope.ServiceProvider.GetRequiredService<Notifications.INotificationService>();
+        var meter = scope.ServiceProvider.GetRequiredService<Common.Subscriptions.ISubscriptionMeter>();
 
         var campaign = await db.Campaigns
             .IgnoreQueryFilters()
@@ -323,6 +324,12 @@ public class CampaignBatchSendJob(
                     alreadyMessaged.Add(recipient.ContactId);
 
                     await db.SaveChangesAsync(ct);
+
+                    // Meter this send against the company's quota — the SAME counter inbox sends move,
+                    // via the shared meter. Done after the recipient is persisted as Sent so a mid-batch
+                    // crash never counts a send that wasn't recorded. Atomic, so concurrent batches/inbox
+                    // sends can't lose the increment.
+                    await meter.ConsumeAsync(campaign.CompanyId, 1, ct);
                 }
                 else
                 {
