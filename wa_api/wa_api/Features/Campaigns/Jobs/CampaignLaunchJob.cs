@@ -133,6 +133,14 @@ public class CampaignLaunchJob(
         logger.LogInformation("CampaignLaunchJob: campaign {Id} launched with {Count} recipients.",
             campaignId, campaign.TotalRecipients);
 
-        jobClient.Enqueue<CampaignBatchSendJob>(j => j.RunAsync(campaignId, CancellationToken.None));
+        // Enqueue the send batch AND record its job id on the campaign. Critical: without persisting this,
+        // campaign.HangfireJobId keeps pointing at THIS (launch) job, which flips to Succeeded the moment we
+        // return. The CampaignSchedulerJob stall-recovery sweeper then sees a Running campaign with Queued
+        // recipients whose HangfireJobId is a dead job, wrongly concludes the batch stalled, and enqueues a
+        // SECOND CampaignBatchSendJob — the two run concurrently and double-send every recipient. Pointing
+        // HangfireJobId at the live batch job makes the sweeper's IsJobAlive check see it and skip.
+        var batchJobId = jobClient.Enqueue<CampaignBatchSendJob>(j => j.RunAsync(campaignId, CancellationToken.None));
+        campaign.HangfireJobId = batchJobId;
+        await db.SaveChangesAsync(ct);
     }
 }
