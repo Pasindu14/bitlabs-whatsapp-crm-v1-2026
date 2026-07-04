@@ -33,18 +33,24 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
         // Collect (messageId → new status) for campaign messages so we can sync recipients in one pass.
         var campaignMessageUpdates = new Dictionary<Guid, (MessageStatus Status, string? ErrorCode)>();
 
-        // Accumulate quota to credit back per company: a message metered on accept that now fails/undelivered
-        // must be refunded (Meta doesn't bill undelivered messages). Applied once, atomically, at the end.
-        var refundsByCompany = new Dictionary<Guid, int>();
+        // Accumulate quota to credit back, keyed by the EXACT subscription that was charged
+        // (Message.MeteredSubscriptionId). A message metered on accept that now fails un-billed must be
+        // refunded, but only against the row it drew down — not "the current active sub", which may be a
+        // different row after a renewal/re-subscribe. Applied once, atomically, at the end.
+        var refundsBySubscription = new Dictionary<Guid, int>();
 
         foreach (var s in ctx.Change.Value!.Statuses!)
         {
             if (string.IsNullOrWhiteSpace(s.Id) || string.IsNullOrWhiteSpace(s.Status))
                 continue;
 
+            // Delivery statuses are only ever about OUTBOUND messages. Filtering on Direction guards against
+            // a (globally unlikely, but latent) wamid collision matching an inbound row — which, being stored
+            // as Delivered and never metered, would otherwise phantom-refund quota on a 'failed' status (L1).
             var message = await db.Messages
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(m => m.ExternalMessageId == s.Id, ct);
+                .FirstOrDefaultAsync(m => m.ExternalMessageId == s.Id
+                                       && m.Direction == MessageDirection.Outbound, ct);
             if (message is null)
             {
                 logger.LogInformation("Delivery status '{Status}' for unknown wamid {Wamid} — ignored.", s.Status, s.Id);
@@ -67,9 +73,12 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
                 if (message.Status == MessageStatus.Failed)
                     continue;
 
-                // Was this message metered? It's consumed on accept (created as Sent), so any message that
-                // is currently Sent/Delivered/Read drew down the quota and must be credited back now.
-                var wasCounted = message.Status is MessageStatus.Sent or MessageStatus.Delivered or MessageStatus.Read;
+                // Forward-only for the failed branch too: a message Meta already confirmed Delivered/Read
+                // cannot genuinely "fail". A late, out-of-order 'failed' callback for such a message is noise
+                // — don't regress its status, and DON'T refund it (a delivered message was billed). Only a
+                // message still at Sent (accepted, never confirmed delivered) can be failed here.
+                if (message.Status is MessageStatus.Delivered or MessageStatus.Read)
+                    continue;
 
                 var err = s.Errors?.FirstOrDefault();
                 message.Status = MessageStatus.Failed;
@@ -83,8 +92,25 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
                 if (MetaPolicyErrorCodes.IsUndeliverableRecipient(message.ErrorCode))
                     await MarkContactNotOnWhatsAppAsync(message.ContactId, ct);
 
-                if (wasCounted)
-                    refundsByCompany[message.CompanyId] = refundsByCompany.GetValueOrDefault(message.CompanyId) + 1;
+                // Refund the quota ONLY when Meta did not bill this message. Pricing (captured above into
+                // message.Billable) is authoritative: if Meta charged for it, crediting the quota back would
+                // under-count real usage. Credit the EXACT subscription that was metered (recorded at send
+                // time); fall back to the company's current active sub only for legacy rows that predate the
+                // MeteredSubscriptionId column.
+                var metaBilled = message.Billable == true;
+                if (!metaBilled)
+                {
+                    var refundSubId = message.MeteredSubscriptionId
+                        ?? await db.Subscriptions.IgnoreQueryFilters()
+                            .Where(sub => sub.CompanyId == message.CompanyId && sub.Status == SubscriptionStatus.Active)
+                            .OrderByDescending(sub => sub.CreatedAt)
+                            .Select(sub => (Guid?)sub.Id)
+                            .FirstOrDefaultAsync(ct);
+
+                    if (refundSubId is not null)
+                        refundsBySubscription[refundSubId.Value] =
+                            refundsBySubscription.GetValueOrDefault(refundSubId.Value) + 1;
+                }
 
                 if (message.CampaignId.HasValue)
                     campaignMessageUpdates[message.Id] = (MessageStatus.Failed, message.ErrorCode);
@@ -115,35 +141,47 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
             await SyncCampaignRecipientsAsync(campaignMessageUpdates, ct);
 
         // Credit failed/undelivered messages back to quota.
-        if (refundsByCompany.Count > 0)
-            await RefundQuotaAsync(refundsByCompany, ct);
+        if (refundsBySubscription.Count > 0)
+            await RefundQuotaAsync(refundsBySubscription, ct);
     }
 
     /// <summary>
-    /// Credits failed/undelivered messages back to each company's active-subscription usage counter.
-    /// Uses a TRACKED update (not the ExecuteUpdate meter) on purpose: the change is flushed by the
-    /// dispatcher's single SaveChanges, in the SAME transaction as the message's Failed status. That makes
-    /// the refund exactly-once — a webhook retry sees the message already Failed and skips it (guard above),
-    /// and a failed batch commits nothing, so nothing is double-refunded. Floored at 0. Webhook scope has no
-    /// tenant context, so subscriptions are read across tenants with IgnoreQueryFilters.
+    /// Credits failed/undelivered messages back to the exact subscription each was metered against.
+    /// Uses an ATOMIC SQL decrement (<c>SET x = GREATEST(0, x - n)</c>), NOT a tracked read-modify-write:
+    /// the previous tracked write read the counter into memory and wrote back an absolute value, which
+    /// silently clobbered concurrent atomic meter increments (a send running on another connection between
+    /// the refund's read and its commit was lost — free messages). This decrement enlists in the explicit
+    /// transaction opened by <see cref="Processing.WebhookProcessingJob"/> around dispatch+MarkProcessed, so
+    /// it still commits together with the message's Failed status: exactly-once (a retry sees the message
+    /// already Failed and skips), and a rolled-back batch reverts the decrement too. Floored at 0 in SQL.
     /// </summary>
-    private async Task RefundQuotaAsync(Dictionary<Guid, int> refundsByCompany, CancellationToken ct)
+    private async Task RefundQuotaAsync(Dictionary<Guid, int> refundsBySubscription, CancellationToken ct)
     {
-        foreach (var (companyId, count) in refundsByCompany)
+        var now = DateTime.UtcNow;
+        var isRelational = db.Database.IsRelational();
+        foreach (var (subscriptionId, count) in refundsBySubscription)
         {
             if (count <= 0)
                 continue;
 
-            var sub = await db.Subscriptions
-                .IgnoreQueryFilters()
-                .Where(s => s.CompanyId == companyId && s.Status == SubscriptionStatus.Active)
-                .OrderByDescending(s => s.CreatedAt)
-                .FirstOrDefaultAsync(ct);
-
-            if (sub is null)
-                continue;
-
-            sub.MessagesUsedThisPeriod = Math.Max(0, sub.MessagesUsedThisPeriod - count);
+            if (isRelational)
+            {
+                // Atomic, floored decrement — the whole point of the fix. Enlists in the webhook transaction.
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $@"UPDATE ""Subscriptions""
+                       SET ""MessagesUsedThisPeriod"" = GREATEST(0, ""MessagesUsedThisPeriod"" - {count}),
+                           ""UpdatedAt"" = {now}
+                       WHERE ""Id"" = {subscriptionId}", ct);
+            }
+            else
+            {
+                // The EF InMemory provider (unit tests) supports neither raw SQL nor ExecuteUpdate — fall
+                // back to a tracked update, flushed by the caller's SaveChanges. Prod is always relational.
+                var sub = await db.Subscriptions.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(s => s.Id == subscriptionId, ct);
+                if (sub is not null)
+                    sub.MessagesUsedThisPeriod = Math.Max(0, sub.MessagesUsedThisPeriod - count);
+            }
         }
     }
 

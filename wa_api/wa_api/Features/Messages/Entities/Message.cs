@@ -51,6 +51,14 @@ public class Message : BaseEntity, ITenantEntity
     /// <summary>FK to Campaign when this message was sent via a campaign. Null for direct sends.</summary>
     public Guid? CampaignId { get; set; }
 
+    /// <summary>
+    /// The subscription whose <c>MessagesUsedThisPeriod</c> this send incremented. Recorded at meter time so
+    /// a later failure refunds the EXACT subscription that was charged — not merely "the current active one"
+    /// (which may be a different row after a renewal / re-subscribe, causing a cross-period free-quota bug).
+    /// Null for sends that weren't metered (no active subscription) or messages predating this column.
+    /// </summary>
+    public Guid? MeteredSubscriptionId { get; set; }
+
     public Contact Contact { get; set; } = null!;
     public WabaConnection WabaConnection { get; set; } = null!;
     public Conversations.Entities.Conversation? Conversation { get; set; }

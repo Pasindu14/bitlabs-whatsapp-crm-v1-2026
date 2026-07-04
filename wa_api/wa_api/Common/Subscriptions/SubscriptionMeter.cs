@@ -17,16 +17,18 @@ public interface ISubscriptionMeter
     /// <c>MessagesUsedThisPeriod</c>. No-op when <paramref name="count"/> ≤ 0 or the company has no
     /// active subscription. Safe from webhook/Hangfire scopes: the company is passed explicitly and
     /// the tenant query filter is ignored (those scopes have no <c>HttpContext</c>).
+    /// Returns the id of the subscription that was charged (so the caller can stamp
+    /// <c>Message.MeteredSubscriptionId</c> for an exact-row refund later), or null when nothing was metered.
     /// </summary>
-    Task ConsumeAsync(Guid companyId, int count = 1, CancellationToken ct = default);
+    Task<Guid?> ConsumeAsync(Guid companyId, int count = 1, CancellationToken ct = default);
 }
 
 public class SubscriptionMeter(AppDbContext db) : ISubscriptionMeter
 {
-    public async Task ConsumeAsync(Guid companyId, int count = 1, CancellationToken ct = default)
+    public async Task<Guid?> ConsumeAsync(Guid companyId, int count = 1, CancellationToken ct = default)
     {
         if (count <= 0 || companyId == Guid.Empty)
-            return;
+            return null;
 
         // Most-recent active subscription for the company. IgnoreQueryFilters: metering runs from the
         // campaign job (Hangfire) and could run from webhooks — neither has the tenant query-filter context.
@@ -38,7 +40,7 @@ public class SubscriptionMeter(AppDbContext db) : ISubscriptionMeter
             .FirstOrDefaultAsync(ct);
 
         if (subId is null)
-            return;
+            return null;
 
         // Increment in the database itself. A read-modify-write (`sub.MessagesUsedThisPeriod++`) loses
         // updates when a campaign batch and inbox sends run concurrently; a single UPDATE ... SET x = x + n
@@ -50,5 +52,7 @@ public class SubscriptionMeter(AppDbContext db) : ISubscriptionMeter
                 setters => setters.SetProperty(
                     s => s.MessagesUsedThisPeriod, s => s.MessagesUsedThisPeriod + count),
                 ct);
+
+        return subId;
     }
 }

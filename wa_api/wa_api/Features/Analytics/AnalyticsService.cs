@@ -20,10 +20,13 @@ public class AnalyticsService(AppDbContext db)
             .Select(g => new { g.Key.Date, g.Key.Status, Count = g.Count() })
             .ToListAsync(ct);
 
+        // "Sent" = messages Meta actually accepted (Sent/Delivered/Read). Failed messages never went out
+        // and (per PRD billing) are refunded off the quota, so they must NOT inflate the sent total —
+        // they're surfaced separately as totalFailed. Previously Failed was summed in here, so the
+        // dashboard "Sent" disagreed with the usage/quota counter for every campaign that had a failure.
         var totalSent = rows.Where(r => r.Status == MessageStatus.Sent).Sum(r => r.Count)
                       + rows.Where(r => r.Status == MessageStatus.Delivered).Sum(r => r.Count)
-                      + rows.Where(r => r.Status == MessageStatus.Read).Sum(r => r.Count)
-                      + rows.Where(r => r.Status == MessageStatus.Failed).Sum(r => r.Count);
+                      + rows.Where(r => r.Status == MessageStatus.Read).Sum(r => r.Count);
 
         var totalDelivered = rows.Where(r => r.Status == MessageStatus.Delivered).Sum(r => r.Count)
                            + rows.Where(r => r.Status == MessageStatus.Read).Sum(r => r.Count);
@@ -37,8 +40,7 @@ public class AnalyticsService(AppDbContext db)
             Date:      g.Key.ToString("yyyy-MM-dd"),
             Sent:      g.Where(r => r.Status == MessageStatus.Sent).Sum(r => r.Count)
                      + g.Where(r => r.Status == MessageStatus.Delivered).Sum(r => r.Count)
-                     + g.Where(r => r.Status == MessageStatus.Read).Sum(r => r.Count)
-                     + g.Where(r => r.Status == MessageStatus.Failed).Sum(r => r.Count),
+                     + g.Where(r => r.Status == MessageStatus.Read).Sum(r => r.Count),
             Delivered: g.Where(r => r.Status == MessageStatus.Delivered).Sum(r => r.Count)
                      + g.Where(r => r.Status == MessageStatus.Read).Sum(r => r.Count),
             Read:      g.Where(r => r.Status == MessageStatus.Read).Sum(r => r.Count),

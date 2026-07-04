@@ -1,6 +1,8 @@
 using Hangfire;
+using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Webhooks.Entities;
 using wa_api.Features.Webhooks.Ingestion;
+using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.Webhooks.Processing;
 
@@ -32,6 +34,7 @@ public sealed class WebhookProcessingJob(IServiceScopeFactory scopeFactory, ILog
         await using var scope = scopeFactory.CreateAsyncScope();
         var inbox = scope.ServiceProvider.GetRequiredService<IWebhookInboxService>();
         var dispatcher = scope.ServiceProvider.GetRequiredService<IWebhookDispatcher>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var row = await inbox.GetForProcessingAsync(eventId, ct);
         if (row is null)
@@ -53,9 +56,18 @@ public sealed class WebhookProcessingJob(IServiceScopeFactory scopeFactory, ILog
 
         try
         {
-            await dispatcher.DispatchAsync(row, ct);
-            // Single SaveChanges — flushes every handler mutation together with the Processed status.
-            await inbox.MarkProcessedAsync(row, ct);
+            // One explicit transaction around dispatch + MarkProcessed. Handler mutations are tracked and
+            // flushed by MarkProcessedAsync's SaveChanges; any atomic SQL a handler runs (e.g. the quota
+            // refund's GREATEST(0, x - n) decrement) enlists in this same transaction. So the refund and the
+            // message's Failed status commit together — exactly-once (a retry sees the message already Failed
+            // and skips), and a rolled-back batch reverts the refund too — while the decrement stays atomic
+            // against concurrent meter increments on another connection.
+            await using (var tx = await db.Database.BeginTransactionAsync(ct))
+            {
+                await dispatcher.DispatchAsync(row, ct);
+                await inbox.MarkProcessedAsync(row, ct);
+                await tx.CommitAsync(ct);
+            }
             logger.LogInformation("Webhook {Id} processed (attempt {Attempt}).", row.Id, row.Attempts);
         }
         catch (Exception ex)

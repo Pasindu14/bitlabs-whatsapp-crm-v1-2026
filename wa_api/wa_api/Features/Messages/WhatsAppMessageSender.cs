@@ -57,9 +57,17 @@ public class WhatsAppMessageSender(
 
         // Quota metering against the active subscription — only successful sends count. CompanyId was
         // auto-stamped by the AuditInterceptor on SaveChanges above. Shared with the campaign sender via
-        // ISubscriptionMeter so every send moves the counter through one atomic path.
+        // ISubscriptionMeter so every send moves the counter through one atomic path. Record which
+        // subscription was charged so a later failure refunds that exact row (not "current active").
         if (message.Status == MessageStatus.Sent)
-            await meter.ConsumeAsync(message.CompanyId, 1, ct);
+        {
+            var meteredSubId = await meter.ConsumeAsync(message.CompanyId, 1, ct);
+            if (meteredSubId is not null)
+            {
+                message.MeteredSubscriptionId = meteredSubId;
+                await db.SaveChangesAsync(ct);
+            }
+        }
 
         return message;
     }

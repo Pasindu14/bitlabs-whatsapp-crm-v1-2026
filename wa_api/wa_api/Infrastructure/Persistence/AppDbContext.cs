@@ -53,6 +53,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<PackagePurchase> PackagePurchases => Set<PackagePurchase>();
     public DbSet<SubscriptionPurchase> SubscriptionPurchases => Set<SubscriptionPurchase>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<TemplateMediaSample> TemplateMediaSamples => Set<TemplateMediaSample>();
     public DbSet<Campaign> Campaigns => Set<Campaign>();
@@ -241,7 +242,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.Property(x => x.Category).HasMaxLength(32);
             e.HasIndex(x => x.CompanyId);
             e.HasIndex(x => x.ContactId);
-            e.HasIndex(x => x.ExternalMessageId);   // fast lookup by wamid for status webhooks (6.4)
+            // Unique per wamid (filtered to non-null): fast status-webhook lookup AND a hard guard against
+            // duplicate inbound rows — the app-level dedup is blind to a concurrent non-identical redelivery,
+            // so the DB is the backstop (a losing insert fails the batch and the retry hits the idempotent
+            // path). Every Meta wamid is globally unique, so this never rejects a legitimate message (M1).
+            e.HasIndex(x => x.ExternalMessageId)
+                .IsUnique()
+                .HasFilter("\"ExternalMessageId\" IS NOT NULL");
             e.HasIndex(x => x.WabaConnectionId);
             e.HasIndex(x => x.ConversationId);      // thread history lookup
             e.HasIndex(x => x.CampaignId);          // campaign delivery rollup
@@ -635,6 +642,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<ProcessedStripeEvent>(e =>
+        {
+            // The Stripe event id is the natural dedup key — a redelivered event collides on the PK.
+            e.HasKey(x => x.StripeEventId);
+            e.Property(x => x.StripeEventId).HasMaxLength(255);
+            e.Property(x => x.EventType).HasMaxLength(100);
+            // No CompanyId / tenant filter: this is platform-plane billing plumbing written from the
+            // webhook job (no HttpContext), mirroring how Stripe rows are handled with IgnoreQueryFilters.
         });
     }
 }

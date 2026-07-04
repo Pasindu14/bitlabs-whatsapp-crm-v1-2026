@@ -48,16 +48,27 @@ public class QuotaWarningCheckerJob(
             .Where(s => companyIds.Contains(s.CompanyId) && s.Status == Subscriptions.Entities.SubscriptionStatus.Active)
             .ToDictionaryAsync(s => s.CompanyId, ct);
 
-        foreach (var campaign in upcoming)
+        // Draw down a running remaining per company in fire order, so earlier campaigns' consumption counts
+        // against later ones. Previously each campaign was compared to the FULL remaining in isolation, so
+        // two 600-recipient campaigns against 1000 remaining each looked fine — but the second fails at fire
+        // time. Ordering by ScheduledAt and subtracting as we go closes that gap (M6).
+        var remainingByCompany = new Dictionary<Guid, int>();
+
+        foreach (var campaign in upcoming.OrderBy(c => c.CompanyId).ThenBy(c => c.ScheduledAt))
         {
             if (!subscriptions.TryGetValue(campaign.CompanyId, out var sub) || sub.Plan is null)
                 continue;
 
-            int remaining = sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits - sub.MessagesUsedThisPeriod;
+            if (!remainingByCompany.TryGetValue(campaign.CompanyId, out var remaining))
+                remaining = sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits - sub.MessagesUsedThisPeriod;
 
             int recipients = campaign.TotalRecipients > 0
                 ? campaign.TotalRecipients
                 : await ResolveDistinctRecipientCountAsync(db, campaign.Id, ct);
+
+            // Account this campaign against the running total whether or not it fits, so the NEXT campaign
+            // in fire order sees the reduced headroom.
+            remainingByCompany[campaign.CompanyId] = remaining - recipients;
 
             if (recipients <= remaining)
                 continue;

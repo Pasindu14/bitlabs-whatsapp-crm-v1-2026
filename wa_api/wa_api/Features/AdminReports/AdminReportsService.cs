@@ -169,7 +169,8 @@ public class AdminReportsService(AppDbContext db)
             .GroupBy(_ => 1)
             .Select(g => new
             {
-                Sent = g.Count(),
+                // Exclude Failed so the dashboard "Sent" matches the quota-consuming count.
+                Sent = g.Count(m => m.Status != MessageStatus.Failed),
                 Billable = g.Count(m => m.Billable == true),
             })
             .FirstOrDefaultAsync(ct);
@@ -205,7 +206,8 @@ public class AdminReportsService(AppDbContext db)
             .Select(g => new
             {
                 CompanyId = g.Key,
-                Sent = g.Count(),
+                // "Sent" excludes Failed so this aligns with the quota counter (Failed is refunded).
+                Sent = g.Count(m => m.Status != MessageStatus.Failed),
                 Delivered = g.Count(m => m.Status == MessageStatus.Delivered),
                 Read = g.Count(m => m.Status == MessageStatus.Read),
                 Failed = g.Count(m => m.Status == MessageStatus.Failed),

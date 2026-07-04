@@ -232,7 +232,7 @@ public class AdminReportsServiceTests
         Assert.Equal(2, result.PackagesSoldThisMonth);
         Assert.Equal(20m, result.RevenueThisMonth);
         Assert.Equal(3, result.NewSignupsThisMonth);
-        Assert.Equal(3, result.MessagesSent30d);     // 40-day-old message excluded
+        Assert.Equal(2, result.MessagesSent30d);     // Sent + Delivered; Failed excluded, 40-day-old excluded
         Assert.Equal(2, result.BillableMessages30d);
         Assert.Equal(1, result.CompaniesLowBalance);
     }
@@ -263,12 +263,12 @@ public class AdminReportsServiceTests
 
         var row = Assert.Single(result.Companies);
         Assert.Equal("Acme", row.CompanyName);
-        Assert.Equal(4, row.Sent);       // 4 outbound in range
+        Assert.Equal(3, row.Sent);       // Sent + Delivered + Read (4 outbound − 1 Failed)
         Assert.Equal(1, row.Delivered);
         Assert.Equal(1, row.Read);
         Assert.Equal(1, row.Failed);
         Assert.Equal(2, row.Billable);
-        Assert.Equal(4, result.TotalSent);
+        Assert.Equal(3, result.TotalSent);
         Assert.Equal(2, result.TotalBillable);
     }
 }

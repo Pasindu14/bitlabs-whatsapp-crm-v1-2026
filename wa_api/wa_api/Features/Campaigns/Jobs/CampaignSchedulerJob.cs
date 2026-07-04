@@ -15,6 +15,11 @@ public class CampaignSchedulerJob(
     IBackgroundJobClient jobClient,
     ILogger<CampaignSchedulerJob> logger)
 {
+    // Serialize ticks: this recurring job runs every minute, but if one run overruns 60s (many due
+    // campaigns / slow DB) the next tick must NOT start alongside it. Two concurrent ticks can each read the
+    // same campaign as Scheduled and both enqueue a launch (→ two batches → double-send). The lock makes
+    // ticks strictly sequential; the atomic status flip below is the second line of defense.
+    [DisableConcurrentExecution(timeoutInSeconds: 60)]
     public async Task RunAsync()
     {
         await using var scope = scopeFactory.CreateAsyncScope();

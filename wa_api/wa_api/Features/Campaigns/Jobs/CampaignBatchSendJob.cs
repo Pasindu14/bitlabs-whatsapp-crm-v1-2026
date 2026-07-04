@@ -35,6 +35,11 @@ public class CampaignBatchSendJob(
     ILogger<CampaignBatchSendJob> logger)
 {
     private const int BatchSize = 50;
+
+    /// <summary>How long a recipient may sit in the transient <c>Sending</c> claim before a later batch
+    /// treats it as abandoned (crashed mid-send) and reclaims it to Queued. Comfortably longer than a single
+    /// send's wall-clock (Meta HttpClient timeout is 15s) so a healthy in-flight send is never reclaimed.</summary>
+    private static readonly TimeSpan StaleClaimThreshold = TimeSpan.FromMinutes(5);
     private readonly RateLimitOptions _rateOptions = rateOptions.Value;
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -121,6 +126,17 @@ public class CampaignBatchSendJob(
 
         // The number's 24-hour unique-recipient tier cap (campaign sends are business-initiated).
         var tierLimit = (int)waba.MessagingTier;
+
+        // Crash recovery: reclaim any recipient a crashed batch left claimed (Sending) longer than the
+        // stale window back to Queued so this run can re-send it. Only STALE rows (UpdatedAt older than the
+        // threshold) are touched — a recipient a concurrently-running batch is actively sending right now is
+        // fresh and left alone, so this can never resurrect an in-flight send. Atomic, tenant-filter-free.
+        await db.CampaignRecipients
+            .IgnoreQueryFilters()
+            .Where(r => r.CampaignId == campaignId
+                        && r.Status == RecipientStatus.Sending
+                        && r.UpdatedAt < DateTime.UtcNow - StaleClaimThreshold)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RecipientStatus.Queued), ct);
 
         // Load one batch of Queued recipients with their contacts.
         var batch = await db.CampaignRecipients
@@ -279,6 +295,28 @@ public class CampaignBatchSendJob(
                 continue;
             }
 
+            // ── Atomic send-claim: the definitive double-send guard ────────────────────────────────
+            // Flip THIS recipient Queued→Sending in one atomic UPDATE. If a concurrent batch already
+            // claimed (or sent) it, zero rows change and we skip WITHOUT calling Meta — so a recipient can
+            // never be sent twice, even if two batch jobs run at once (the exact bug behind the duplicate
+            // WhatsApp messages). ExecuteUpdate commits immediately, making the claim visible to rivals; the
+            // UpdatedAt stamp lets a later batch reclaim this row if we crash while Sending (see stale sweep).
+            var claimed = await db.CampaignRecipients
+                .IgnoreQueryFilters()
+                .Where(r => r.Id == recipient.Id && r.Status == RecipientStatus.Queued)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, RecipientStatus.Sending)
+                    .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
+            if (claimed == 0)
+            {
+                logger.LogInformation(
+                    "Recipient {ContactId} in campaign {CampaignId} already claimed by another batch — skipping.",
+                    recipient.ContactId, campaignId);
+                continue;
+            }
+            // ExecuteUpdate bypassed the change tracker — sync the tracked entity so later saves see Sending.
+            recipient.Status = RecipientStatus.Sending;
+
             try
             {
                 var resolvedVars = BuildResolvedVariables(resolvedMapping, recipient.Contact);
@@ -328,8 +366,44 @@ public class CampaignBatchSendJob(
                     // Meter this send against the company's quota — the SAME counter inbox sends move,
                     // via the shared meter. Done after the recipient is persisted as Sent so a mid-batch
                     // crash never counts a send that wasn't recorded. Atomic, so concurrent batches/inbox
-                    // sends can't lose the increment.
-                    await meter.ConsumeAsync(campaign.CompanyId, 1, ct);
+                    // sends can't lose the increment. Record which subscription was charged so a later
+                    // failure webhook refunds that exact row.
+                    var meteredSubId = await meter.ConsumeAsync(campaign.CompanyId, 1, ct);
+                    if (meteredSubId is not null)
+                    {
+                        message.MeteredSubscriptionId = meteredSubId;
+                        await db.SaveChangesAsync(ct);
+
+                        // Hard quota enforcement at send time (H1): the launch pre-check is advisory only —
+                        // two concurrent campaigns can both pass it and then blow past the plan. Re-check the
+                        // LIVE atomic counter after each send; once usage reaches the effective quota, pause
+                        // the campaign and stop. This caps overshoot at ~one message per in-flight batch
+                        // instead of letting parallel sends run arbitrarily over the plan.
+                        var quota = await db.Subscriptions.IgnoreQueryFilters()
+                            .Where(s => s.Id == meteredSubId.Value)
+                            .Select(s => new
+                            {
+                                s.MessagesUsedThisPeriod,
+                                Effective = s.Plan.MonthlyMessageQuota + s.ExtraMessageCredits
+                            })
+                            .FirstOrDefaultAsync(ct);
+                        if (quota is not null && quota.MessagesUsedThisPeriod >= quota.Effective)
+                        {
+                            campaign.Status = CampaignStatus.Paused;
+                            await db.SaveChangesAsync(ct);
+                            await notifier.CreateAsync(
+                                campaign.CompanyId, campaignId, null,
+                                NotificationType.CampaignThrottled,
+                                "Campaign paused — message quota reached",
+                                $"\"{campaign.Name}\" reached your plan's message quota and was paused. " +
+                                "Add credits or upgrade your plan, then resume the campaign.",
+                                ct);
+                            logger.LogWarning(
+                                "CampaignBatchSendJob: campaign {Id} paused — company {CompanyId} quota reached ({Used}/{Quota}).",
+                                campaignId, campaign.CompanyId, quota.MessagesUsedThisPeriod, quota.Effective);
+                            return;
+                        }
+                    }
                 }
                 else
                 {
@@ -343,6 +417,8 @@ public class CampaignBatchSendJob(
 
                         waba.IsActive = false;
                         campaign.Status = CampaignStatus.Paused;
+                        // The send did not happen — release the claim so a resume re-sends this recipient.
+                        recipient.Status = RecipientStatus.Queued;
                         await db.SaveChangesAsync(ct);
 
                         await notifier.CreateAsync(
@@ -363,6 +439,8 @@ public class CampaignBatchSendJob(
                             errorCode, campaignId);
 
                         campaign.Status = CampaignStatus.Paused;
+                        // The send did not happen — release the claim so a resume re-sends this recipient.
+                        recipient.Status = RecipientStatus.Queued;
                         await db.SaveChangesAsync(ct);
 
                         await notifier.CreateAsync(
@@ -376,15 +454,16 @@ public class CampaignBatchSendJob(
                     }
 
                     // Transient throughput throttle (130429 / 131056): Meta asked us to slow down, so the send
-                    // did NOT happen. Leave this recipient Queued, persist progress, and reschedule the batch
-                    // with backoff — the same graceful path as our own per-second limiter. Retrying the same
-                    // Queued recipient is duplicate-safe; failing it would drop a deliverable message.
+                    // did NOT happen. Release the claim (Sending→Queued), persist progress, and reschedule the
+                    // batch with backoff — the same graceful path as our own per-second limiter. Retrying the
+                    // same Queued recipient is duplicate-safe; failing it would drop a deliverable message.
                     if (MetaPolicyErrorCodes.IsTransientThrottle(errorCode))
                     {
                         logger.LogWarning(
                             "Meta returned throttle code {Code} for campaign {CampaignId} — backing off and rescheduling batch.",
                             errorCode, campaignId);
 
+                        recipient.Status = RecipientStatus.Queued;
                         await db.SaveChangesAsync(ct);
                         await RescheduleBatchAsync(
                             campaign, campaignId,

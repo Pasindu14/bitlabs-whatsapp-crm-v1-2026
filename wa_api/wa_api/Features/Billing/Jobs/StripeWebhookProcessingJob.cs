@@ -32,6 +32,20 @@ public class StripeWebhookProcessingJob(
     {
         var stripeEvent = EventUtility.ParseEvent(eventJson);
 
+        // Idempotency: Stripe delivers at-least-once and this job carries a retry budget, so the same event
+        // can arrive twice. Without this guard a redelivered invoice.paid re-ran its handler and re-zeroed
+        // MessagesUsedThisPeriod — silently wiping a whole period's usage (free quota). Process + record the
+        // dedup marker in ONE transaction: a replay finds the marker and skips; a mid-processing failure
+        // rolls both the effects AND the marker back so a genuine retry re-applies cleanly.
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        if (await db.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == stripeEvent.Id, ct))
+        {
+            logger.LogInformation("Stripe event {EventId} ({Type}) already processed — skipping replay.",
+                stripeEvent.Id, eventType);
+            return;
+        }
+
         switch (eventType)
         {
             case SubCreated:
@@ -59,6 +73,15 @@ public class StripeWebhookProcessingJob(
                 logger.LogDebug("Stripe event {EventType} ignored (no handler)", eventType);
                 break;
         }
+
+        db.ProcessedStripeEvents.Add(new Entities.ProcessedStripeEvent
+        {
+            StripeEventId = stripeEvent.Id,
+            EventType = eventType,
+            ProcessedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
     }
 
     // ── Subscription sync ────────────────────────────────────────────────────

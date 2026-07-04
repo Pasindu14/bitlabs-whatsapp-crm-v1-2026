@@ -132,7 +132,12 @@ public class MessageService(
 
         // Best-effort quota metering against the active subscription (PRD 3.1 gate stub).
         // The authoritative per-message metering arrives with the Phase 6 send pipeline.
-        await IncrementSubscriptionUsageAsync(ct);
+        var meteredSubId = await IncrementSubscriptionUsageAsync(ct);
+        if (meteredSubId is not null)
+        {
+            message.MeteredSubscriptionId = meteredSubId;
+            await db.SaveChangesAsync(ct);
+        }
 
         return Map(message, contact.Name, contact.Phone, waba.DisplayPhoneNumber);
     }
@@ -147,7 +152,7 @@ public class MessageService(
     /// No-op when no active subscription exists. ExecuteUpdate bypasses the audit interceptor, so
     /// UpdatedAt is set explicitly here.
     /// </summary>
-    private async Task IncrementSubscriptionUsageAsync(CancellationToken ct)
+    private async Task<Guid?> IncrementSubscriptionUsageAsync(CancellationToken ct)
     {
         var subId = await db.Subscriptions
             .Where(s => s.Status == SubscriptionStatus.Active)
@@ -155,7 +160,7 @@ public class MessageService(
             .Select(s => (Guid?)s.Id)
             .FirstOrDefaultAsync(ct);
 
-        if (subId is null) return;
+        if (subId is null) return null;
 
         var now = DateTime.UtcNow;
         await db.Subscriptions
@@ -163,6 +168,8 @@ public class MessageService(
             .ExecuteUpdateAsync(s => s
                 .SetProperty(x => x.MessagesUsedThisPeriod, x => x.MessagesUsedThisPeriod + 1)
                 .SetProperty(x => x.UpdatedAt, now), ct);
+
+        return subId;
     }
 
     private async Task<(string? ExternalId, string? Error)> CallMetaApiAsync(

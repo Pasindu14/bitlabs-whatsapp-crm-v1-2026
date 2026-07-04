@@ -8,6 +8,12 @@ namespace wa_api.Features.Campaigns.Entities;
 public enum RecipientStatus
 {
     Queued,
+    /// <summary>Transient: a batch has atomically claimed this recipient (Queued→Sending) and is calling
+    /// Meta. Only the batch that wins the claim sends, so two concurrent batches can never double-send the
+    /// same recipient. Reverted to Queued on a retriable failure; advanced to Sent/Failed on completion; a
+    /// stale Sending row (crashed mid-send) is reclaimed to Queued by the next batch. Stored as text, so
+    /// inserting it here needs no migration.</summary>
+    Sending,
     Sent,
     Delivered,
     Read,
