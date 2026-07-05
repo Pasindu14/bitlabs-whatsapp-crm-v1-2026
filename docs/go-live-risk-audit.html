@@ -127,7 +127,7 @@
   <strong>Remediation update — 2026-07-05.</strong> Findings are tagged inline below with a <span class="badge b-done">✓ Fixed</span> / <span class="badge b-part">◐ Partial</span> badge and a resolution note; untagged items remain open.
   <br><br><strong>Fixed:</strong> C2, C3 · H1, H2, H4, H7, H8, H9, H10, H11, H12 · M1–M14, M16, M18, M20, M21 · L1, L9.
   <strong>Partial:</strong> C1 (no hard meter ceiling), H3 (encryption code-complete; needs ops to provision a prod key + rotate tokens), H5 (idempotency done; ordering guard + Fail/dead-letter open), H6 (exact-sub done; legacy fallback kept), M19 (JWT shortened; CSP/hub-token open).
-  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision). Lows L1–L6 &amp; L9 fixed; L7 won't-fix-as-written (regresses double-send — folds into C1), L8 ops-only (<code>.env</code>), L10 product decision (whole chat plane is CompanyAdmin-only, consistent).
+  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision). Lows L1–L6, L9 &amp; L10 fixed; L7 won't-fix-as-written (regresses double-send — folds into C1) and L8 ops-only (<code>.env</code>) are the only remaining.
   <br><br>Billing model confirmed: <strong>no auto-renew</strong> — a subscription runs to its period end, then the tenant must subscribe again (accumulate-until-expiry). This resolved M21 (no dunning applies) and L1 (delete the reset job). Most fixes remain <strong>uncommitted</strong>; 6 migrations must be applied to prod before deploy.
 </div>
 
@@ -486,10 +486,10 @@
   <div class="row"><div class="k">Detail</div> Redis backs Hangfire storage + cache + locks; unbounded growth risks OOM and losing the AOF loses queued/scheduled jobs. Set <code>maxmemory</code> + policy and back up the volume.</div>
   <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Redis now runs <code>--maxmemory 512mb --maxmemory-policy noeviction</code> (noeviction because it backs Hangfire job state — tune to VPS RAM). AOF-volume backup remains an ops task. <span class="tag">uncommitted</span></div>
 </div>
-<div class="card low">
-  <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L10.</span> Realtime <code>ChatHub</code> is <code>CompanyAdmin</code>-only</span><span class="tag">Infra / Product</span></div>
+<div class="card low done">
+  <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L10.</span> Realtime <code>ChatHub</code> is <code>CompanyAdmin</code>-only</span><span class="tag">Infra / Product</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">ChatHub.cs:14</span> — non-admin agent roles won't receive realtime inbox events. Confirm against the intended role model.</div>
-  <div class="row"><div class="k">Product decision — 2026-07-05</div> Verified the WHOLE chat plane is CompanyAdmin-only — <code>ConversationsController</code> is also <code>[Authorize(Roles="CompanyAdmin")]</code> — so <code>ChatHub</code> is consistent, not a bug. The <code>Agent</code> role is described as handling chats but isn't granted chat access anywhere yet. Giving Agents the inbox is a multi-controller feature (conversations + messages + hub) and a product call — say the word and I'll widen it across the board.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Widened the chat plane to the <code>Agent</code> role (which is defined as handling chats): both <code>ConversationsController</code> (list/view/reply/mark-read) and <code>ChatHub</code> now allow <code>CompanyAdmin,Agent</code>, kept in lock-step. Tenant isolation is unchanged — agents are company-scoped, so the global query filter still limits them to their own company. The direct-send <code>MessagesController</code> stays admin-only (not part of the thread inbox). Regression-tested (<span class="fileref">ChatPlaneAuthorizationTests.cs</span>). <span class="tag">uncommitted</span></div>
 </div>
 
 <!-- ===================== VERIFICATION ===================== -->

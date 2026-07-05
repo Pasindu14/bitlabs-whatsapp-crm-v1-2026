@@ -11,7 +11,10 @@ namespace wa_api.Features.Conversations.Realtime;
 /// <para>Browsers can't set an Authorization header on the WebSocket handshake, so the JWT arrives via the
 /// <c>?access_token=</c> query string (wired in AuthenticationExtensions).</para>
 /// </summary>
-[Authorize(Roles = "CompanyAdmin")]
+// CompanyAdmin AND Agent — matches the ConversationsController plane so agents get realtime inbox events for
+// the threads they can already load over REST (L10). The company group is derived from the server-side
+// companyId claim, so a tenant only ever receives its own company's events regardless of role.
+[Authorize(Roles = "CompanyAdmin,Agent")]
 public sealed class ChatHub : Hub
 {
     /// <summary>SignalR group name for a company.</summary>

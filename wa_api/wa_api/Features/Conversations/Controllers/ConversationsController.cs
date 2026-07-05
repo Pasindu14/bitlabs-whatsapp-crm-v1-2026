@@ -10,7 +10,10 @@ namespace wa_api.Features.Conversations.Controllers;
 
 [ApiController]
 [Route("conversations")]
-[Authorize(Roles = "CompanyAdmin")]
+// Agents work the inbox (the Agent role is defined as "operates within a company: chats, contacts"), so the
+// whole thread plane — list/view/reply/mark-read — is open to CompanyAdmin AND Agent (L10). Tenant isolation
+// still holds: agents are company-scoped, so the global query filter limits them to their own company's rows.
+[Authorize(Roles = "CompanyAdmin,Agent")]
 public class ConversationsController(IConversationService service, IIdempotencyService idempotency) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
