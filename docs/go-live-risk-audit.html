@@ -127,7 +127,7 @@
   <strong>Remediation update — 2026-07-05.</strong> Findings are tagged inline below with a <span class="badge b-done">✓ Fixed</span> / <span class="badge b-part">◐ Partial</span> badge and a resolution note; untagged items remain open.
   <br><br><strong>Fixed:</strong> C2, C3 · H1, H2, H4, H7, H8, H9, H10, H11, H12 · M1–M14, M16, M18, M20, M21 · L1, L9.
   <strong>Partial:</strong> C1 (no hard meter ceiling), H3 (encryption code-complete; needs ops to provision a prod key + rotate tokens), H5 (idempotency done; ordering guard + Fail/dead-letter open), H6 (exact-sub done; legacy fallback kept), M19 (JWT shortened; CSP/hub-token open).
-  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision). Lows L1–L5 &amp; L9 fixed; L6/L7/L8/L10 left as documented dispositions (defensive-test / safe-direction / ops / product-decision).
+  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision). Lows L1–L6 &amp; L9 fixed; L7 won't-fix-as-written (regresses double-send — folds into C1), L8 ops-only (<code>.env</code>), L10 product decision (whole chat plane is CompanyAdmin-only, consistent).
   <br><br>Billing model confirmed: <strong>no auto-renew</strong> — a subscription runs to its period end, then the tenant must subscribe again (accumulate-until-expiry). This resolved M21 (no dunning applies) and L1 (delete the reset job). Most fixes remain <strong>uncommitted</strong>; 6 migrations must be applied to prod before deploy.
 </div>
 
@@ -466,20 +466,20 @@
   <div class="row"><div class="k">Detail</div> <span class="fileref">DataSeeder.cs:92–93</span> defaults to <code>superadmin@btilabs.com / ChangeMe123!</code>. Seeding runs only in Dev/Staging, but an internet-reachable staging box with defaults + no login throttle (H8) is a risk. Require an explicit seed password.</div>
   <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Seeding now <strong>refuses</strong> the built-in default SuperAdmin password outside Development (throws) and warns loudly in Dev — no more default creds on a reachable Staging box. (H8's login throttle is also now in place.) <span class="tag">uncommitted</span></div>
 </div>
-<div class="card low">
-  <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L6.</span> <code>User</code> entity has no global query filter; SuperAdmin methods trust body <code>CompanyId</code></span><span class="tag">Security</span></div>
+<div class="card low done">
+  <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L6.</span> <code>User</code> entity has no global query filter; SuperAdmin methods trust body <code>CompanyId</code></span><span class="tag">Security</span></div>
   <div class="row"><div class="k">Detail</div> Safe today (only reachable from the SuperAdmin-gated controller), but fragile. Add a guard/integration test asserting the unscoped <code>UserService</code> methods are never reachable outside SuperAdmin.</div>
-  <div class="row"><div class="k">Disposition — 2026-07-05</div> Left as-is — safe today (only reachable from the SuperAdmin-gated controller). A defensive test adds no behavior and is worth doing but low-value; tracked as a follow-up.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The cross-tenant <code>UsersController</code> is already <code>[Authorize(Roles = "SuperAdmin")]</code>; added <span class="fileref">UsersControllerAuthorizationTests.cs</span> that fails if that gate is removed/widened or an <code>[AllowAnonymous]</code> escape hatch appears — so the unscoped path can never quietly become reachable by a tenant role. <span class="tag">uncommitted</span></div>
 </div>
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L7.</span> Meter's second SaveChanges gap under-counts (never over-sends) quota on a crash</span><span class="tag">Billing</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">CampaignBatchSendJob.cs:326–338</span> commits the Message, then meters in a separate save. A crash between them under-counts — correct direction, but compounds the historical under-count. Meter in the same transaction as the send record.</div>
-  <div class="row"><div class="k">Disposition — 2026-07-05</div> Left as-is deliberately — Low and in the safe direction (under-counts, never over-sends). Wrapping the just-hardened, double-send-critical send path in an extra transaction adds real regression risk for negligible gain.</div>
+  <div class="row"><div class="k">Won't fix as written — 2026-07-05</div> The suggested fix would REGRESS safety: WhatsApp Cloud API has no server-side idempotency key (see C2), so the message row must commit BEFORE metering — it's the durable "already sent" record. Making meter+send-record atomic means a rollback loses that record → the crash-window resend becomes a DOUBLE-SEND. The current record-then-meter order is deliberate; the only correct way to remove the under-count is <strong>reserve-then-send (C1)</strong>, which this folds into. Not done standalone.</div>
 </div>
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L8.</span> Stale <code>AppUrl</code> points at a dead endpoint</span><span class="tag">Infra / Config</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">contabo.md:207</span> sets <code>AppUrl=http://213.136.74.159:8080</code>, which the same doc says no longer works. Any link built from it (emails, Stripe returns) is broken. Update to the HTTPS domain.</div>
-  <div class="row"><div class="k">Disposition — 2026-07-05</div> Ops config — the stale AppUrl lives in the git-ignored <code>contabo.md</code> / prod <code>.env</code>; the tracked <code>appsettings</code> AppUrl is the correct localhost. Update the prod <code>.env</code> AppUrl to the HTTPS domain.</div>
+  <div class="row"><div class="k">Ops-only — 2026-07-05</div> Verified NO tracked C# reads <code>AppUrl</code> — it's consumed only from the prod <code>.env</code> / git-ignored <code>contabo.md</code> (the tracked <code>appsettings</code> value is the correct localhost). Nothing to change in code; update the prod <code>.env</code> <code>AppUrl</code> to the HTTPS domain.</div>
 </div>
 <div class="card low done">
   <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L9.</span> Redis has no <code>maxmemory</code>/eviction policy and its AOF volume isn't backed up</span><span class="tag">Infra</span></div>
@@ -489,7 +489,7 @@
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L10.</span> Realtime <code>ChatHub</code> is <code>CompanyAdmin</code>-only</span><span class="tag">Infra / Product</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">ChatHub.cs:14</span> — non-admin agent roles won't receive realtime inbox events. Confirm against the intended role model.</div>
-  <div class="row"><div class="k">Disposition — 2026-07-05</div> Product decision — restricting realtime inbox events to <code>CompanyAdmin</code> excludes any agent roles. Confirm the intended role model before widening the <code>ChatHub</code> gate.</div>
+  <div class="row"><div class="k">Product decision — 2026-07-05</div> Verified the WHOLE chat plane is CompanyAdmin-only — <code>ConversationsController</code> is also <code>[Authorize(Roles="CompanyAdmin")]</code> — so <code>ChatHub</code> is consistent, not a bug. The <code>Agent</code> role is described as handling chats but isn't granted chat access anywhere yet. Giving Agents the inbox is a multi-controller feature (conversations + messages + hub) and a product call — say the word and I'll widen it across the board.</div>
 </div>
 
 <!-- ===================== VERIFICATION ===================== -->
