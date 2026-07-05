@@ -7,9 +7,13 @@ namespace wa_api.Features.Messages.Entities;
 
 public enum MessageDirection { Outbound, Inbound }
 
-// Forward-only delivery lifecycle (Sent < Delivered < Read; Failed is terminal). Stored as text,
-// so appending values never needs a backfill. Status webhooks (6.4) advance via StatusRank.
-public enum MessageStatus { Sent, Failed, Delivered, Read }
+// Forward-only delivery lifecycle (Accepted < Sent < Delivered < Read; Failed is terminal). Stored as
+// text, so appending values never needs a backfill. Status webhooks (6.4) advance via StatusRank.
+// Accepted = Meta's send API returned a wamid (message queued) but its asynchronous 'sent' status
+// webhook hasn't arrived yet; the incoming 'sent' webhook promotes Accepted → Sent (the single grey
+// tick). Modelling this honestly means a stuck-at-Accepted message signals "handed to Meta, delivery
+// unconfirmed" instead of a webhook outage masquerading as a confident "Sent".
+public enum MessageStatus { Sent, Failed, Delivered, Read, Accepted }
 
 /// <summary>
 /// A single WhatsApp message sent by the tenant to a contact.

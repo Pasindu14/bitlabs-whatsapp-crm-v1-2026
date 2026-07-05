@@ -55,7 +55,9 @@ public class WhatsAppMessageSender(
             ConversationId = conversationId,
             Body = body,
             Direction = MessageDirection.Outbound,
-            Status = externalId is not null ? MessageStatus.Sent : MessageStatus.Failed,
+            // Accepted (not Sent) on success: Meta returned a wamid but its 'sent' status webhook is still
+            // in flight. The webhook promotes Accepted → Sent; a failed API call is terminal Failed here.
+            Status = externalId is not null ? MessageStatus.Accepted : MessageStatus.Failed,
             ExternalMessageId = externalId,
             ErrorMessage = errorMessage,
             // Stamp the reserved subscription so a later delivery-failure webhook refunds that exact row.

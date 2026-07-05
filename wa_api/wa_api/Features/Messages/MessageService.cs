@@ -128,7 +128,8 @@ public class MessageService(
             ContactId = contact.Id,
             WabaConnectionId = waba.Id,
             Body = request.Body,
-            Status = externalId is not null ? MessageStatus.Sent : MessageStatus.Failed,
+            // Accepted (not Sent) on success: awaiting Meta's 'sent' status webhook, which promotes it to Sent.
+            Status = externalId is not null ? MessageStatus.Accepted : MessageStatus.Failed,
             ExternalMessageId = externalId,
             ErrorMessage = errorMessage,
             MeteredSubscriptionId = reservedSubId,

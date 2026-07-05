@@ -413,7 +413,10 @@ public class CampaignBatchSendJob(
                         CampaignId = campaignId,
                         Body = BuildBodyPreview(campaign.Template.Components?.Body?.Text, resolvedVars),
                         Direction = MessageDirection.Outbound,
-                        Status = MessageStatus.Sent,
+                        // Accepted, not Sent: Meta returned a wamid (queued) but hasn't delivered its 'sent'
+                        // status webhook yet. The incoming 'sent' webhook promotes this to Sent, so a message
+                        // frozen at Accepted honestly signals a delivery/webhook problem rather than success.
+                        Status = MessageStatus.Accepted,
                         ExternalMessageId = externalId,
                         CampaignRunNumber = campaign.CurrentRunNumber,
                         // Quota was reserved up front — stamp the charged sub so a later delivery-failure

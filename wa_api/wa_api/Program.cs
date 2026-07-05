@@ -141,6 +141,7 @@ try
     builder.Services.AddTransient<TemplateStatusSyncJob>();
     builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookProcessingJob>();
     builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>();
+    builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookHealthCheckJob>();
     builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookRetentionJob>();
 
     // Named HttpClient for Meta Graph API calls (base address set here; auth header per-request).
@@ -371,6 +372,7 @@ try
     RecurringJob.RemoveIfExists("subscription-period-reset");
     RecurringJob.AddOrUpdate<TemplateStatusSyncJob>("template-status-sync", j => j.RunAsync(), Cron.MinuteInterval(15));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>("webhook-sweeper", j => j.RunAsync(), Cron.MinuteInterval(5));
+    RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookHealthCheckJob>("webhook-health-check", j => j.RunAsync(), Cron.MinuteInterval(5));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookRetentionJob>("webhook-retention", j => j.RunAsync(CancellationToken.None), "30 3 * * *");
     RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.CampaignSchedulerJob>("campaign-scheduler", j => j.RunAsync(), Cron.Minutely);
     RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>("quota-warning-checker", j => j.RunAsync(CancellationToken.None), "0 6 * * *");

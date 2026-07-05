@@ -1,6 +1,7 @@
 export type ConversationStatus = "Open" | "Closed";
 export type MessageDirection = "Outbound" | "Inbound";
-export type MessageStatus = "Sent" | "Failed" | "Delivered" | "Read";
+// "Accepted" = Meta queued the message (wamid returned) but its 'sent' status webhook hasn't arrived yet.
+export type MessageStatus = "Accepted" | "Sent" | "Failed" | "Delivered" | "Read";
 
 /** Inbox list / thread-header row. All timestamps are UTC ISO strings (rendered in local time). */
 export interface Conversation {

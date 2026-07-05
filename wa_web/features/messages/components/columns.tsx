@@ -1,7 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { User, CheckCircle2, XCircle } from "lucide-react";
+import { User, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import type { Message } from "@/features/messages/types";
@@ -59,13 +59,16 @@ export function getMessageColumns(): ColumnDef<Message>[] {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const sent = row.original.status === "Sent";
+        const status = row.original.status;
+        // Failed is the only error state. "Accepted" is pending (queued at Meta, awaiting the 'sent'
+        // webhook) — shown neutral with a clock. Sent/Delivered/Read all read as success.
+        const failed = status === "Failed";
+        const pending = status === "Accepted";
+        const Icon = failed ? XCircle : pending ? Clock : CheckCircle2;
         return (
-          <Badge variant={sent ? "default" : "destructive"} className="gap-1">
-            {sent
-              ? <CheckCircle2 className="h-3 w-3" />
-              : <XCircle className="h-3 w-3" />}
-            {row.original.status}
+          <Badge variant={failed ? "destructive" : pending ? "secondary" : "default"} className="gap-1">
+            <Icon className="h-3 w-3" />
+            {status}
           </Badge>
         );
       },

@@ -17,9 +17,12 @@ namespace wa_api.Features.Webhooks.Handlers;
 public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<MessageStatusWebhookHandler> logger)
     : IWebhookEventHandler
 {
-    // Sent < Delivered < Read (PRD §5: forward-only StatusRank). Failed is terminal, handled separately.
+    // Accepted < Sent < Delivered < Read (PRD §5: forward-only StatusRank). Failed is terminal, handled
+    // separately. Accepted (rank 0) is the initial state for outbound sends — a wamid is back but Meta's
+    // 'sent' webhook hasn't landed — so an incoming 'sent' (rank 1) promotes Accepted → Sent.
     private static readonly Dictionary<MessageStatus, int> Rank = new()
     {
+        [MessageStatus.Accepted] = 0,
         [MessageStatus.Sent] = 1,
         [MessageStatus.Delivered] = 2,
         [MessageStatus.Read] = 3,
@@ -76,7 +79,8 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
                 // Forward-only for the failed branch too: a message Meta already confirmed Delivered/Read
                 // cannot genuinely "fail". A late, out-of-order 'failed' callback for such a message is noise
                 // — don't regress its status, and DON'T refund it (a delivered message was billed). Only a
-                // message still at Sent (accepted, never confirmed delivered) can be failed here.
+                // message still at Accepted or Sent (queued/accepted, never confirmed delivered) can be
+                // failed here — e.g. a 131049 non-delivery that arrives before any 'sent' webhook.
                 if (message.Status is MessageStatus.Delivered or MessageStatus.Read)
                     continue;
 

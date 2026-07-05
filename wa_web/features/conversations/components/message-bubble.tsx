@@ -8,6 +8,9 @@ import { formatMessageTime } from "./format";
 
 function StatusTick({ status }: { status: MessageStatus }) {
   switch (status) {
+    case "Accepted":
+      // Queued at Meta, awaiting the 'sent' status webhook — pending clock, no tick yet.
+      return <Clock className="size-3.5" />;
     case "Sent":
       return <Check className="size-3.5" />;
     case "Delivered":

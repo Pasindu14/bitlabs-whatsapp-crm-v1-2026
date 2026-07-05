@@ -7,7 +7,9 @@ export interface MessageListParams {
 }
 
 export type MessageDirection = "Outbound";
-export type MessageStatus = "Sent" | "Failed";
+// "Accepted" = queued at Meta, awaiting the 'sent' status webhook. Campaign rows also advance to
+// Delivered/Read as Meta's callbacks arrive.
+export type MessageStatus = "Accepted" | "Sent" | "Failed" | "Delivered" | "Read";
 
 export interface Message {
   id: string;
