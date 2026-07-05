@@ -41,6 +41,8 @@ export interface CampaignStats {
   campaignId: string;
   totalRecipients: number;
   queued: number;
+  /** Dispatched to Meta (wamid returned), awaiting the 'sent' status webhook that promotes to Sent. */
+  accepted: number;
   sent: number;
   delivered: number;
   read: number;

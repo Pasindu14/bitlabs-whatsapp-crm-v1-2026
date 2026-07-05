@@ -248,11 +248,14 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
     private static int RecipientRank(RecipientStatus s) => s switch
     {
         RecipientStatus.Queued => 0,
-        RecipientStatus.Sent => 1,
-        RecipientStatus.Delivered => 2,
-        RecipientStatus.Read => 3,
-        RecipientStatus.Failed => 4,
-        RecipientStatus.Skipped => 4,
+        RecipientStatus.Accepted => 1,
+        RecipientStatus.Sent => 2,
+        RecipientStatus.Delivered => 3,
+        RecipientStatus.Read => 4,
+        RecipientStatus.Failed => 5,
+        RecipientStatus.Skipped => 5,
+        // Sending is a transient pre-send claim, never a webhook target — treat as lowest so any real
+        // delivery status advances past it.
         _ => 0
     };
 

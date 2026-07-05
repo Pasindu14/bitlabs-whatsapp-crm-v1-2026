@@ -303,9 +303,12 @@ public class CampaignBatchSendJob(
             // resend — this is the guard against the duplicate-message bug.
             if (alreadyMessaged.Contains(recipient.ContactId))
             {
-                recipient.Status = RecipientStatus.Sent;
+                // A message already exists (a prior attempt sent to Meta but didn't commit the flip). Reconcile
+                // to Accepted — the "dispatched, awaiting confirmation" state — and let the status webhooks
+                // advance it; the forward-only sync never regresses a message already past Accepted.
+                recipient.Status = RecipientStatus.Accepted;
                 logger.LogWarning(
-                    "Recipient {ContactId} in campaign {CampaignId} already has a message — reconciling to Sent, skipping resend.",
+                    "Recipient {ContactId} in campaign {CampaignId} already has a message — reconciling to Accepted, skipping resend.",
                     recipient.ContactId, campaignId);
                 continue;
             }
@@ -425,11 +428,13 @@ public class CampaignBatchSendJob(
                     };
                     db.Messages.Add(message);
 
-                    // Flip the recipient to Sent in the SAME save as the message insert, so the send is
+                    // Flip the recipient to Accepted in the SAME save as the message insert, so the send is
                     // recorded atomically. (Previously the status flip lagged to a later save; if the job
                     // was retried in that window the recipient was still Queued and got sent a SECOND time.)
-                    // Setting the Message nav fills MessageId on insert without a separate round-trip.
-                    recipient.Status = RecipientStatus.Sent;
+                    // Accepted (not Sent): Meta returned a wamid but its 'sent' webhook is still in flight —
+                    // MessageStatusWebhookHandler promotes it to Sent. Setting the Message nav fills MessageId
+                    // on insert without a separate round-trip.
+                    recipient.Status = RecipientStatus.Accepted;
                     recipient.Message = message;
                     recipient.ResolvedVariables = JsonSerializer.Serialize(resolvedVars, JsonOpts);
                     campaign.SentCount++;
@@ -660,7 +665,8 @@ public class CampaignBatchSendJob(
             .GroupBy(_ => 1)
             .Select(g => new
             {
-                Sent = g.Count(r => r.Status == RecipientStatus.Sent
+                Sent = g.Count(r => r.Status == RecipientStatus.Accepted
+                                    || r.Status == RecipientStatus.Sent
                                     || r.Status == RecipientStatus.Delivered
                                     || r.Status == RecipientStatus.Read),
                 Failed = g.Count(r => r.Status == RecipientStatus.Failed),

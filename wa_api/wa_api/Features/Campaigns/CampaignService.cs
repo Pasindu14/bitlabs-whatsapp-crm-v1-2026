@@ -320,6 +320,7 @@ public class CampaignService(
             {
                 Total = g.Count(),
                 Queued = g.Count(r => r.Status == RecipientStatus.Queued),
+                Accepted = g.Count(r => r.Status == RecipientStatus.Accepted),
                 Sent = g.Count(r => r.Status == RecipientStatus.Sent),
                 Delivered = g.Count(r => r.Status == RecipientStatus.Delivered),
                 Read = g.Count(r => r.Status == RecipientStatus.Read),
@@ -330,14 +331,14 @@ public class CampaignService(
             .FirstOrDefaultAsync(ct);
 
         if (counts is null)
-            return new CampaignStatsResponse(id, 0, 0, 0, 0, 0, 0, 0, 0, 0m, 0m);
+            return new CampaignStatsResponse(id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0m, 0m);
 
         var delivered = counts.Delivered + counts.Read;
         var deliveryRate = counts.Total > 0 ? Math.Round((decimal)delivered / counts.Total * 100, 1) : 0m;
         var readRate = counts.Total > 0 ? Math.Round((decimal)counts.Read / counts.Total * 100, 1) : 0m;
 
         return new CampaignStatsResponse(
-            id, counts.Total, counts.Queued, counts.Sent,
+            id, counts.Total, counts.Queued, counts.Accepted, counts.Sent,
             counts.Delivered, counts.Read, counts.Failed, counts.Skipped,
             counts.SentWithoutConsent, deliveryRate, readRate);
     }

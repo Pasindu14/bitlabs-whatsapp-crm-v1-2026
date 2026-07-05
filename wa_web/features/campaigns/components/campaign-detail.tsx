@@ -51,6 +51,7 @@ const RECIPIENT_STATUS_VARIANT: Record<
   "default" | "secondary" | "destructive" | "outline"
 > = {
   Queued: "secondary",
+  Accepted: "secondary",
   Sent: "outline",
   Delivered: "default",
   Read: "default",
@@ -187,8 +188,9 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const { data: stats } = useCampaignStats(campaignId);
   const { data: health } = useCampaignAudienceHealth(campaignId);
 
-  // "Live" while recipients remain queued — drives polling for both stats and the recipient list.
-  const isLive = stats ? stats.queued > 0 : false;
+  // "Live" while recipients are still queued OR accepted (dispatched but awaiting Meta's 'sent'/delivery
+  // webhooks) — drives polling so the page shows Accepted → Sent → Delivered/Read/Failed as it settles.
+  const isLive = stats ? stats.queued > 0 || stats.accepted > 0 : false;
 
   const { data: recipients, isLoading: recipientsLoading } = useCampaignRecipients(
     campaignId,
@@ -213,6 +215,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const TABS: [string, string, number | undefined][] = [
     ["all", "All", stats?.totalRecipients],
     ["Queued", "Queued", stats?.queued],
+    ["Accepted", "Accepted", stats?.accepted],
     ["Sent", "Sent", stats?.sent],
     ["Delivered", "Delivered", stats?.delivered],
     ["Read", "Read", stats?.read],
@@ -316,11 +319,12 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           </div>
           <Progress value={percent} />
 
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
             {(
               [
                 ["Total", stats.totalRecipients],
                 ["Queued", stats.queued],
+                ["Accepted", stats.accepted],
                 ["Sent", stats.sent],
                 ["Delivered", stats.delivered],
                 ["Read", stats.read],

@@ -14,6 +14,12 @@ public enum RecipientStatus
     /// stale Sending row (crashed mid-send) is reclaimed to Queued by the next batch. Stored as text, so
     /// inserting it here needs no migration.</summary>
     Sending,
+    /// <summary>Handed to Meta: the send API returned a wamid (message queued) but Meta's asynchronous
+    /// 'sent' status webhook hasn't arrived yet. The initial post-send state (mirrors
+    /// <c>MessageStatus.Accepted</c>); the 'sent' webhook promotes it to Sent. A recipient frozen at
+    /// Accepted honestly signals "dispatched to Meta, delivery unconfirmed" rather than a confident Sent.
+    /// Stored as text, so inserting it here needs no migration.</summary>
+    Accepted,
     Sent,
     Delivered,
     Read,

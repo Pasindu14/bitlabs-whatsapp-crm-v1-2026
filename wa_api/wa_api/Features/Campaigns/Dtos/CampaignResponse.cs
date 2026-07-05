@@ -33,6 +33,8 @@ public record CampaignStatsResponse(
     Guid CampaignId,
     int TotalRecipients,
     int Queued,
+    /// <summary>Dispatched to Meta (wamid returned), awaiting the 'sent' status webhook that promotes to Sent.</summary>
+    int Accepted,
     int Sent,
     int Delivered,
     int Read,
