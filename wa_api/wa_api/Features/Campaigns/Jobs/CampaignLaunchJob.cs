@@ -100,6 +100,51 @@ public class CampaignLaunchJob(
             return;
         }
 
+        // Recurring re-fire: after a run completes, CampaignBatchSendJob resets the campaign to Scheduled and
+        // the cron fires this launch again. Every contact already has a CampaignRecipient row, so without this
+        // the new-recipient set below is empty and the campaign silently sends nothing ever again. Start a
+        // fresh run: bump the run number and re-queue prior recipients that are STILL in the audience (clearing
+        // their last-run send state) so this run re-sends them. Each resulting Message is stamped with the new
+        // run number, and the batch's per-run duplicate guard is scoped to it, so re-sending is not blocked by
+        // the previous run's messages. Guarded on Status==Scheduled so a launch-job retry (which has already
+        // flipped the campaign to Running) never advances the run a second time.
+        var recipientsExist = await db.CampaignRecipients
+            .IgnoreQueryFilters()
+            .AnyAsync(r => r.CampaignId == campaignId, ct);
+
+        if (campaign.ScheduleType == ScheduleType.Recurring
+            && campaign.Status == CampaignStatus.Scheduled
+            && recipientsExist)
+        {
+            campaign.CurrentRunNumber++;
+
+            // Re-queue recipients still targeted by the campaign so this run re-sends them.
+            await db.CampaignRecipients
+                .IgnoreQueryFilters()
+                .Where(r => r.CampaignId == campaignId && contactIds.Contains(r.ContactId))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, RecipientStatus.Queued)
+                    .SetProperty(r => r.MessageId, (Guid?)null)
+                    .SetProperty(r => r.ErrorCode, (string?)null)
+                    .SetProperty(r => r.SentWithoutConsent, false)
+                    .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
+
+            // Contacts dropped from the audience since the last run must not be re-sent — retire any of their
+            // rows still left Queued (terminal rows from the prior run are already excluded by the batch).
+            await db.CampaignRecipients
+                .IgnoreQueryFilters()
+                .Where(r => r.CampaignId == campaignId
+                            && !contactIds.Contains(r.ContactId)
+                            && r.Status == RecipientStatus.Queued)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status, RecipientStatus.Skipped)
+                    .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
+
+            logger.LogInformation(
+                "CampaignLaunchJob: recurring campaign {Id} starting run {Run} — re-queued audience.",
+                campaignId, campaign.CurrentRunNumber);
+        }
+
         // Bulk-insert CampaignRecipient rows (skip any that already exist — idempotent on retry).
         var existingContactIds = await db.CampaignRecipients
             .IgnoreQueryFilters()
@@ -125,8 +170,13 @@ public class CampaignLaunchJob(
             db.CampaignRecipients.AddRange(newRecipients);
 
         campaign.Status = CampaignStatus.Running;
-        campaign.TotalRecipients = existingSet.Count + newRecipients.Count;
+        campaign.TotalRecipients = contactIds.Count;   // snapshot of THIS run's target audience
         campaign.LaunchedAt = DateTime.UtcNow;
+
+        // Fresh run starts with a clean poison-recovery slate: the sweeper's no-progress strikes from a prior
+        // run (or a since-fixed fault) must not carry over and prematurely fail this launch.
+        campaign.RecoveryAttempts = 0;
+        campaign.LastRecoveryQueuedCount = null;
 
         await db.SaveChangesAsync(ct);
 

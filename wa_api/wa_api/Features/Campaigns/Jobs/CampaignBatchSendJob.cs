@@ -1,6 +1,7 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -175,10 +176,15 @@ public class CampaignBatchSendJob(
         // (from a prior, possibly interrupted, run). A recipient here was sent before — never send again.
         // This closes the duplicate-message window where Meta accepted a send but the status flip wasn't
         // committed before the job was retried/re-enqueued. Scoped to the batch so it stays cheap at scale.
+        // Scoped to the CURRENT run: a Recurring campaign re-sends to the same contacts each run, so a
+        // message from a prior run must NOT suppress this run's send. Only messages stamped with this run
+        // count as "already sent" (existing pre-run campaign messages are backfilled to run 1 by migration).
         var batchContactIds = batch.Select(r => r.ContactId).ToList();
         var alreadyMessaged = new HashSet<Guid>(
             await db.Messages.IgnoreQueryFilters()
-                .Where(m => m.CampaignId == campaignId && batchContactIds.Contains(m.ContactId))
+                .Where(m => m.CampaignId == campaignId
+                            && m.CampaignRunNumber == campaign.CurrentRunNumber
+                            && batchContactIds.Contains(m.ContactId))
                 .Select(m => m.ContactId)
                 .ToListAsync(ct));
 
@@ -339,6 +345,7 @@ public class CampaignBatchSendJob(
                         Direction = MessageDirection.Outbound,
                         Status = MessageStatus.Sent,
                         ExternalMessageId = externalId,
+                        CampaignRunNumber = campaign.CurrentRunNumber,
                     };
                     db.Messages.Add(message);
 
@@ -802,13 +809,7 @@ public class CampaignBatchSendJob(
                 return (msgId, null);
             }
 
-            string? errorCode = null;
-            try
-            {
-                using var doc = JsonDocument.Parse(json);
-                errorCode = doc.RootElement.GetProperty("error").GetProperty("code").GetString();
-            }
-            catch { /* ignore parse failures */ }
+            var errorCode = ParseMetaErrorCode(json);
 
             logger.LogWarning("Meta API {Status} for {Phone}: {Json}", (int)res.StatusCode, toPhone, json);
             return (null, errorCode ?? $"HTTP_{(int)res.StatusCode}");
@@ -818,5 +819,29 @@ public class CampaignBatchSendJob(
             logger.LogError(ex, "HTTP error calling Meta Graph API for {Phone}.", toPhone);
             return (null, "NETWORK_ERROR");
         }
+    }
+
+    /// <summary>
+    /// Extracts Meta's <c>error.code</c> from a Graph API error body as a string the
+    /// <see cref="MetaPolicyErrorCodes"/> classifiers can match. Meta returns the code as a JSON NUMBER
+    /// (e.g. <c>131048</c>); a prior <c>GetString()</c> threw on that shape and left the code null, which
+    /// silently disabled every policy response (spam pause, account restriction, transient throttle,
+    /// undeliverable). Handles both Number and String shapes and returns null on any unexpected body.
+    /// </summary>
+    public static string? ParseMetaErrorCode(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("error", out var error) &&
+                error.TryGetProperty("code", out var code))
+            {
+                return code.ValueKind == JsonValueKind.Number
+                    ? code.GetInt32().ToString(CultureInfo.InvariantCulture)
+                    : code.GetString();
+            }
+        }
+        catch { /* not JSON or unexpected shape — fall through to null */ }
+        return null;
     }
 }

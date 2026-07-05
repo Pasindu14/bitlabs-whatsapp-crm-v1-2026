@@ -52,6 +52,14 @@ public class Message : BaseEntity, ITenantEntity
     public Guid? CampaignId { get; set; }
 
     /// <summary>
+    /// Which run of the owning campaign produced this message (see <c>Campaign.CurrentRunNumber</c>). Lets a
+    /// re-firing Recurring campaign re-send to the same contacts without the batch's per-run duplicate guard
+    /// mistaking a prior run's message for this one. Null for direct sends; existing campaign rows are
+    /// backfilled to 1 by migration.
+    /// </summary>
+    public int? CampaignRunNumber { get; set; }
+
+    /// <summary>
     /// The subscription whose <c>MessagesUsedThisPeriod</c> this send incremented. Recorded at meter time so
     /// a later failure refunds the EXACT subscription that was charged — not merely "the current active one"
     /// (which may be a different row after a renewal / re-subscribe, causing a cross-period free-quota bug).

@@ -70,6 +70,14 @@ public class Campaign : BaseEntity, ITenantEntity
     /// <summary>Snapshot of contact count taken at launch time.</summary>
     public int TotalRecipients { get; set; }
 
+    /// <summary>
+    /// Which send run is currently active (1-based). Incremented each time a Recurring campaign is re-fired
+    /// by its cron after the previous run completed. Recipient rows are re-queued and each resulting Message
+    /// is stamped with this number, so the batch's per-run duplicate guard only skips sends from THIS run —
+    /// a message from run 1 must not stop run 2 from sending. OneTime/Immediate campaigns stay at run 1.
+    /// </summary>
+    public int CurrentRunNumber { get; set; } = 1;
+
     /// <summary>Running count of messages enqueued/sent by the batch job.</summary>
     public int SentCount { get; set; }
 
@@ -81,6 +89,23 @@ public class Campaign : BaseEntity, ITenantEntity
 
     /// <summary>Hangfire job id stored so we can cancel or reschedule.</summary>
     public string? HangfireJobId { get; set; }
+
+    /// <summary>
+    /// Number of consecutive stall-recoveries the scheduler's sweeper has performed WITHOUT the batch making
+    /// progress (no drop in the Queued backlog since the previous recovery). A deterministic fault (bad
+    /// template payload, NRE) makes the batch throw every attempt; Hangfire deletes it after its retry budget
+    /// and the sweeper would otherwise re-enqueue it every minute forever. Once this exceeds the sweeper's
+    /// threshold the campaign is handed to <c>CampaignPoisonHandlerJob</c> (marked Failed + tenant notified)
+    /// instead of being re-enqueued. Reset to 0 whenever a recovery observes progress or a fresh run launches.
+    /// </summary>
+    public int RecoveryAttempts { get; set; }
+
+    /// <summary>
+    /// The Queued-recipient count observed at the previous stall-recovery. The sweeper compares against it to
+    /// tell a poison batch (backlog unchanged) from one making genuine progress (backlog shrinking), so a
+    /// campaign that merely hit a few transient infra restarts is never wrongly failed. Null until first recovery.
+    /// </summary>
+    public int? LastRecoveryQueuedCount { get; set; }
 
     public Template Template { get; set; } = null!;
     public ContactList? ContactList { get; set; }
