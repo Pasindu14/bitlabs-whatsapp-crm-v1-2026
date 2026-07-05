@@ -62,12 +62,26 @@ public sealed class WebhookProcessingJob(IServiceScopeFactory scopeFactory, ILog
             // message's Failed status commit together — exactly-once (a retry sees the message already Failed
             // and skips), and a rolled-back batch reverts the refund too — while the decrement stays atomic
             // against concurrent meter increments on another connection.
-            await using (var tx = await db.Database.BeginTransactionAsync(ct))
+            //
+            // The DbContext runs an EnableRetryOnFailure execution strategy, which forbids a bare
+            // user-initiated BeginTransaction (it must own the whole retriable unit). So the transaction is
+            // opened INSIDE strategy.ExecuteAsync. The strategy may re-invoke this delegate after a transient
+            // fault, so each attempt starts from a clean change tracker and a freshly-loaded row — otherwise a
+            // retry would re-apply the previous attempt's still-tracked handler mutations (double-inserting
+            // Messages, double-refunding quota, …). The atomic claim already happened above and is unaffected.
+            var strategy = db.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                await dispatcher.DispatchAsync(row, ct);
-                await inbox.MarkProcessedAsync(row, ct);
+                db.ChangeTracker.Clear();
+                var fresh = await inbox.GetForProcessingAsync(eventId, ct)
+                    ?? throw new InvalidOperationException(
+                        $"Webhook {eventId} disappeared between claim and processing.");
+
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+                await dispatcher.DispatchAsync(fresh, ct);
+                await inbox.MarkProcessedAsync(fresh, ct);
                 await tx.CommitAsync(ct);
-            }
+            });
             logger.LogInformation("Webhook {Id} processed (attempt {Attempt}).", row.Id, row.Attempts);
         }
         catch (Exception ex)

@@ -37,51 +37,62 @@ public class StripeWebhookProcessingJob(
         // MessagesUsedThisPeriod — silently wiping a whole period's usage (free quota). Process + record the
         // dedup marker in ONE transaction: a replay finds the marker and skips; a mid-processing failure
         // rolls both the effects AND the marker back so a genuine retry re-applies cleanly.
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-
-        if (await db.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == stripeEvent.Id, ct))
+        //
+        // The DbContext runs an EnableRetryOnFailure execution strategy, which forbids a bare user-initiated
+        // BeginTransaction (it must own the whole retriable unit), so the transaction is opened INSIDE
+        // strategy.ExecuteAsync. The strategy may re-invoke this delegate after a transient fault; clearing the
+        // change tracker at the top of each attempt keeps a retry from re-applying the prior attempt's tracked
+        // mutations, and every handler re-reads its rows fresh so the replay is clean.
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            logger.LogInformation("Stripe event {EventId} ({Type}) already processed — skipping replay.",
-                stripeEvent.Id, eventType);
-            return;
-        }
+            db.ChangeTracker.Clear();
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        switch (eventType)
-        {
-            case SubCreated:
-            case SubUpdated:
-                if (stripeEvent.Data.Object is global::Stripe.Subscription sub)
-                    await SyncSubscriptionAsync(sub, ct);
-                break;
+            if (await db.ProcessedStripeEvents.AnyAsync(e => e.StripeEventId == stripeEvent.Id, ct))
+            {
+                logger.LogInformation("Stripe event {EventId} ({Type}) already processed — skipping replay.",
+                    stripeEvent.Id, eventType);
+                return;
+            }
 
-            case SubDeleted:
-                if (stripeEvent.Data.Object is global::Stripe.Subscription subDel)
-                    await CancelSubscriptionAsync(subDel, ct);
-                break;
+            switch (eventType)
+            {
+                case SubCreated:
+                case SubUpdated:
+                    if (stripeEvent.Data.Object is global::Stripe.Subscription sub)
+                        await SyncSubscriptionAsync(sub, ct);
+                    break;
 
-            case InvPaid:
-                if (stripeEvent.Data.Object is global::Stripe.Invoice inv)
-                    await UpsertInvoiceAsync(inv, ct);
-                break;
+                case SubDeleted:
+                    if (stripeEvent.Data.Object is global::Stripe.Subscription subDel)
+                        await CancelSubscriptionAsync(subDel, ct);
+                    break;
 
-            case InvFailed:
-                if (stripeEvent.Data.Object is global::Stripe.Invoice invFailed)
-                    await MarkSubscriptionInactiveAsync(invFailed, ct);
-                break;
+                case InvPaid:
+                    if (stripeEvent.Data.Object is global::Stripe.Invoice inv)
+                        await UpsertInvoiceAsync(inv, ct);
+                    break;
 
-            default:
-                logger.LogDebug("Stripe event {EventType} ignored (no handler)", eventType);
-                break;
-        }
+                case InvFailed:
+                    if (stripeEvent.Data.Object is global::Stripe.Invoice invFailed)
+                        await MarkSubscriptionInactiveAsync(invFailed, ct);
+                    break;
 
-        db.ProcessedStripeEvents.Add(new Entities.ProcessedStripeEvent
-        {
-            StripeEventId = stripeEvent.Id,
-            EventType = eventType,
-            ProcessedAt = DateTime.UtcNow,
+                default:
+                    logger.LogDebug("Stripe event {EventType} ignored (no handler)", eventType);
+                    break;
+            }
+
+            db.ProcessedStripeEvents.Add(new Entities.ProcessedStripeEvent
+            {
+                StripeEventId = stripeEvent.Id,
+                EventType = eventType,
+                ProcessedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
         });
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
     }
 
     // ── Subscription sync ────────────────────────────────────────────────────

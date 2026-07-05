@@ -93,24 +93,36 @@ public class CompanyService(AppDbContext db) : ICompanyService
         if (await db.Users.AnyAsync(u => u.Email == adminEmail, ct))
             throw new ConflictException("USER_EMAIL_DUPLICATE", "A user with this email already exists.");
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-
-        var company = new Company { Name = name, Slug = slug, Email = companyEmail, Phone = phone };
-        db.Companies.Add(company);
-        await db.SaveChangesAsync(ct);
-
-        var admin = new User
+        // The DbContext runs an EnableRetryOnFailure execution strategy, which forbids a bare user-initiated
+        // BeginTransaction (it must own the whole retriable unit), so the company+admin transaction runs INSIDE
+        // strategy.ExecuteAsync. The entities are built inside the delegate and the tracker is cleared at the
+        // top of each attempt, so a transient-fault retry re-inserts cleanly instead of re-adding the previous
+        // attempt's still-tracked rows.
+        Company company = null!;
+        User admin = null!;
+        var strategy = db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            CompanyId = company.Id,
-            FullName = adminFullName,
-            Email = adminEmail,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
-            Role = UserRole.CompanyAdmin,
-        };
-        db.Users.Add(admin);
-        await db.SaveChangesAsync(ct);
+            db.ChangeTracker.Clear();
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
 
-        await tx.CommitAsync(ct);
+            company = new Company { Name = name, Slug = slug, Email = companyEmail, Phone = phone };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync(ct);
+
+            admin = new User
+            {
+                CompanyId = company.Id,
+                FullName = adminFullName,
+                Email = adminEmail,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
+                Role = UserRole.CompanyAdmin,
+            };
+            db.Users.Add(admin);
+            await db.SaveChangesAsync(ct);
+
+            await tx.CommitAsync(ct);
+        });
 
         admin.Company = company;
         return new ProvisionCompanyResponse(Map(company), MapUser(admin));
