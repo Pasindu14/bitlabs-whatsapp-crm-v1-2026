@@ -19,6 +19,10 @@ public class OptOutKeywordsTests
     [InlineData("unsubscribe")]
     [InlineData("optout")]
     [InlineData("opt out")]
+    [InlineData("STOP!")]        // surrounding punctuation tolerated (L2)
+    [InlineData("(stop)")]
+    [InlineData("stop.")]
+    [InlineData("stop all.")]
     public void IsStopIntent_True_ForOptOutKeywords(string text) =>
         Assert.True(OptOutKeywords.IsStopIntent(text));
 

@@ -560,7 +560,8 @@ public class CampaignService(
 
         if (type == ScheduleType.Recurring && cron is not null && SendWindow.CronStartsInWindow(cron) == false)
             throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",
-                $"Recurring sends are only permitted between {SendWindow.WindowText}. Adjust the schedule to fire inside that window.");
+                $"Recurring sends are only permitted between {SendWindow.WindowText}. Cron times are interpreted "
+                + "as UTC (e.g. 12:00 UTC = 16:00 UAE), so adjust the schedule to fire inside that window.");
     }
 
     private static CampaignResponse MapToResponse(Campaign c) => new(

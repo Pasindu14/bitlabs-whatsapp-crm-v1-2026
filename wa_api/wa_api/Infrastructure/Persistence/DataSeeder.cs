@@ -90,8 +90,25 @@ public static class DataSeeder
 
         var config = services.GetRequiredService<IConfiguration>();
         var email = (config["Seed:SuperAdmin:Email"] ?? "superadmin@btilabs.com").Trim().ToLowerInvariant();
-        var password = config["Seed:SuperAdmin:Password"] ?? "ChangeMe123!";
         var fullName = config["Seed:SuperAdmin:FullName"] ?? "Platform Super Admin";
+
+        // Require an explicit seed password outside Development (L5): a Staging box is internet-reachable and,
+        // combined with a known default credential, is a takeover risk. Refuse to seed the built-in default
+        // there; in Development, fall back but warn loudly.
+        var configuredPassword = config["Seed:SuperAdmin:Password"];
+        if (string.IsNullOrWhiteSpace(configuredPassword))
+        {
+            var hostEnv = services.GetRequiredService<IHostEnvironment>();
+            if (!hostEnv.IsDevelopment())
+                throw new InvalidOperationException(
+                    "Seed:SuperAdmin:Password is not configured. Refusing to seed a SuperAdmin with the " +
+                    "built-in default outside Development — set an explicit seed password.");
+
+            logger.LogWarning(
+                "Seed:SuperAdmin:Password not configured — seeding with the INSECURE dev default. " +
+                "Set Seed:SuperAdmin:Password before exposing this environment.");
+        }
+        var password = configuredPassword ?? "ChangeMe123!";
 
         db.Users.Add(new User
         {

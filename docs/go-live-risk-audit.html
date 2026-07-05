@@ -127,7 +127,7 @@
   <strong>Remediation update — 2026-07-05.</strong> Findings are tagged inline below with a <span class="badge b-done">✓ Fixed</span> / <span class="badge b-part">◐ Partial</span> badge and a resolution note; untagged items remain open.
   <br><br><strong>Fixed:</strong> C2, C3 · H1, H2, H4, H7, H8, H9, H10, H11, H12 · M1–M14, M16, M18, M20, M21 · L1, L9.
   <strong>Partial:</strong> C1 (no hard meter ceiling), H3 (encryption code-complete; needs ops to provision a prod key + rotate tokens), H5 (idempotency done; ordering guard + Fail/dead-letter open), H6 (exact-sub done; legacy fallback kept), M19 (JWT shortened; CSP/hub-token open).
-  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision), and most Lows.
+  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision). Lows L1–L5 &amp; L9 fixed; L6/L7/L8/L10 left as documented dispositions (defensive-test / safe-direction / ops / product-decision).
   <br><br>Billing model confirmed: <strong>no auto-renew</strong> — a subscription runs to its period end, then the tenant must subscribe again (accumulate-until-expiry). This resolved M21 (no dunning applies) and L1 (delete the reset job). Most fixes remain <strong>uncommitted</strong>; 6 migrations must be applied to prod before deploy.
 </div>
 
@@ -446,33 +446,40 @@
   <div class="row"><div class="k">Detail</div> <span class="fileref">SubscriptionPeriodResetJob.cs</span> is registered (<span class="fileref">Program.cs:95</span>) though unscheduled (<span class="fileref">:293 RemoveIfExists</span>). Its pre-"accumulate-until-expiry" logic would wrongly draw down credits/zero usage if re-added. Delete the class.</div>
   <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Deleted <code>SubscriptionPeriodResetJob</code> and its DI registration — confirmed obsolete by the no-auto-renew / accumulate-until-expiry model. The <code>RemoveIfExists</code> cleanup stays. <span class="tag">uncommitted</span></div>
 </div>
-<div class="card low">
-  <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L2.</span> Opt-out is exact-keyword only and one-directional</span><span class="tag">Webhooks / Product</span></div>
+<div class="card low done">
+  <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L2.</span> Opt-out is exact-keyword only and one-directional</span><span class="tag">Webhooks / Product</span></div>
   <div class="row"><div class="k">Detail</div> "Stop please" won't trigger; a re-engaging contact stays suppressed until an admin lifts it (<span class="fileref">OptOutKeywords.cs:19–26</span>). May be intentional — confirm against Meta START/UNSTOP policy.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Opt-out matching now tolerates surrounding whitespace/punctuation (<code>STOP!</code>, <code>(stop)</code>, <code>stop.</code>) while staying a whole-message match (no substring), so ordinary chat isn't suppressed. Tested. The deliberate no-broad-verbs and manual-re-opt-in stance is kept as a documented product choice. <span class="tag">uncommitted</span></div>
 </div>
-<div class="card low">
-  <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L3.</span> Recurring cron window validation treats the cron hour as UTC, then adds the UAE offset</span><span class="tag">Send pipeline</span></div>
+<div class="card low done">
+  <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L3.</span> Recurring cron window validation treats the cron hour as UTC, then adds the UAE offset</span><span class="tag">Send pipeline</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">SendWindow.cs:62–79</span> validates <code>0 8 * * *</code> as 12:00 UAE. The runtime gate is the real backstop (no message escapes the window) — only the up-front validation is misleading. Align the check or document crons as UTC.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The recurring-schedule validation error now states cron times are UTC (e.g. 12:00 UTC = 16:00 UAE) — the check was already internally consistent; this removes the misleading local-time assumption. <span class="tag">uncommitted</span></div>
 </div>
-<div class="card low">
-  <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L4.</span> Hangfire dashboard authz is a stale placeholder (dev-only)</span><span class="tag">Security / Ops</span></div>
+<div class="card low done">
+  <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L4.</span> Hangfire dashboard authz is a stale placeholder (dev-only)</span><span class="tag">Security / Ops</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">HangfireDashboardAuthorizationFilter.cs:13</span> returns <code>IsDevelopment()</code> — fail-closed in prod (secure) but means no job visibility in prod, and no real authz behind it if someone loosens it. Wire a real SuperAdmin check before enabling.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The dashboard filter now allows an authenticated <code>SuperAdmin</code> outside Development (still fail-closed for anonymous browser requests), giving prod job visibility without opening it to anyone. <span class="tag">uncommitted</span></div>
 </div>
-<div class="card low">
-  <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L5.</span> Default seed SuperAdmin credentials (Staging only)</span><span class="tag">Security</span></div>
+<div class="card low done">
+  <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L5.</span> Default seed SuperAdmin credentials (Staging only)</span><span class="tag">Security</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">DataSeeder.cs:92–93</span> defaults to <code>superadmin@btilabs.com / ChangeMe123!</code>. Seeding runs only in Dev/Staging, but an internet-reachable staging box with defaults + no login throttle (H8) is a risk. Require an explicit seed password.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Seeding now <strong>refuses</strong> the built-in default SuperAdmin password outside Development (throws) and warns loudly in Dev — no more default creds on a reachable Staging box. (H8's login throttle is also now in place.) <span class="tag">uncommitted</span></div>
 </div>
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L6.</span> <code>User</code> entity has no global query filter; SuperAdmin methods trust body <code>CompanyId</code></span><span class="tag">Security</span></div>
   <div class="row"><div class="k">Detail</div> Safe today (only reachable from the SuperAdmin-gated controller), but fragile. Add a guard/integration test asserting the unscoped <code>UserService</code> methods are never reachable outside SuperAdmin.</div>
+  <div class="row"><div class="k">Disposition — 2026-07-05</div> Left as-is — safe today (only reachable from the SuperAdmin-gated controller). A defensive test adds no behavior and is worth doing but low-value; tracked as a follow-up.</div>
 </div>
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L7.</span> Meter's second SaveChanges gap under-counts (never over-sends) quota on a crash</span><span class="tag">Billing</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">CampaignBatchSendJob.cs:326–338</span> commits the Message, then meters in a separate save. A crash between them under-counts — correct direction, but compounds the historical under-count. Meter in the same transaction as the send record.</div>
+  <div class="row"><div class="k">Disposition — 2026-07-05</div> Left as-is deliberately — Low and in the safe direction (under-counts, never over-sends). Wrapping the just-hardened, double-send-critical send path in an extra transaction adds real regression risk for negligible gain.</div>
 </div>
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L8.</span> Stale <code>AppUrl</code> points at a dead endpoint</span><span class="tag">Infra / Config</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">contabo.md:207</span> sets <code>AppUrl=http://213.136.74.159:8080</code>, which the same doc says no longer works. Any link built from it (emails, Stripe returns) is broken. Update to the HTTPS domain.</div>
+  <div class="row"><div class="k">Disposition — 2026-07-05</div> Ops config — the stale AppUrl lives in the git-ignored <code>contabo.md</code> / prod <code>.env</code>; the tracked <code>appsettings</code> AppUrl is the correct localhost. Update the prod <code>.env</code> AppUrl to the HTTPS domain.</div>
 </div>
 <div class="card low done">
   <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L9.</span> Redis has no <code>maxmemory</code>/eviction policy and its AOF volume isn't backed up</span><span class="tag">Infra</span></div>
@@ -482,6 +489,7 @@
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L10.</span> Realtime <code>ChatHub</code> is <code>CompanyAdmin</code>-only</span><span class="tag">Infra / Product</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">ChatHub.cs:14</span> — non-admin agent roles won't receive realtime inbox events. Confirm against the intended role model.</div>
+  <div class="row"><div class="k">Disposition — 2026-07-05</div> Product decision — restricting realtime inbox events to <code>CompanyAdmin</code> excludes any agent roles. Confirm the intended role model before widening the <code>ChatHub</code> gate.</div>
 </div>
 
 <!-- ===================== VERIFICATION ===================== -->
@@ -527,7 +535,7 @@
     <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-part">◐</span> Auth rate-limiting + lockout; shorten JWT lifetime; confirm prod JWT secret</td><td>H8, M19</td></tr>
     <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-done">✓</span> SignalR Redis backplane; fix health-check second pool + Hangfire pool contention</td><td>H9, H10</td></tr>
     <tr><td class="p" style="color:var(--med)">3 · Fast-follow</td><td><span class="badge b-part">◐</span> ForwardedHeaders, body-size limit, Docker log rotation + grace period, healthcheck, gated migrations, inbox pruning, unique wamid index <em>(all but CI-gated migrations M11)</em></td><td>M1–M2, M7–M13, M18</td></tr>
-    <tr><td class="p" style="color:var(--low)">4 · Backlog</td><td><span class="badge b-part">◐</span> Delete retired reset job, fix cron validation, Redis maxmemory, stale AppUrl, seed-cred hardening <em>(L1, L9 done)</em></td><td>L1–L10</td></tr>
+    <tr><td class="p" style="color:var(--low)">4 · Backlog</td><td><span class="badge b-done">✓</span> Delete retired reset job, fix cron validation, Redis maxmemory, seed-cred hardening, dashboard authz <em>(L1–L5, L9; L6/L7/L8/L10 dispositioned)</em></td><td>L1–L10</td></tr>
   </tbody>
 </table>
 

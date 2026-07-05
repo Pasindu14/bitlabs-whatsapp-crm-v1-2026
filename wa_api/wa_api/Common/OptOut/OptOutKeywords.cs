@@ -21,7 +21,20 @@ public static class OptOutKeywords
         "stop", "stopall", "stop all", "unsubscribe", "optout", "opt out",
     };
 
-    /// <summary>True when <paramref name="text"/> is an exact (trimmed, case-insensitive) opt-out keyword.</summary>
-    public static bool IsStopIntent(string? text) =>
-        !string.IsNullOrWhiteSpace(text) && Stop.Contains(text.Trim());
+    /// <summary>
+    /// True when <paramref name="text"/> IS an opt-out keyword (case-insensitive), tolerating surrounding
+    /// whitespace and punctuation so "STOP!", "(stop)", "stop." still register — WhatsApp honours STOP
+    /// regardless of trailing punctuation (L2). Interior spaces are preserved ("stop all"). Still a whole-
+    /// message match, NOT a substring, so ordinary conversation ("stop by later", "cancel my order") is safe.
+    /// </summary>
+    public static bool IsStopIntent(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        var normalized = text.Trim()
+            .Trim('.', '!', '?', ',', ';', ':', '"', '\'', '(', ')', '[', ']', '-')
+            .Trim();
+        return Stop.Contains(normalized);
+    }
 }
