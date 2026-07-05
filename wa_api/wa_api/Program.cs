@@ -16,6 +16,7 @@ using wa_api.Infrastructure.Caching;
 using wa_api.Infrastructure.Jobs;
 using wa_api.Infrastructure.Locking;
 using wa_api.Infrastructure.Persistence;
+using wa_api.Infrastructure.Security;
 
 // Bootstrap logger — captures failures during startup before the host is built.
 Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
@@ -60,6 +61,26 @@ try
     // Per-request tenant identity (resolved from JWT claims). Scoped so it can be
     // injected into AppDbContext for the global query filter + CompanyId auto-stamp.
     builder.Services.AddScoped<wa_api.Common.Tenancy.ITenantContext, wa_api.Common.Tenancy.HttpTenantContext>();
+
+    // ── At-rest secret encryption (H3) ─────────────────────────────────────
+    // Encrypts WABA access tokens + per-connection app secrets at the DB boundary (AppDbContext value
+    // converter). A valid base64 32-byte Encryption:Key enables AES-256-GCM; a missing key or the public
+    // all-zero placeholder falls back to a passthrough protector with a loud warning (dev / key not yet
+    // provisioned) rather than failing startup — reads/writes still work, just unencrypted.
+    ITokenProtector tokenProtector = NullTokenProtector.Instance;
+    var encryptionKeyRaw = builder.Configuration["Encryption:Key"];
+    byte[]? encKey = null;
+    if (!string.IsNullOrWhiteSpace(encryptionKeyRaw))
+    {
+        try { encKey = Convert.FromBase64String(encryptionKeyRaw); }
+        catch (FormatException) { encKey = null; }
+    }
+    if (encKey is { Length: 32 } && Array.Exists(encKey, b => b != 0))
+        tokenProtector = new AesGcmTokenProtector(encKey);
+    else
+        Log.Warning("Encryption:Key missing or a placeholder — WABA tokens & app secrets are stored " +
+                    "UNENCRYPTED. Provision a real base64-encoded 32-byte key to enable at-rest encryption.");
+    builder.Services.AddSingleton(tokenProtector);
 
     var baseConnStr = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
@@ -311,6 +332,10 @@ try
     {
         await DataSeeder.SeedAsync(app.Services, app.Logger);
     }
+
+    // Encrypt any WABA secrets still stored as plaintext (H3). Idempotent; no-op without an encryption key.
+    // All environments — this is how existing prod rows reach rest-encrypted after the key is provisioned.
+    await WabaSecretEncryptionBackfill.RunAsync(app.Services, app.Logger);
 
     // ── Middleware Pipeline (ORDER MATTERS) ───────────────────────────────
     app.UseForwardedHeaders();                       // 0. Restore real client IP/scheme from Caddy (before all)

@@ -19,15 +19,23 @@ using wa_api.Features.Billing.Entities;
 using wa_api.Features.Notifications.Entities;
 using wa_api.Features.Webhooks.Entities;
 using wa_api.Features.WhatsApp.Entities;
+using wa_api.Infrastructure.Security;
 
 namespace wa_api.Infrastructure.Persistence;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext? tenant = null)
+public class AppDbContext(
+    DbContextOptions<AppDbContext> options,
+    ITenantContext? tenant = null,
+    ITokenProtector? tokenProtector = null)
     : DbContext(options)
 {
     // Per-request tenant; falls back to the fail-closed null object for design-time
     // (EF CLI) and other non-HTTP scopes where no ITenantContext is injected.
     private readonly ITenantContext _tenant = tenant ?? NullTenantContext.Instance;
+
+    // At-rest secret protector (H3); passthrough when unset (design-time / tests / no key). Registered as a
+    // singleton, so capturing it in the cached model's value converter is safe.
+    private readonly ITokenProtector _tokenProtector = tokenProtector ?? NullTokenProtector.Instance;
 
     // Web-default (camelCase) JSON for the jsonb Components column (Plan 004 — Templates).
     private static readonly JsonSerializerOptions ComponentsJsonOptions = new(JsonSerializerDefaults.Web);
@@ -146,6 +154,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.HasIndex(x => x.StripeCustomerId).IsUnique().HasFilter("\"StripeCustomerId\" IS NOT NULL");
         });
 
+        // At-rest encryption for the two stored secrets (H3): the converter encrypts on write and decrypts on
+        // read, so every call site keeps using plaintext. Empty stays empty (so "has a token?" checks still
+        // work) and legacy plaintext rows read back unchanged until the startup backfill re-writes them.
+        var secretConverter = new ValueConverter<string, string>(
+            plaintext => _tokenProtector.Protect(plaintext),
+            stored => _tokenProtector.Unprotect(stored));
+
         modelBuilder.Entity<WabaConnection>(e =>
         {
             e.HasKey(x => x.Id);
@@ -153,7 +168,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.HasIndex(x => x.PhoneNumberId).IsUnique();   // one connection per Meta phone-number id
             e.Property(x => x.WabaId).IsRequired().HasMaxLength(64);
             e.Property(x => x.DisplayPhoneNumber).HasMaxLength(32);
-            e.Property(x => x.EncryptedAccessToken).IsRequired().HasMaxLength(2048);
+            e.Property(x => x.EncryptedAccessToken).IsRequired().HasMaxLength(2048).HasConversion(secretConverter);
+            e.Property(x => x.AppSecret).HasConversion(secretConverter);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             e.Property(x => x.MessagingTier).HasConversion<string>().HasMaxLength(20).IsRequired();
             e.Property(x => x.QualityRating).HasMaxLength(20);

@@ -126,8 +126,8 @@
 <div class="note" style="border-left:4px solid var(--good)">
   <strong>Remediation update — 2026-07-05.</strong> Findings are tagged inline below with a <span class="badge b-done">✓ Fixed</span> / <span class="badge b-part">◐ Partial</span> badge and a resolution note; untagged items remain open.
   <br><br><strong>Fixed:</strong> C2, C3 · H1, H2, H4, H7, H8, H9, H10, H11, H12 · M1–M14, M16, M18, M20, M21 · L1, L9.
-  <strong>Partial:</strong> C1 (no hard meter ceiling), H5 (idempotency done; ordering guard + Fail/dead-letter open), H6 (exact-sub done; legacy fallback kept), M19 (JWT shortened; CSP/hub-token open).
-  <strong>Still open:</strong> H3 (encrypt tokens at rest — needs a dedicated pass plus an ops key + token rotation), M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision), and most Lows.
+  <strong>Partial:</strong> C1 (no hard meter ceiling), H3 (encryption code-complete; needs ops to provision a prod key + rotate tokens), H5 (idempotency done; ordering guard + Fail/dead-letter open), H6 (exact-sub done; legacy fallback kept), M19 (JWT shortened; CSP/hub-token open).
+  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision), and most Lows.
   <br><br>Billing model confirmed: <strong>no auto-renew</strong> — a subscription runs to its period end, then the tenant must subscribe again (accumulate-until-expiry). This resolved M21 (no dunning applies) and L1 (delete the reset job). Most fixes remain <strong>uncommitted</strong>; 6 migrations must be applied to prod before deploy.
 </div>
 
@@ -210,13 +210,14 @@
   <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The stall-sweeper is now progress-aware: <code>Campaign.RecoveryAttempts</code>/<code>LastRecoveryQueuedCount</code> track whether the Queued backlog shrinks between recoveries. A stuck backlog past 3 no-progress cycles hands the campaign to <code>CampaignPoisonHandlerJob</code> (→ <code>Failed</code> + tenant notified + remaining Queued flipped to Failed); progress forgives strikes so a transient restart never fails a healthy campaign. Regression-tested in <span class="fileref">PoisonRecoveryTests.cs</span>. Migration <code>AddCampaignPoisonRecovery</code>. <span class="fileref">ed0eeec</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high part">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-part">◐ Partial</span>
     <span class="ctitle"><span class="id">H3.</span> Meta access tokens &amp; App Secrets stored in plaintext; the "encryption" key is 32 zero-bytes and never used</span>
     <span class="tag">Security</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">WabaConnection.cs:47–51, 74–78</span><span class="fileref">WabaConnectionService.cs:90–91, 135–139</span><span class="fileref">appsettings.Development.json:24–26 (Key = base64 of all-zero)</span><span class="fileref">no AesGcm/Decrypt/Encryption:Key reader anywhere in source</span></div>
   <div class="row"><div class="k">Detail</div> The column is only <em>named</em> <code>EncryptedAccessToken</code> — values are stored as-is. Every tenant's long-lived Meta token (full send capability, real billing) and per-app HMAC secret (used to verify inbound webhooks) sit in cleartext in Supabase and in every <code>pg_dump</code> backup. Any DB/backup leak = full takeover of every tenant's WhatsApp sending and the ability to forge inbound webhooks. The provisioned <code>Encryption:Key</code> is a public all-zero placeholder — "fixing" the code with it would be worthless.</div>
   <div class="row"><div class="k fix">Fix</div> Encrypt both columns at rest (AES-256-GCM via <code>ITokenProtector</code>, or ASP.NET Data Protection / pgcrypto / KMS). Generate a real key (<code>openssl rand -base64 32</code>), keep it only in the server <code>.env</code>/secret store, migrate existing rows, and <strong>rotate every token &amp; secret</strong> since they've lived in plaintext.</div>
+  <div class="row res"><div class="k">◐ Code complete — 2026-07-05</div> Added <code>ITokenProtector</code> (AES-256-GCM, <code>enc:v1:</code>-prefixed) applied as an EF value converter on <code>WabaConnection.EncryptedAccessToken</code> + <code>AppSecret</code>, so all ~10 call sites keep using plaintext and every new write is encrypted at rest. Transparent + non-breaking: legacy plaintext still decrypts, empty stays empty, and a startup <code>WabaSecretEncryptionBackfill</code> encrypts existing rows. Falls back to a passthrough protector (with a loud warning) when no key is set, so nothing breaks pre-provisioning. Round-trip tested (<span class="fileref">TokenProtectorTests.cs</span>). <strong>Ops to finish (data stays plaintext until then):</strong> provision a real base64 32-byte <code>Encryption:Key</code> in the prod <code>.env</code>, deploy (backfill runs), then <strong>rotate every Meta token &amp; app secret</strong> since they lived in cleartext. <span class="tag">uncommitted</span></div>
 </div>
 
 <div class="card high done">
@@ -519,7 +520,7 @@
     <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-part">◐</span> Atomic quota ceiling + gate campaigns at send time (reserve-then-send)</td><td>C1, M17, M21</td></tr>
     <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-done">✓</span> Unique <code>Messages(CampaignId,ContactId)</code> index + claim-then-send + use the existing distributed lock</td><td>C2, M3, H11</td></tr>
     <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-done">✓</span> Fix the Meta error-code number/string parse (revives all anti-ban handling)</td><td>C3, H12, M4, M5</td></tr>
-    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td>Encrypt WABA tokens/secrets at rest with a real key; rotate all existing values</td><td>H3</td></tr>
+    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-part">◐</span> Encrypt WABA tokens/secrets at rest with a real key; rotate all existing values</td><td>H3</td></tr>
     <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-done">✓</span> Fix recurring campaigns; wire the poison handler / terminal <code>Failed</code> state</td><td>H1, H2</td></tr>
     <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-part">◐</span> Stripe: event-id idempotency + ordering guard; stop per-delivery quota reset; <code>OnAttemptsExceeded=Fail</code>; drop null-metered refund</td><td>H4, H5, H6</td></tr>
     <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-done">✓</span> Return 200 for unroutable-but-signed webhooks (protect the shared endpoint)</td><td>H7, M14</td></tr>
