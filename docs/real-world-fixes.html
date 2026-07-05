@@ -79,6 +79,14 @@
   .line.after{color:var(--ink)}
   .line.after b{color:var(--accent);font-weight:600}
 
+  .guards{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:20px}
+  .guard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:17px 18px;box-shadow:var(--shadow)}
+  .gtag{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.09em;
+    color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:3px 7px;margin-bottom:9px}
+  .guard h4{margin:0 0 6px;font-size:15px;font-weight:650;letter-spacing:-.005em;line-height:1.3}
+  .guard p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.52}
+  @media (max-width:620px){.guards{grid-template-columns:1fr}}
+
   .foot{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);color:var(--faint);
     font-size:13px;line-height:1.6}
   .foot .todo{color:var(--gold);font-weight:600}
@@ -97,7 +105,7 @@
 
   <p class="eyebrow">GrowChat · WhatsApp CRM · Go-Live Readiness</p>
   <h1>The real-world problems we fixed before going live</h1>
-  <p class="lede">Twenty issues that would have cost you money, sent your customers duplicate messages, or exposed their WhatsApp accounts — each one now fixed, deployed, and confirmed with live traffic in production.</p>
+  <p class="lede">Twenty issues that would have cost you money, sent your customers duplicate messages, or exposed their WhatsApp accounts — each now fixed, deployed, and confirmed with live traffic. Plus the deeper layer beneath them: the concurrency and correctness guarantees that keep the system honest when everything happens at once.</p>
   <span class="pill"><span class="dot"></span> Live &amp; verified in production · 5 Jul 2026</span>
 
   <div class="tiles">
@@ -234,6 +242,50 @@
       <p class="line before"><span class="tag tag-risk">Before</span> Only admins could open chat — the agent role, whose whole job is handling conversations, couldn't reach the inbox at all.</p>
       <p class="line after"><span class="tag tag-fix">Now</span> Agents have full inbox access, in both the chat list and realtime updates.</p>
     </article>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Under the hood — built for real-world concurrency</h2><span class="cnt">12 GUARANTEES</span></div>
+    <p class="secsub">The issues above were the visible symptoms. Underneath, the system is built to stay correct when thousands of things happen at the same instant — the class of bug that only appears under real load, with multiple servers and background workers all racing. Each of these is a guarantee the system now holds.</p>
+
+    <div class="guards">
+      <div class="guard"><span class="gtag">RACE</span>
+        <h4>No double-send, even across servers</h4>
+        <p>A recipient is claimed with one atomic, locked update before any message goes out — only the worker that wins the claim sends. Two overlapping jobs can't both deliver to the same person.</p></div>
+      <div class="guard"><span class="gtag">LOST UPDATE</span>
+        <h4>The usage counter can't be corrupted</h4>
+        <p>Every change is a single atomic database operation, never read-then-write — so two sends finishing at the same moment can't overwrite each other's count.</p></div>
+      <div class="guard"><span class="gtag">RACE</span>
+        <h4>The plan limit can't be overshot</h4>
+        <p>Reservations are serialized by a database row lock: twenty simultaneous sends at the cap resolve one at a time, and the ones over the line are cleanly rejected — not sent-then-regretted.</p></div>
+      <div class="guard"><span class="gtag">EXACTLY-ONCE</span>
+        <h4>Each incoming webhook is handled once</h4>
+        <p>A short-lived lease stops two workers processing the same event, and a re-delivered duplicate is recognized by its signature and skipped.</p></div>
+      <div class="guard"><span class="gtag">IDEMPOTENCY</span>
+        <h4>Billing events can't double-apply</h4>
+        <p>Every Stripe event ID is recorded before it's acted on, so a re-delivered "payment succeeded" is a no-op instead of a second charge or a second reset.</p></div>
+      <div class="guard"><span class="gtag">DISTRIBUTED</span>
+        <h4>Rate limits hold across every server</h4>
+        <p>WhatsApp's per-second cap is enforced by a shared counter in Redis, not per-server — and it reads its clock from Redis, so servers with skewed clocks still can't collectively over-send.</p></div>
+      <div class="guard"><span class="gtag">RECOVERY</span>
+        <h4>Crashed mid-send work self-heals</h4>
+        <p>If a worker dies holding a send, that recipient is automatically reclaimed after a timeout and retried — without re-sending anyone the batch already completed.</p></div>
+      <div class="guard"><span class="gtag">ATOMICITY</span>
+        <h4>Money and delivery status commit together</h4>
+        <p>A quota refund and the message's failure status are written in one transaction — a crash can never leave the counter refunded but the message still "sent," or vice-versa.</p></div>
+      <div class="guard"><span class="gtag">ISOLATION</span>
+        <h4>Tenants can never see each other's data</h4>
+        <p>Every query is automatically scoped to the caller's company at the database layer. There is no code path where one customer's contacts, messages, or tokens can surface for another.</p></div>
+      <div class="guard"><span class="gtag">CONSISTENCY</span>
+        <h4>Message status only moves forward</h4>
+        <p>Delivery updates can arrive out of order. A late "delivered" can never overwrite a "read," and a failed message can't be resurrected — the lifecycle is one-directional by design.</p></div>
+      <div class="guard"><span class="gtag">CONCURRENCY</span>
+        <h4>No scheduled job runs twice at once</h4>
+        <p>The campaign scheduler is guarded so that if one run overruns its minute, the next tick can't start a second copy alongside it and double-fire campaigns.</p></div>
+      <div class="guard"><span class="gtag">IDEMPOTENCY</span>
+        <h4>Safe to retry, by design</h4>
+        <p>Repeat an API send with the same key, or replay the same webhook, and the system returns the original result instead of doing the work twice — so automatic retries never cause duplicates.</p></div>
+    </div>
   </section>
 
   <div class="foot">
