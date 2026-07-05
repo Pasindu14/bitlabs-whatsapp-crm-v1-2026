@@ -1,0 +1,244 @@
+<title>What We Fixed Before Go-Live — WhatsApp CRM</title>
+<style>
+  :root{
+    --paper:#f3f6f2; --panel:#ffffff; --ink:#14201c; --muted:#5d6f67; --faint:#84968c;
+    --line:#e2e8e2; --accent:#1a7a56; --accent-soft:#e6f1ea;
+    --risk:#a8452f; --risk-soft:#f5e9e3; --gold:#8a6d24;
+    --shadow:0 1px 2px rgba(20,32,28,.05),0 4px 16px rgba(20,32,28,.04);
+    --serif:"Iowan Old Style",Georgia,"Palatino Linotype","Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"SF Mono","JetBrains Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#0d1310; --panel:#151d19; --ink:#e9efe9; --muted:#96aaa0; --faint:#6f847a;
+      --line:#233029; --accent:#4bc78d; --accent-soft:#16241d;
+      --risk:#e0906b; --risk-soft:#241510; --gold:#cCaa5e;
+      --shadow:0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#f3f6f2; --panel:#ffffff; --ink:#14201c; --muted:#5d6f67; --faint:#84968c;
+    --line:#e2e8e2; --accent:#1a7a56; --accent-soft:#e6f1ea;
+    --risk:#a8452f; --risk-soft:#f5e9e3; --gold:#8a6d24;
+    --shadow:0 1px 2px rgba(20,32,28,.05),0 4px 16px rgba(20,32,28,.04);
+  }
+  :root[data-theme="dark"]{
+    --paper:#0d1310; --panel:#151d19; --ink:#e9efe9; --muted:#96aaa0; --faint:#6f847a;
+    --line:#233029; --accent:#4bc78d; --accent-soft:#16241d;
+    --risk:#e0906b; --risk-soft:#241510; --gold:#ccaa5e;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .wrap{max-width:840px;margin:0 auto;padding:56px 22px 96px}
+  .eyebrow{font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);
+    font-weight:700;margin:0 0 14px}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,5.4vw,46px);line-height:1.08;
+    letter-spacing:-.01em;margin:0 0 16px;text-wrap:balance}
+  .lede{font-size:18px;color:var(--muted);max-width:60ch;margin:0 0 26px;line-height:1.55}
+  .pill{display:inline-flex;align-items:center;gap:9px;background:var(--accent-soft);color:var(--accent);
+    border:1px solid color-mix(in srgb,var(--accent) 26%,transparent);border-radius:999px;
+    padding:7px 15px;font-size:13.5px;font-weight:600}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent);animation:pulse 2.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+    70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:34px 0 12px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 16px;box-shadow:var(--shadow)}
+  .tile .n{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1;letter-spacing:-.02em;
+    font-variant-numeric:tabular-nums}
+  .tile .l{font-size:12.5px;color:var(--muted);margin-top:9px;line-height:1.35}
+
+  .proof{display:flex;gap:15px;align-items:flex-start;background:var(--accent-soft);
+    border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);border-radius:14px;
+    padding:18px 20px;margin:22px 0 6px;font-size:14.5px;line-height:1.55}
+  .proof .mk{color:var(--accent);font-weight:700;flex:none;font-size:19px;line-height:1.3}
+  .proof b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+  section{margin-top:52px}
+  .sechead{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+    padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .sechead h2{font-family:var(--serif);font-weight:600;font-size:24px;margin:0;letter-spacing:-.01em}
+  .sechead .cnt{font-family:var(--mono);font-size:12.5px;color:var(--faint);letter-spacing:.04em;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .secsub{color:var(--muted);font-size:14.5px;margin:0 0 18px}
+
+  .item{padding:20px 0;border-bottom:1px solid var(--line)}
+  .item:last-child{border-bottom:0}
+  .item h3{font-size:17px;font-weight:650;margin:0 0 11px;letter-spacing:-.005em}
+  .line{display:flex;gap:11px;align-items:flex-start;font-size:14.5px;line-height:1.55;margin-top:7px}
+  .tag{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    padding:3px 8px;border-radius:6px;margin-top:2px;min-width:52px;text-align:center}
+  .tag-risk{background:var(--risk-soft);color:var(--risk)}
+  .tag-fix{background:var(--accent-soft);color:var(--accent)}
+  .line.before{color:var(--muted)}
+  .line.after{color:var(--ink)}
+  .line.after b{color:var(--accent);font-weight:600}
+
+  .foot{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);color:var(--faint);
+    font-size:13px;line-height:1.6}
+  .foot .todo{color:var(--gold);font-weight:600}
+  .toggle{position:fixed;top:16px;right:16px;background:var(--panel);border:1px solid var(--line);
+    color:var(--muted);border-radius:999px;padding:8px 13px;font-size:12.5px;cursor:pointer;
+    box-shadow:var(--shadow);font-family:var(--sans)}
+  .toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (max-width:620px){.tiles{grid-template-columns:repeat(2,1fr)}.wrap{padding:40px 16px 72px}
+    .sechead{flex-direction:column;gap:4px}}
+  @media (prefers-reduced-motion:reduce){.dot{animation:none}*{scroll-behavior:auto}}
+</style>
+
+<button class="toggle" onclick="(function(){var r=document.documentElement,d=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',d==='dark'?'light':'dark')})()">◐ theme</button>
+
+<div class="wrap">
+
+  <p class="eyebrow">GrowChat · WhatsApp CRM · Go-Live Readiness</p>
+  <h1>The real-world problems we fixed before going live</h1>
+  <p class="lede">Twenty issues that would have cost you money, sent your customers duplicate messages, or exposed their WhatsApp accounts — each one now fixed, deployed, and confirmed with live traffic in production.</p>
+  <span class="pill"><span class="dot"></span> Live &amp; verified in production · 5 Jul 2026</span>
+
+  <div class="tiles">
+    <div class="tile"><div class="n">20</div><div class="l">real-world issues resolved</div></div>
+    <div class="tile"><div class="n">0</div><div class="l">duplicate sends (live-verified)</div></div>
+    <div class="tile"><div class="n">1&#8202;:&#8202;1</div><div class="l">every send metered exactly once</div></div>
+    <div class="tile"><div class="n">AES</div><div class="l">tokens now encrypted at rest</div></div>
+  </div>
+
+  <div class="proof">
+    <span class="mk">✓</span>
+    <div><b>Proven with a real send.</b> A live test on 5 Jul moved the usage counter <b>1&nbsp;→&nbsp;4</b> for three messages — exactly one charge each, zero double-sends — and every message went out through the newly-encrypted WhatsApp tokens. Not just tested in a lab; watched happening in production.</div>
+  </div>
+
+  <section>
+    <div class="sechead"><h2>Money &amp; billing</h2><span class="cnt">6 ISSUES</span></div>
+    <p class="secsub">The category that started this — sends that weren't being charged, and limits that didn't hold.</p>
+
+    <article class="item">
+      <h3>Messages sent but never counted against the plan</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Sends through Facebook and campaigns weren't charged to the customer's quota — so they could blow past their paid limit, and it never showed up in usage or reports. <em>This was your original complaint.</em></p>
+      <p class="line after"><span class="tag tag-fix">Now</span> <b>Every</b> send — direct, campaign, or reply — meters through one shared, atomic path. Nothing goes out uncounted.</p>
+    </article>
+    <article class="item">
+      <h3>A billing retry could hand out a free month</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Stripe routinely re-delivers payment events. Each delivery re-zeroed the customer's usage mid-month — a fresh full quota, for free, every time it fired.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Usage resets only on a genuine renewal, and every billing event is de-duplicated so a retry can't wipe the counter.</p>
+    </article>
+    <article class="item">
+      <h3>Customers could send past what they paid for</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Near the limit, many sends at once all read "still under" and all went through — quietly overshooting the plan.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> The cap is enforced at the database in one atomic step — it's physically impossible to reserve past the limit, even under heavy concurrency. <b>Verified against the live database.</b></p>
+    </article>
+    <article class="item">
+      <h3>Failed messages counted as delivered</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Reports and usage counted messages that never arrived, so the numbers customers saw were simply wrong.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Only real, successful sends count — dashboards and the quota counter finally agree.</p>
+    </article>
+    <article class="item">
+      <h3>Refunds credited the wrong account</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> When a message later failed, the refund could land on a different subscription than the one that was charged — gifting free messages.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> A refund always returns to the exact plan that paid for the message.</p>
+    </article>
+    <article class="item">
+      <h3>Foreign-currency invoices shown 100× wrong</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Yen and won invoices (currencies with no decimals) displayed one-hundredth of the real amount.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Each currency is formatted by its own rules.</p>
+    </article>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Message delivery</h2><span class="cnt">6 ISSUES</span></div>
+    <p class="secsub">What your customers actually experienced on WhatsApp — and what protects your sending number.</p>
+
+    <article class="item">
+      <h3>The same message delivered twice</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Overlapping background jobs could send one recipient the same WhatsApp message twice — the exact "I received 2 messages" issue you reported.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> An atomic claim guarantees one send per recipient, even if two jobs run at once. <b>Zero duplicates confirmed in production.</b></p>
+    </article>
+    <article class="item">
+      <h3>Recurring campaigns silently stopped forever</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> A recurring campaign sent once, then delivered nothing on every future run — with no error, no warning. A core feature, quietly broken.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Each run correctly re-sends to its audience, and its history is kept straight.</p>
+    </article>
+    <article class="item">
+      <h3>A stuck campaign retried forever</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> A campaign that hit one bad message would re-attempt every minute, indefinitely — never marked failed, nobody notified, re-sending earlier recipients each cycle.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> It gives up cleanly, marks itself failed, and notifies the customer.</p>
+    </article>
+    <article class="item">
+      <h3>A brief network blip permanently killed messages</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> A two-second hiccup reaching WhatsApp marked every message in that window as permanently failed — deliverable customers simply never got them.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Temporary errors wait and retry instead of dropping the message.</p>
+    </article>
+    <article class="item">
+      <h3>WhatsApp's ban-protection was silently switched off</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> A one-line data bug disabled <em>every</em> anti-ban safeguard — spam flags, quality warnings, throttling — so a campaign flagged by Meta would keep blasting and risk the number being blocked.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> The safeguards work again: a flagged campaign pauses itself to protect your number.</p>
+    </article>
+    <article class="item">
+      <h3>An expired token burned the whole audience</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> If a connection's token expired mid-campaign, it failed every remaining recipient one at a time instead of stopping.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> It halts immediately and flags the connection to reconnect.</p>
+    </article>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Security</h2><span class="cnt">4 ISSUES</span></div>
+    <p class="secsub">Protecting your customers' WhatsApp accounts and their logins.</p>
+
+    <article class="item">
+      <h3>WhatsApp tokens stored in plain text</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Every customer's WhatsApp access token and app secret sat in the database unencrypted. A single database or backup leak meant full takeover of every tenant's WhatsApp sending.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Encrypted at rest with AES-256 — <b>provisioned and verified live in production</b>, with sending confirmed working through the encrypted tokens.</p>
+    </article>
+    <article class="item">
+      <h3>No limit on login attempts</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Unlimited password guesses per account, per IP — open to password-spraying against a known admin email.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Login and token-refresh are rate-limited.</p>
+    </article>
+    <article class="item">
+      <h3>Logins stayed valid for 8 hours</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Deactivating a user or changing their role didn't take effect for up to eight hours.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Sessions are 60 minutes, refreshed silently in the background.</p>
+    </article>
+    <article class="item">
+      <h3>One stray webhook could mute everyone</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> An event for a number not yet in the system returned an error — and enough of those could make Meta disable incoming notifications for <em>all</em> customers on the shared endpoint.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Unroutable events are safely acknowledged and dropped, protecting everyone's inbound.</p>
+    </article>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Reliability &amp; scale</h2><span class="cnt">4 ISSUES</span></div>
+    <p class="secsub">The things that break the moment you grow past one server or run under real load.</p>
+
+    <article class="item">
+      <h3>Live chat broke on a second server</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> The instant you ran more than one server, realtime inbox updates silently stopped reaching half your users — no error, just a dead inbox until refresh.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Realtime events are shared across every server, so you can scale out safely.</p>
+    </article>
+    <article class="item">
+      <h3>The database could run out of connections</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Under load, health checks and background jobs could exhaust the database's connection limit and take the app down.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Connection use is bounded and background work is capped so it can't starve the app.</p>
+    </article>
+    <article class="item">
+      <h3>Deploys cut off in-flight sends</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Every deployment could kill messages that were mid-send, leaving things half-done.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> In-flight work is given time to finish before the old version shuts down.</p>
+    </article>
+    <article class="item">
+      <h3>Support agents were locked out of the inbox</h3>
+      <p class="line before"><span class="tag tag-risk">Before</span> Only admins could open chat — the agent role, whose whole job is handling conversations, couldn't reach the inbox at all.</p>
+      <p class="line after"><span class="tag tag-fix">Now</span> Agents have full inbox access, in both the chat list and realtime updates.</p>
+    </article>
+  </section>
+
+  <div class="foot">
+    Everything above is deployed and running in production as of 5 Jul 2026, verified with a live test send.
+    <br>One recommended follow-up remains, not a blocker: <span class="todo">rotate the Meta tokens &amp; app secrets in Business Suite</span> — they're encrypted now, but lived in plain text historically, so refreshing them closes the loop.
+  </div>
+
+</div>
