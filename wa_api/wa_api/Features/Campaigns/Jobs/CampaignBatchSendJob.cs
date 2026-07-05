@@ -362,6 +362,37 @@ public class CampaignBatchSendJob(
             // ExecuteUpdate bypassed the change tracker — sync the tracked entity so later saves see Sending.
             recipient.Status = RecipientStatus.Sending;
 
+            // Reserve quota atomically BEFORE sending (C1 reserve-then-send): the meter enforces a hard ceiling,
+            // so concurrent batches near the cap can't overshoot the plan. Null ⇒ ceiling reached (M21 ensured
+            // an active in-period sub at batch start): release this recipient's claim and pause the campaign.
+            var reservedSubId = await meter.TryReserveAsync(campaign.CompanyId, 1, ct);
+            if (reservedSubId is null)
+            {
+                // Release the claim with an atomic UPDATE (a tracked Sending→Queued is a no-op vs the loaded
+                // snapshot), then pause so a resume re-sends this recipient once quota is available.
+                await db.CampaignRecipients.IgnoreQueryFilters()
+                    .Where(r => r.Id == recipient.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(r => r.Status, RecipientStatus.Queued)
+                        .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
+                recipient.Status = RecipientStatus.Queued;
+                campaign.Status = CampaignStatus.Paused;
+                await db.SaveChangesAsync(ct);
+
+                await notifier.CreateAsync(
+                    campaign.CompanyId, campaignId, null,
+                    NotificationType.CampaignThrottled,
+                    "Campaign paused — message quota reached",
+                    $"\"{campaign.Name}\" reached your plan's message quota and was paused. " +
+                    "Add credits or upgrade your plan, then resume the campaign.",
+                    ct);
+                logger.LogWarning(
+                    "CampaignBatchSendJob: campaign {Id} paused — company {CompanyId} quota ceiling reached.",
+                    campaignId, campaign.CompanyId);
+                return;
+            }
+
+            var sendSucceeded = false;
             try
             {
                 var resolvedVars = BuildResolvedVariables(resolvedMapping, recipient.Contact);
@@ -385,6 +416,9 @@ public class CampaignBatchSendJob(
                         Status = MessageStatus.Sent,
                         ExternalMessageId = externalId,
                         CampaignRunNumber = campaign.CurrentRunNumber,
+                        // Quota was reserved up front — stamp the charged sub so a later delivery-failure
+                        // webhook refunds that exact row.
+                        MeteredSubscriptionId = reservedSubId,
                     };
                     db.Messages.Add(message);
 
@@ -407,54 +441,11 @@ public class CampaignBatchSendJob(
                     // Track within this run too, so a contact can never be picked twice in one batch.
                     alreadyMessaged.Add(recipient.ContactId);
 
+                    // One save records the message (with the reserved subscription stamped) and the recipient
+                    // flip to Sent atomically. Quota was already reserved before the send, so there's no
+                    // separate meter call and no post-hoc ceiling re-check — the reserve enforced the cap.
                     await db.SaveChangesAsync(ct);
-
-                    // Meter this send against the company's quota — the SAME counter inbox sends move,
-                    // via the shared meter. Done after the recipient is persisted as Sent so a mid-batch
-                    // crash never counts a send that wasn't recorded. Atomic, so concurrent batches/inbox
-                    // sends can't lose the increment. Record which subscription was charged so a later
-                    // failure webhook refunds that exact row.
-                    var meteredSubId = await meter.ConsumeAsync(campaign.CompanyId, 1, ct);
-                    if (meteredSubId is not null)
-                    {
-                        message.MeteredSubscriptionId = meteredSubId;
-                        await db.SaveChangesAsync(ct);
-
-                        // Hard quota enforcement at send time (H1): the launch pre-check is advisory only —
-                        // two concurrent campaigns can both pass it and then blow past the plan. Re-check the
-                        // LIVE atomic counter after each send; once usage reaches the effective quota, pause
-                        // the campaign and stop. This caps overshoot at ~one message per in-flight batch
-                        // instead of letting parallel sends run arbitrarily over the plan.
-                        var quota = await db.Subscriptions.IgnoreQueryFilters()
-                            .Where(s => s.Id == meteredSubId.Value)
-                            .Select(s => new
-                            {
-                                s.MessagesUsedThisPeriod,
-                                Effective = s.Plan.MonthlyMessageQuota + s.ExtraMessageCredits
-                            })
-                            .FirstOrDefaultAsync(ct);
-                        if (quota is not null && quota.MessagesUsedThisPeriod >= quota.Effective)
-                        {
-                            campaign.Status = CampaignStatus.Paused;
-                            await db.SaveChangesAsync(ct);
-                            await notifier.CreateAsync(
-                                campaign.CompanyId, campaignId, null,
-                                NotificationType.CampaignThrottled,
-                                "Campaign paused — message quota reached",
-                                $"\"{campaign.Name}\" reached your plan's message quota and was paused. " +
-                                "Add credits or upgrade your plan, then resume the campaign.",
-                                ct);
-                            logger.LogWarning(
-                                "CampaignBatchSendJob: campaign {Id} paused — company {CompanyId} quota reached ({Used}/{Quota}).",
-                                campaignId, campaign.CompanyId, quota.MessagesUsedThisPeriod, quota.Effective);
-                            return;
-                        }
-                    }
-
-                    // YELLOW pacing: space sends out to actually reduce the per-second rate for an at-risk
-                    // number (M5). Applied only on a real send, so skips/failures aren't penalised.
-                    if (isYellow)
-                        await Task.Delay(YellowInterSendDelay, ct);
+                    sendSucceeded = true;
                 }
                 else
                 {
@@ -594,6 +585,19 @@ public class CampaignBatchSendJob(
                     "CampaignBatchSendJob: exception sending to contact {ContactId} in campaign {CampaignId}.",
                     recipient.ContactId, campaignId);
             }
+            finally
+            {
+                // Reserve-then-send: any path that didn't commit the send as Sent returns the reservation,
+                // exactly once (the success path sets sendSucceeded before this runs). Branches that leave the
+                // recipient Queued for retry will re-reserve on the retry, so this nets to zero for them.
+                if (!sendSucceeded)
+                    await meter.RefundAsync(reservedSubId.Value, 1, ct);
+            }
+
+            // YELLOW pacing: space real sends out to lower the effective per-second rate for an at-risk
+            // number (M5). Only after a committed send — skips/failures aren't penalised.
+            if (sendSucceeded && isYellow)
+                await Task.Delay(YellowInterSendDelay, ct);
         }
 
         await db.SaveChangesAsync(ct);

@@ -20,6 +20,7 @@ public class MessageService(
     IWabaRateLimiter rateLimiter,
     IOptions<RateLimitOptions> rateOptions,
     ISubscriptionGate subscriptionGate,
+    ISubscriptionMeter meter,
     ILogger<MessageService> logger)
     : IMessageService
 {
@@ -112,6 +113,14 @@ public class MessageService(
             waba.PhoneNumberId, recipientContactId: null, dailyTierLimit: 0,
             maxWait: TimeSpan.FromMilliseconds(_rateOptions.InteractiveMaxWaitMs), ct);
 
+        // Reserve quota atomically BEFORE sending (C1 reserve-then-send): the meter enforces a hard ceiling so
+        // concurrent sends near the cap can't overshoot the plan. The [RequireActiveSubscription] gate has
+        // already ensured an active sub, so null here means the ceiling was reached. Refunded below if the
+        // send then fails.
+        var reservedSubId = await meter.TryReserveAsync(contact.CompanyId, 1, ct);
+        if (reservedSubId is null)
+            throw new BusinessRuleException("QUOTA_EXCEEDED", "Your message quota has been reached.");
+
         var (externalId, errorMessage) = await CallMetaApiAsync(waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, request.Body, ct);
 
         var message = new Message
@@ -122,54 +131,22 @@ public class MessageService(
             Status = externalId is not null ? MessageStatus.Sent : MessageStatus.Failed,
             ExternalMessageId = externalId,
             ErrorMessage = errorMessage,
+            MeteredSubscriptionId = reservedSubId,
             // CompanyId is auto-stamped by AuditInterceptor from JWT tenant context.
         };
         db.Messages.Add(message);
         await db.SaveChangesAsync(ct);
 
         if (message.Status == MessageStatus.Failed)
-            throw new BusinessRuleException("WHATSAPP_SEND_FAILED", errorMessage ?? "Failed to send message via WhatsApp.");
-
-        // Best-effort quota metering against the active subscription (PRD 3.1 gate stub).
-        // The authoritative per-message metering arrives with the Phase 6 send pipeline.
-        var meteredSubId = await IncrementSubscriptionUsageAsync(ct);
-        if (meteredSubId is not null)
         {
-            message.MeteredSubscriptionId = meteredSubId;
+            // Send failed — return the reservation, drop the stamp, then surface the error.
+            await meter.RefundAsync(reservedSubId.Value, 1, ct);
+            message.MeteredSubscriptionId = null;
             await db.SaveChangesAsync(ct);
+            throw new BusinessRuleException("WHATSAPP_SEND_FAILED", errorMessage ?? "Failed to send message via WhatsApp.");
         }
 
         return Map(message, contact.Name, contact.Phone, waba.DisplayPhoneNumber);
-    }
-
-    /// <summary>
-    /// Atomically increments the caller company's active-subscription usage counter by one. The target
-    /// row is resolved first (the EF global query filter scopes it to the JWT company; the unique
-    /// active-subscription index guarantees at most one), then bumped with a single
-    /// <c>UPDATE … SET col = col + 1 WHERE Id = …</c>. Scoping the update to that one Id keeps it
-    /// single-row even on the SuperAdmin plane (where the query filter is bypassed), so it can never
-    /// amplify across tenants — while <c>col = col + 1</c> stays lost-update-safe under concurrency.
-    /// No-op when no active subscription exists. ExecuteUpdate bypasses the audit interceptor, so
-    /// UpdatedAt is set explicitly here.
-    /// </summary>
-    private async Task<Guid?> IncrementSubscriptionUsageAsync(CancellationToken ct)
-    {
-        var subId = await db.Subscriptions
-            .Where(s => s.Status == SubscriptionStatus.Active)
-            .OrderByDescending(s => s.CreatedAt)
-            .Select(s => (Guid?)s.Id)
-            .FirstOrDefaultAsync(ct);
-
-        if (subId is null) return null;
-
-        var now = DateTime.UtcNow;
-        await db.Subscriptions
-            .Where(s => s.Id == subId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(x => x.MessagesUsedThisPeriod, x => x.MessagesUsedThisPeriod + 1)
-                .SetProperty(x => x.UpdatedAt, now), ct);
-
-        return subId;
     }
 
     private async Task<(string? ExternalId, string? Error)> CallMetaApiAsync(

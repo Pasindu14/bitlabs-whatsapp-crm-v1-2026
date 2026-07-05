@@ -126,8 +126,8 @@
 <div class="note" style="border-left:4px solid var(--good)">
   <strong>Remediation update — 2026-07-05.</strong> Findings are tagged inline below with a <span class="badge b-done">✓ Fixed</span> / <span class="badge b-part">◐ Partial</span> badge and a resolution note; untagged items remain open.
   <br><br><strong>Fixed:</strong> C2, C3 · H1, H2, H4, H7, H8, H9, H10, H11, H12 · M1–M14, M16, M18, M20, M21 · L1, L9.
-  <strong>Partial:</strong> C1 (no hard meter ceiling), H3 (encryption code-complete; needs ops to provision a prod key + rotate tokens), H5 (idempotency done; ordering guard + Fail/dead-letter open), H6 (exact-sub done; legacy fallback kept), M19 (JWT shortened; CSP/hub-token open).
-  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision). Lows L1–L6, L9 &amp; L10 fixed; L7 won't-fix-as-written (regresses double-send — folds into C1) and L8 ops-only (<code>.env</code>) are the only remaining.
+  <strong>Partial:</strong> H3 (encryption code-complete; needs ops to provision a prod key + rotate tokens), H5 (idempotency done; ordering guard + Fail/dead-letter open), H6 (exact-sub done; legacy fallback kept), M19 (JWT shortened; CSP/hub-token open).
+  <strong>Still open:</strong> M11 (CI-gated migrations — process), M15 (replica-count decision). Lows L1–L6, L9 &amp; L10 fixed; L7 won't-fix-as-written (regresses double-send) and L8 ops-only (<code>.env</code>) remain. <strong>C1 is now fully fixed</strong> (hard atomic meter ceiling + reserve-then-send), which also closed M17 and supersedes L7's under-count concern.
   <br><br>Billing model confirmed: <strong>no auto-renew</strong> — a subscription runs to its period end, then the tenant must subscribe again (accumulate-until-expiry). This resolved M21 (no dunning applies) and L1 (delete the reset job). Most fixes remain <strong>uncommitted</strong>; 6 migrations must be applied to prod before deploy.
 </div>
 
@@ -135,8 +135,8 @@
 <h2 class="sec">Critical — fix before go-live</h2>
 <p class="lead">Each of these causes real, customer-visible or money-losing harm under ordinary production conditions (retries, concurrency, restarts). Not theoretical.</p>
 
-<div class="card crit part">
-  <div class="chead"><span class="badge b-crit">Critical</span><span class="badge b-part">◐ Partial</span>
+<div class="card crit done">
+  <div class="chead"><span class="badge b-crit">Critical</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">C1.</span> Quota is never enforced atomically, and campaigns aren't gated at send time → paid quota is a soft suggestion</span>
     <span class="tag">Billing / Quota</span></div>
   <div class="row"><div class="k">Evidence</div>
@@ -150,7 +150,7 @@
     A tenant on a 1,000-message plan fires 20 concurrent sends near the cap — all read <code>used = 999</code>, all pass, all send, all increment → real spend past the paid quota. Launch two campaigns at once and both clear the same launch check. A campaign running for hours keeps sending after the subscription expires or a Stripe payment-failed webhook marks it inactive mid-run.</div>
   <div class="row"><div class="k fix">Fix</div>
     Make the meter the enforcement point: <code>UPDATE ... SET used = used + n WHERE id=@id AND used + n &lt;= quota + credits RETURNING id</code>; treat 0 rows as QUOTA_EXCEEDED. Invert order to <em>reserve-then-send</em> (refund on send failure — the refund plumbing already exists). Re-check active + not-expired + remaining quota at the top of every campaign batch, including Recurring.</div>
-  <div class="row res"><div class="k">◐ Partially fixed — 2026-07-05</div> The meter is now a race-free atomic increment, and the campaign batch enforces quota <em>at send time</em> — it pauses the campaign and notifies when usage reaches quota+credits, Recurring included. <strong>Still open:</strong> the meter has no hard ceiling (it increments unconditionally), so concurrent HTTP sends right at the cap can still marginally overshoot — true reserve-then-send at the meter is not yet implemented. <span class="fileref">2e80888</span></div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The meter is now the hard enforcement point: <code>TryReserveAsync</code> is a single conditional SQL <code>UPDATE … WHERE used + n &lt;= quota + credits</code>, so concurrent reservations are serialized by the row lock and the ceiling can NEVER be overshot (no read-check-then-increment TOCTOU). All three send paths — campaign batch, conversation replies, and the standalone <code>/messages</code> — switched to <strong>reserve-then-send</strong>: reserve before the Meta call, refund (via <code>RefundAsync</code>, floored) if it fails. The campaign job pauses on a ceiling hit instead of overshooting by ~1/batch. This also closes <strong>M17</strong> (gate + meter no longer resolve the sub independently — the meter's atomic reserve is the sole authority). Regression-tested in <span class="fileref">SubscriptionMeterTests.cs</span>. <span class="tag">uncommitted</span></div>
 </div>
 
 <div class="card crit done">
@@ -408,9 +408,10 @@
   <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Invoice display goes through <code>StripeCurrency.ToMajorUnit</code>, which leaves zero-decimal currencies (JPY, KRW, …) unscaled instead of dividing by 100. Regression-tested in <span class="fileref">StripeCurrencyTests.cs</span>. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M17.</span> Gate and meter resolve the target subscription independently</span><span class="tag">Billing</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M17.</span> Gate and meter resolve the target subscription independently</span><span class="tag">Billing</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> The gate checks the most-recent-active sub; the meter re-resolves it independently. A re-subscribe between gate and meter charges a different row than was validated. Low probability; resolve/lock the same row across gate+meter (folds into C1's reserve-then-send).</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Resolved with C1: the meter's atomic <code>TryReserveAsync</code> is now the sole enforcement point, so the gate is advisory only — whatever row the meter reserves is the row charged, atomically. No gate/meter divergence to exploit. <span class="tag">uncommitted</span></div>
 </div>
 
 <div class="card med done">
@@ -525,7 +526,7 @@
 <table class="chk">
   <thead><tr><th>Order</th><th>Do this</th><th>Refs</th></tr></thead>
   <tbody>
-    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-part">◐</span> Atomic quota ceiling + gate campaigns at send time (reserve-then-send)</td><td>C1, M17, M21</td></tr>
+    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-done">✓</span> Atomic quota ceiling + gate campaigns at send time (reserve-then-send)</td><td>C1, M17, M21</td></tr>
     <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-done">✓</span> Unique <code>Messages(CampaignId,ContactId)</code> index + claim-then-send + use the existing distributed lock</td><td>C2, M3, H11</td></tr>
     <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-done">✓</span> Fix the Meta error-code number/string parse (revives all anti-ban handling)</td><td>C3, H12, M4, M5</td></tr>
     <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-part">◐</span> Encrypt WABA tokens/secrets at rest with a real key; rotate all existing values</td><td>H3</td></tr>

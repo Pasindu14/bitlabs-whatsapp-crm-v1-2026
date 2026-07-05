@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using wa_api.Common.Errors;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.WhatsApp.Entities;
@@ -37,6 +38,13 @@ public class WhatsAppMessageSender(
             waba.PhoneNumberId, recipientContactId: null, dailyTierLimit: 0,
             maxWait: TimeSpan.FromMilliseconds(_rateOptions.InteractiveMaxWaitMs), ct);
 
+        // Reserve quota atomically BEFORE sending (C1 reserve-then-send): the meter enforces a hard ceiling,
+        // so concurrent sends near the cap can't overshoot the plan. Null ⇒ ceiling reached (the caller's
+        // active-subscription gate has already ensured a sub exists). Refunded below if the send then fails.
+        var reservedSubId = await meter.TryReserveAsync(contact.CompanyId, 1, ct);
+        if (reservedSubId is null)
+            throw new BusinessRuleException("QUOTA_EXCEEDED", "Your message quota has been reached.");
+
         var (externalId, errorMessage) = await CallMetaApiAsync(
             waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, body, ct);
 
@@ -50,23 +58,19 @@ public class WhatsAppMessageSender(
             Status = externalId is not null ? MessageStatus.Sent : MessageStatus.Failed,
             ExternalMessageId = externalId,
             ErrorMessage = errorMessage,
+            // Stamp the reserved subscription so a later delivery-failure webhook refunds that exact row.
+            MeteredSubscriptionId = reservedSubId,
             // CompanyId is auto-stamped by AuditInterceptor from the JWT tenant context (HTTP path).
         };
         db.Messages.Add(message);
         await db.SaveChangesAsync(ct);
 
-        // Quota metering against the active subscription — only successful sends count. CompanyId was
-        // auto-stamped by the AuditInterceptor on SaveChanges above. Shared with the campaign sender via
-        // ISubscriptionMeter so every send moves the counter through one atomic path. Record which
-        // subscription was charged so a later failure refunds that exact row (not "current active").
-        if (message.Status == MessageStatus.Sent)
+        // Send failed at the API level — give the reservation back and drop the (unused) metered stamp.
+        if (externalId is null)
         {
-            var meteredSubId = await meter.ConsumeAsync(message.CompanyId, 1, ct);
-            if (meteredSubId is not null)
-            {
-                message.MeteredSubscriptionId = meteredSubId;
-                await db.SaveChangesAsync(ct);
-            }
+            await meter.RefundAsync(reservedSubId.Value, 1, ct);
+            message.MeteredSubscriptionId = null;
+            await db.SaveChangesAsync(ct);
         }
 
         return message;
