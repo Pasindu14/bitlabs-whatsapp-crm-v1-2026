@@ -1,8 +1,20 @@
+# Bounded json-file logging for every service (M9): Docker's default driver is unbounded, so a chatty
+# container can fill the disk and take the whole stack down. 10m × 5 files caps each service at ~50 MB.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    # maxmemory + noeviction (L9): cap growth so Redis can't OOM the host, but NEVER evict — it backs
+    # Hangfire job state (with AOF), so silently dropping keys would lose queued/scheduled jobs. Tune
+    # --maxmemory to ~25-50% of the VPS RAM. A full store rejects writes (visible) rather than losing data.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
+    logging: *default-logging
     volumes:
       - redis-data:/data
     healthcheck:
@@ -17,6 +29,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    logging: *default-logging
+    # Give .NET's graceful shutdown room to finish in-flight requests / a send batch before SIGKILL (M10).
+    # Docker's default is 10s (< the 30s host shutdown), so a redeploy mid-batch would hard-kill in-flight
+    # Meta calls and leave inconsistent state (re-run via at-least-once). 30s matches the host timeout.
+    stop_grace_period: 30s
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:8080"
@@ -41,6 +58,7 @@ services:
   autoheal:
     image: willfarrell/autoheal:latest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       AUTOHEAL_CONTAINER_LABEL: all   # monitor all containers that have a healthcheck
       AUTOHEAL_INTERVAL: 10           # seconds between checks
@@ -51,6 +69,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
@@ -59,8 +78,12 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+    # Wait for the api to pass its healthcheck, not merely start (M18): a plain start-gate lets Caddy come up
+    # while the app is still booting/migrating and serve brief 502s. service_healthy holds Caddy until /health
+    # succeeds. autoheal (above) covers the runtime "hung but alive" case.
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
   # Real-time server-load dashboard (CPU / RAM / disk / network + per-container metrics).
   # Bound to 127.0.0.1 only — Netdata ships with NO auth, so it is NOT exposed publicly.
@@ -70,6 +93,7 @@ services:
     image: netdata/netdata:stable
     hostname: wa-api-vps
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:19999:19999"
     cap_add:

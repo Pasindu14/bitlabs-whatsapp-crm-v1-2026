@@ -13,7 +13,17 @@ public static class HealthCheckExtensions
 
         var connectionString = config.GetConnectionString("DefaultConnection");
         if (!string.IsNullOrWhiteSpace(connectionString))
-            healthChecks.AddNpgSql(connectionString, name: "postgresql", tags: ["ready"]);
+        {
+            // Bound the probe to its OWN tiny pool. Given a raw string, HealthChecks.NpgSql builds a data
+            // source with Npgsql's default Max Pool Size=100 — a SECOND pool in front of Supavisor, whose
+            // session-mode client cap (15, shared across all app instances) the app pool already sits under.
+            // Concurrent readiness probes on the unbounded pool could exhaust the pooler ("sorry, too many
+            // clients"). A cap of 2 (idle-released) is ample for a SELECT 1 and keeps total PG clients under
+            // the ceiling. Mirrors the app pool params in Program.cs.
+            var probeConnStr = connectionString.TrimEnd(';')
+                + ";Maximum Pool Size=2;Minimum Pool Size=0;Connection Idle Lifetime=30";
+            healthChecks.AddNpgSql(probeConnStr, name: "postgresql", tags: ["ready"]);
+        }
 
         var redis = config["REDIS_CONNECTION"];
         if (!string.IsNullOrWhiteSpace(redis))

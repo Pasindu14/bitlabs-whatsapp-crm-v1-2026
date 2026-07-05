@@ -41,6 +41,10 @@ public class CampaignBatchSendJob(
     /// treats it as abandoned (crashed mid-send) and reclaims it to Queued. Comfortably longer than a single
     /// send's wall-clock (Meta HttpClient timeout is 15s) so a healthy in-flight send is never reclaimed.</summary>
     private static readonly TimeSpan StaleClaimThreshold = TimeSpan.FromMinutes(5);
+
+    /// <summary>Inter-send pause applied only while the number's quality rating is YELLOW, to halve the
+    /// effective send rate and ease pressure on an at-risk number (M5). GREEN sends run unthrottled.</summary>
+    private static readonly TimeSpan YellowInterSendDelay = TimeSpan.FromMilliseconds(250);
     private readonly RateLimitOptions _rateOptions = rateOptions.Value;
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -69,6 +73,34 @@ public class CampaignBatchSendJob(
         {
             logger.LogInformation("CampaignBatchSendJob: campaign {Id} is {Status}, skipping batch.",
                 campaignId, campaign.Status);
+            return;
+        }
+
+        // Subscription-plane enforcement (M21): the HTTP send gate blocks an inactive / period-ended
+        // subscription, but campaigns bypassed it entirely. There is NO auto-renew — a subscription simply
+        // runs until CurrentPeriodEnd and the tenant must subscribe again — so a long-running or Recurring
+        // campaign that crosses that boundary must stop, not keep sending free/uncounted. Pause + notify when
+        // there is no active, in-period subscription. (Quota within the period is still enforced per-send below.)
+        var sub = await db.Subscriptions.IgnoreQueryFilters()
+            .Where(s => s.CompanyId == campaign.CompanyId
+                     && s.Status == wa_api.Features.Subscriptions.Entities.SubscriptionStatus.Active)
+            .OrderByDescending(s => s.CreatedAt)
+            .Select(s => new { s.CurrentPeriodEnd })
+            .FirstOrDefaultAsync(ct);
+        if (sub is null || sub.CurrentPeriodEnd < DateTime.UtcNow)
+        {
+            campaign.Status = CampaignStatus.Paused;
+            await db.SaveChangesAsync(ct);
+            await notifier.CreateAsync(
+                campaign.CompanyId, campaignId, null,
+                NotificationType.CampaignThrottled,
+                "Campaign paused — subscription ended",
+                $"\"{campaign.Name}\" was paused because your subscription has ended. " +
+                "Subscribe again, then resume the campaign.",
+                ct);
+            logger.LogWarning(
+                "CampaignBatchSendJob: campaign {Id} paused — company {CompanyId} has no active in-period subscription.",
+                campaignId, campaign.CompanyId);
             return;
         }
 
@@ -122,8 +154,13 @@ public class CampaignBatchSendJob(
             return;
         }
 
-        // YELLOW: halve batch size to reduce send pressure while quality recovers.
-        var effectiveBatchSize = waba.QualityRating == "YELLOW" ? BatchSize / 2 : BatchSize;
+        // YELLOW quality: reduce send PRESSURE while quality recovers. Halving the batch alone is ineffective
+        // (M5) — batches chain back-to-back, so real throughput is governed by the per-second limiter, not the
+        // batch size. So we also inject an inter-send delay (YellowInterSendDelay) after each send below to
+        // genuinely lower the effective rate for an at-risk number. The smaller batch just tightens the
+        // reschedule cadence so a RED downgrade / recovery is noticed sooner.
+        var isYellow = waba.QualityRating == "YELLOW";
+        var effectiveBatchSize = isYellow ? BatchSize / 2 : BatchSize;
 
         // The number's 24-hour unique-recipient tier cap (campaign sends are business-initiated).
         var tierLimit = (int)waba.MessagingTier;
@@ -273,6 +310,17 @@ public class CampaignBatchSendJob(
                 continue;
             }
 
+            // The template needs a media header but we couldn't obtain a send-time media id — every send would
+            // fail at Meta with HTTP 400. Fail this recipient locally BEFORE acquiring a permit (M20): the tier
+            // permit counts against the number's scarce daily unique-recipient cap, so consuming one for a send
+            // that cannot happen would burn that allowance for nothing.
+            if (headerMediaRequired && headerMedia is null)
+            {
+                recipient.Status = RecipientStatus.Failed;
+                recipient.ErrorCode = "HEADER_MEDIA_MISSING";
+                continue;
+            }
+
             // ── Acquire a send permit (graceful: brief wait, else reschedule the whole batch) ──
             // Per-second pacing + the number's daily unique-recipient tier cap.
             var permit = await rateLimiter.TryAcquireAsync(waba.PhoneNumberId, recipient.ContactId, tierLimit, ct);
@@ -290,15 +338,6 @@ public class CampaignBatchSendJob(
                 await db.SaveChangesAsync(ct);
                 await RescheduleBatchAsync(campaign, campaignId, permit, db, notifier, ct);
                 return;
-            }
-
-            // The template needs a media header but we couldn't obtain a send-time media id — every send
-            // would fail at Meta with HTTP 400. Fail this recipient locally with a clear cause.
-            if (headerMediaRequired && headerMedia is null)
-            {
-                recipient.Status = RecipientStatus.Failed;
-                recipient.ErrorCode = "HEADER_MEDIA_MISSING";
-                continue;
             }
 
             // ── Atomic send-claim: the definitive double-send guard ────────────────────────────────
@@ -326,7 +365,7 @@ public class CampaignBatchSendJob(
             try
             {
                 var resolvedVars = BuildResolvedVariables(resolvedMapping, recipient.Contact);
-                var (externalId, errorCode) = await SendTemplateMessageAsync(
+                var (externalId, errorCode, retryAfter) = await SendTemplateMessageAsync(
                     waba.PhoneNumberId, waba.EncryptedAccessToken,
                     recipient.Contact.Phone,
                     campaign.Template.Name, campaign.Template.Language,
@@ -411,6 +450,11 @@ public class CampaignBatchSendJob(
                             return;
                         }
                     }
+
+                    // YELLOW pacing: space sends out to actually reduce the per-second rate for an at-risk
+                    // number (M5). Applied only on a real send, so skips/failures aren't penalised.
+                    if (isYellow)
+                        await Task.Delay(YellowInterSendDelay, ct);
                 }
                 else
                 {
@@ -434,6 +478,30 @@ public class CampaignBatchSendJob(
                             "WhatsApp account restricted",
                             $"Meta has restricted your WhatsApp number (code {errorCode}). All campaigns paused. " +
                             "Please review your account in Meta Business Suite before resuming.",
+                            ct);
+                        return;
+                    }
+
+                    // Access token expired/invalid (190): fatal for the whole connection — every remaining send
+                    // would fail identically. Deactivate the connection, pause the campaign, release the claim
+                    // and halt immediately instead of burning the audience one 190 at a time (H12).
+                    if (MetaPolicyErrorCodes.IsAuthError(errorCode))
+                    {
+                        logger.LogError(
+                            "Meta returned auth error {Code} for WABA {WabaId} — deactivating connection and halting campaign {CampaignId}.",
+                            errorCode, waba.Id, campaignId);
+
+                        waba.IsActive = false;
+                        campaign.Status = CampaignStatus.Paused;
+                        recipient.Status = RecipientStatus.Queued;
+                        await db.SaveChangesAsync(ct);
+
+                        await notifier.CreateAsync(
+                            campaign.CompanyId, campaignId, null,
+                            NotificationType.CampaignFailed,
+                            "Campaign paused — WhatsApp access token invalid",
+                            $"Your WhatsApp connection's access token is expired or invalid (code {errorCode}). " +
+                            "All sending is paused. Reconnect the number in settings, then resume the campaign.",
                             ct);
                         return;
                     }
@@ -475,7 +543,26 @@ public class CampaignBatchSendJob(
                         await RescheduleBatchAsync(
                             campaign, campaignId,
                             new RateLimitResult(false, TimeSpan.Zero, RateLimitReason.PerSecondThrottle),
-                            db, notifier, ct);
+                            db, notifier, ct, retryAfter);
+                        return;
+                    }
+
+                    // Transient transport error (network blip / Meta 5xx / 408 / bare 429): the send didn't
+                    // land, so keep the recipient Queued and reschedule the batch with backoff rather than
+                    // permanently failing a deliverable message (H11). The atomic send-claim (C2) makes the
+                    // reschedule duplicate-safe; honour any Retry-After Meta supplied.
+                    if (MetaPolicyErrorCodes.IsTransientTransportError(errorCode))
+                    {
+                        logger.LogWarning(
+                            "Transient send error {Code} for campaign {CampaignId} — recipient stays Queued, rescheduling batch.",
+                            errorCode, campaignId);
+
+                        recipient.Status = RecipientStatus.Queued;
+                        await db.SaveChangesAsync(ct);
+                        await RescheduleBatchAsync(
+                            campaign, campaignId,
+                            new RateLimitResult(false, TimeSpan.Zero, RateLimitReason.PerSecondThrottle),
+                            db, notifier, ct, retryAfter);
                         return;
                     }
 
@@ -598,13 +685,23 @@ public class CampaignBatchSendJob(
     /// lockstep); a daily-tier exhaustion waits until the 24-hour window rolls over. Recipients stay Queued,
     /// so the rescheduled run resumes exactly where this one stopped — no double-send.
     /// </summary>
+    /// <summary>Ceiling on a Meta-requested backoff so a pathological Retry-After can't park a campaign for
+    /// hours; the daily-tier reschedule uses its own (longer) until-midnight delay and is unaffected.</summary>
+    private static readonly TimeSpan MaxThrottleBackoff = TimeSpan.FromMinutes(10);
+
     private async Task RescheduleBatchAsync(
         Campaign campaign, Guid campaignId, RateLimitResult permit, AppDbContext db,
-        Notifications.INotificationService notifier, CancellationToken ct)
+        Notifications.INotificationService notifier, CancellationToken ct, TimeSpan? retryAfterFloor = null)
     {
         var delay = permit.Reason == RateLimitReason.DailyTierExceeded
             ? DelayUntilNextUtcDay()
             : TimeSpan.FromSeconds(5 + Random.Shared.Next(0, 10));
+
+        // Honour Meta's Retry-After when it asked for a longer cool-down than our default jitter: retrying
+        // sooner than Meta wants just re-trips the throttle and digs the number deeper (M4). Capped so a bad
+        // header value can't stall the campaign indefinitely.
+        if (retryAfterFloor is { } floor && floor > delay)
+            delay = floor < MaxThrottleBackoff ? floor : MaxThrottleBackoff;
 
         // A daily-tier pause lasts hours — tell the tenant. Idempotent (unique index on CampaignId+Type),
         // so repeated reschedules emit at most one notification per campaign.
@@ -735,8 +832,9 @@ public class CampaignBatchSendJob(
         }
     }
 
-    /// <summary>Call Meta's template message send endpoint.</summary>
-    private async Task<(string? ExternalId, string? ErrorCode)> SendTemplateMessageAsync(
+    /// <summary>Call Meta's template message send endpoint. On a throttle response, <c>RetryAfter</c> carries
+    /// Meta's requested cool-down (from the <c>Retry-After</c> header) when present, else null.</summary>
+    private async Task<(string? ExternalId, string? ErrorCode, TimeSpan? RetryAfter)> SendTemplateMessageAsync(
         string phoneNumberId, string accessToken, string toPhone,
         string templateName, string language,
         Dictionary<string, string> resolvedVars,
@@ -806,18 +904,22 @@ public class CampaignBatchSendJob(
             {
                 using var doc = JsonDocument.Parse(json);
                 var msgId = doc.RootElement.GetProperty("messages")[0].GetProperty("id").GetString();
-                return (msgId, null);
+                return (msgId, null, null);
             }
 
             var errorCode = ParseMetaErrorCode(json);
 
+            // Meta's suggested cool-down, if it sent one (Retry-After as a delta or an absolute date).
+            var retryAfter = res.Headers.RetryAfter?.Delta
+                ?? (res.Headers.RetryAfter?.Date is { } when ? when - DateTimeOffset.UtcNow : (TimeSpan?)null);
+
             logger.LogWarning("Meta API {Status} for {Phone}: {Json}", (int)res.StatusCode, toPhone, json);
-            return (null, errorCode ?? $"HTTP_{(int)res.StatusCode}");
+            return (null, errorCode ?? $"HTTP_{(int)res.StatusCode}", retryAfter);
         }
         catch (HttpRequestException ex)
         {
             logger.LogError(ex, "HTTP error calling Meta Graph API for {Phone}.", toPhone);
-            return (null, "NETWORK_ERROR");
+            return (null, "NETWORK_ERROR", null);
         }
     }
 

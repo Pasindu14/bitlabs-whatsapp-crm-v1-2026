@@ -64,15 +64,30 @@ public sealed class WhatsAppWebhookController(
             var conn = await connections.GetConnectionByPhoneNumberIdAsync(phoneNumberId, ct);
             if (conn is null || string.IsNullOrWhiteSpace(conn.AppSecret))
             {
-                logger.LogWarning("Rejected webhook — no active connection found for phone_number_id {Id}.", phoneNumberId);
-                return Unauthorized();
+                // Unroutable but plausibly legitimate: a number onboarded on Meta's side but not yet (or no
+                // longer) in our DB. This ONE URL is shared by every tenant, and Meta disables the whole
+                // subscription after sustained non-2xx — so a 401 here would degrade ingestion for ALL
+                // companies. Ack 200 and drop instead; reserve non-2xx for bad signatures / persistence errors
+                // on routable payloads (H7). We can't verify without the secret, so we don't process it.
+                logger.LogWarning(
+                    "Dropping webhook for unroutable phone_number_id {Id} (no active connection) — acking 200.",
+                    phoneNumberId);
+                return Ok();
             }
             verified = verifier.Verify(rawBody, signature, conn.AppSecret);
         }
         else
         {
-            // No phone_number_id extractable — fall back to global secret (template status updates, etc.)
-            verified = verifier.Verify(rawBody, signature);
+            // No phone_number_id — this is a template-status update (or similar), which carries only the WABA
+            // id in entry[].id. Route verification to the owning connection's App Secret (M14): a tenant whose
+            // Meta app secret differs from the global one would otherwise have all its template webhooks
+            // rejected. Fall back to the global secret only when the WABA can't be resolved (single-app setups).
+            var wabaId = TryExtractWabaId(rawBody);
+            var conn = wabaId is not null ? await connections.GetConnectionByWabaIdAsync(wabaId, ct) : null;
+
+            verified = conn is not null && !string.IsNullOrWhiteSpace(conn.AppSecret)
+                ? verifier.Verify(rawBody, signature, conn.AppSecret)
+                : verifier.Verify(rawBody, signature);
         }
 
         if (!verified)
@@ -118,6 +133,23 @@ public sealed class WhatsAppWebhookController(
             }
         }
         catch (JsonException) { /* malformed — the dispatcher surfaces the real parse error during processing */ }
+        return null;
+    }
+
+    /// <summary>Best-effort first <c>entry[].id</c> — the WABA id on events without a phone_number_id
+    /// (e.g. template-status updates), used to pick the owning connection's App Secret for verification.</summary>
+    private static string? TryExtractWabaId(string rawBody)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(rawBody);
+            if (!doc.RootElement.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
+                return null;
+            foreach (var entry in entries.EnumerateArray())
+                if (entry.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+                    return id.GetString();
+        }
+        catch (JsonException) { /* malformed — verification will fail closed below */ }
         return null;
     }
 

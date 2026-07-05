@@ -88,7 +88,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             e.Property(x => x.PhoneNumberId).HasMaxLength(64);
             e.Property(x => x.EventSignature).HasMaxLength(128);
-            e.HasIndex(x => x.Status);
+            // Composite so the sweeper (Status IN … AND UpdatedAt < cutoff, ORDER BY UpdatedAt) and the
+            // retention prune (Status = Processed AND UpdatedAt < cutoff) both index-seek instead of scanning.
+            // Covers Status-only lookups too as its leftmost prefix, so a separate Status index is redundant.
+            e.HasIndex(x => new { x.Status, x.UpdatedAt });
             e.HasIndex(x => x.PhoneNumberId);
             // Replay dedupe: a redelivered identical payload collides on its signature. Partial index
             // (nullable) so rows without a computed signature never conflict. The inbox is platform-level

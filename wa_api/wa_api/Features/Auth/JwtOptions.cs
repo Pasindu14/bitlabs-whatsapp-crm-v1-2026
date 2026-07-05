@@ -11,6 +11,9 @@ public class JwtOptions
     public string SecretKey { get; set; } = null!;
     public string Issuer { get; set; } = "wa-api";
     public string Audience { get; set; } = "wa-api";
-    public int AccessTokenExpiryMinutes { get; set; } = 480; // 8 hours
+    // Access tokens are stateless — a deactivation or role change only takes effect when the token expires,
+    // and an XSS-leaked token is usable until then. Kept short (60 min) and leaned on refresh-token rotation
+    // for longer sessions (H8 / M19). Was 8h.
+    public int AccessTokenExpiryMinutes { get; set; } = 60;
     public int RefreshTokenExpiryDays { get; set; } = 30;
 }

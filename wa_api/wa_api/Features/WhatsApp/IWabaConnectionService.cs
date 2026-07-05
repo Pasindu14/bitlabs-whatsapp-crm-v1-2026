@@ -31,4 +31,11 @@ public interface IWabaConnectionService
     /// filter by design. Returns the entity (callers need CompanyId / access token); null when unknown.
     /// </summary>
     Task<WabaConnection?> GetConnectionByPhoneNumberIdAsync(string phoneNumberId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolves an active connection by its Meta WABA id, ACROSS tenants — used to verify template-status
+    /// webhooks, which carry no phone_number_id (only <c>entry[].id</c> = WABA id). Bypasses the tenant query
+    /// filter by design. Returns the entity (callers need the App Secret); null when unknown.
+    /// </summary>
+    Task<WabaConnection?> GetConnectionByWabaIdAsync(string wabaId, CancellationToken ct = default);
 }

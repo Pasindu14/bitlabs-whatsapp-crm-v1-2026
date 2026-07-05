@@ -104,14 +104,22 @@ public sealed class WebhookInboxService(AppDbContext db) : IWebhookInboxService
                 .SetProperty(e => e.UpdatedAt, now), ct);
     }
 
+    // A Failed row is owned by Hangfire's own AutomaticRetry backoff (max 900s in WebhookProcessingJob). The
+    // sweeper must NOT re-enqueue it within that window: doing so double-drives the row and inflates Attempts,
+    // dead-lettering it early (M13). Only reclaim a Failed row once it's clearly orphaned — older than the
+    // whole retry schedule plus the processing lease — so a genuinely lost retry is still recovered.
+    private static readonly TimeSpan FailedOrphanThreshold = TimeSpan.FromMinutes(20);
+
     public async Task<IReadOnlyList<Guid>> GetStuckIdsAsync(TimeSpan olderThan, int max, CancellationToken ct = default)
     {
-        var cutoff = DateTime.UtcNow - olderThan;
+        var now = DateTime.UtcNow;
+        var cutoff = now - olderThan;
+        var failedCutoff = now - FailedOrphanThreshold;
         return await db.WhatsAppWebhookEvents.IgnoreQueryFilters().AsNoTracking()
-            .Where(e => (e.Status == WebhookEventStatus.Received
-                      || e.Status == WebhookEventStatus.Processing
-                      || e.Status == WebhookEventStatus.Failed)
-                     && e.UpdatedAt < cutoff)
+            .Where(e =>
+                ((e.Status == WebhookEventStatus.Received || e.Status == WebhookEventStatus.Processing)
+                    && e.UpdatedAt < cutoff)
+                || (e.Status == WebhookEventStatus.Failed && e.UpdatedAt < failedCutoff))
             .OrderBy(e => e.UpdatedAt)
             .Take(max)
             .Select(e => e.Id)

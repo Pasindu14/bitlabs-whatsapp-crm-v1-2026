@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using wa_api.Common.Errors;
 using wa_api.Features.Auth.Dtos;
 
@@ -18,6 +19,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <summary>POST /api/v1/auth/login → email + password → JWT + refresh token.</summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
     {
         var result = await authService.LoginAsync(request, ct);
@@ -27,6 +29,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     /// <summary>POST /api/v1/auth/refresh → exchange refresh token for new access + refresh tokens.</summary>
     [HttpPost("refresh")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Refresh(RefreshRequest request, CancellationToken ct)
     {
         var result = await authService.RefreshAsync(request.RefreshToken, ct);

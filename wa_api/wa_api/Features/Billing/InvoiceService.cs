@@ -23,7 +23,7 @@ public class InvoiceService(AppDbContext db, ITenantContext tenant) : IInvoiceSe
         return invoices.Select(i => new InvoiceResponse(
             i.Id,
             i.StripeInvoiceId,
-            i.AmountPaid / 100m,   // cents → major currency unit
+            StripeCurrency.ToMajorUnit(i.AmountPaid, i.Currency),   // smallest unit → major unit (zero-decimal aware)
             i.Currency.ToUpperInvariant(),
             i.Status,
             i.PaidAt,

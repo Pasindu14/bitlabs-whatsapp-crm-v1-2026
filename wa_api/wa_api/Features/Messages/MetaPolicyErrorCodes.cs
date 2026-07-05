@@ -32,6 +32,9 @@ public static class MetaPolicyErrorCodes
     /// </summary>
     public const string Undeliverable = "131026";
 
+    /// <summary>Access token expired or invalid (190). Fatal for the whole connection — halt, don't per-recipient fail.</summary>
+    public const string AccessTokenInvalid = "190";
+
     /// <summary>
     /// Returns true when the error code is a transient throughput throttle (Meta asking us to slow down).
     /// The send did not happen, so the recipient must stay Queued and the batch should back off and retry —
@@ -61,4 +64,22 @@ public static class MetaPolicyErrorCodes
     /// </summary>
     public static bool IsUndeliverableRecipient(string? code) =>
         code is Undeliverable;
+
+    /// <summary>
+    /// Returns true for an expired/invalid access token (190). This is fatal for the entire connection — every
+    /// remaining send would fail identically — so the caller must halt the campaign and mark the connection
+    /// invalid immediately, not fail the audience one recipient at a time.
+    /// </summary>
+    public static bool IsAuthError(string? code) =>
+        code is AccessTokenInvalid;
+
+    /// <summary>
+    /// Returns true for a transient transport/server error (a network blip, a Meta 5xx / 408, or a bare HTTP
+    /// 429 with no Meta policy code). The send did not land, so the recipient must stay Queued and the batch
+    /// back off and retry — permanently failing these would drop deliverable messages over a temporary glitch.
+    /// Distinct from the Meta policy throttle codes handled by <see cref="IsTransientThrottle"/>.
+    /// </summary>
+    public static bool IsTransientTransportError(string? code) =>
+        code is "NETWORK_ERROR" or "HTTP_408" or "HTTP_429"
+        || (code is not null && code.StartsWith("HTTP_5", StringComparison.Ordinal));
 }

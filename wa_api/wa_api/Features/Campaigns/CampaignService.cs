@@ -194,6 +194,18 @@ public class CampaignService(
                 campaign.Id, campaign.CompanyId);
         }
 
+        // Atomically claim the launch: flip out of the launchable set in a single UPDATE so two concurrent
+        // launches (or a launch racing the scheduler) can't both pass the Status check above and enqueue two
+        // batches → a double-send (M3). Only the launcher that changes exactly one row proceeds; the loser
+        // gets a 409. The tracked entity's final status is set and persisted below.
+        var claimed = await db.Campaigns
+            .Where(c => c.Id == id
+                && (c.Status == CampaignStatus.Draft || c.Status == CampaignStatus.Scheduled))
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CampaignStatus.Running), ct);
+        if (claimed == 0)
+            throw new ConflictException("CAMPAIGN_ALREADY_LAUNCHING",
+                "This campaign is already being launched or is no longer in a launchable state.");
+
         string jobId;
         if (campaign.ScheduleType == ScheduleType.OneTime && campaign.ScheduledAt.HasValue)
         {

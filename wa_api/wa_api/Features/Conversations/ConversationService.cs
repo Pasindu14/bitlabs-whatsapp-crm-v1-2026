@@ -154,9 +154,16 @@ public class ConversationService(
             throw new BusinessRuleException("WABA_INACTIVE",
                 "The selected WhatsApp connection is inactive.");
 
-        // No local window pre-check here: the standalone endpoint preserves its prior behavior of
-        // attempting the send and letting Meta reject (131047) for a first-contact / closed window.
         var conversation = await FindOrCreateOpenAsync(contact, waba, ct);
+
+        // 24-hour customer-service window pre-check (M6) — mirror the two primary send paths. Meta's 131047 is
+        // the authoritative backstop, but pre-checking avoids a quality-damaging rejection round-trip on a
+        // cold / expired-window contact and returns a clean error instead.
+        if (conversation.WindowExpiresAt is null || conversation.WindowExpiresAt <= DateTime.UtcNow)
+            throw new BusinessRuleException("WINDOW_CLOSED",
+                "The 24-hour customer service window has closed. You can reply again after the customer "
+                + "messages you (or by sending an approved template).");
+
         var message = await SendInThreadAsync(conversation, contact, waba, body, ct);
 
         return new MessageResponse(

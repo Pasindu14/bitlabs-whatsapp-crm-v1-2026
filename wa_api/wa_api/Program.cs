@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hangfire;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -30,6 +32,26 @@ try
         .WriteTo.Sink(new InMemoryLogSink(InMemoryLogBuffer.Instance)));
 
     builder.Services.AddSingleton(InMemoryLogBuffer.Instance);
+
+    // ── Request limits (M8) ───────────────────────────────────────────────
+    // WhatsApp template media (video/docs) can approach ~100 MB; the framework default of 30 MB would 413
+    // before the handler even runs. Set an explicit, intentional ceiling for both the raw body and multipart.
+    const long MaxRequestBytes = 100L * 1024 * 1024;
+    builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = MaxRequestBytes);
+    builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = MaxRequestBytes);
+
+    // ── Forwarded headers (M7) ─────────────────────────────────────────────
+    // Kestrel runs behind Caddy (TLS terminates there), so without this every RemoteIpAddress is Caddy's
+    // container IP and Request.Scheme is always http — corrupting audit logs and making UseHttpsRedirection a
+    // no-op. Trust the single in-network proxy: the app port is only reachable through Caddy, so clearing the
+    // known-proxy allowlist (which otherwise can't match Docker's dynamic bridge IP) is safe here.
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        o.ForwardLimit = 1;
+        o.KnownNetworks.Clear();
+        o.KnownProxies.Clear();
+    });
 
     // ── Database (Supabase Postgres via Supavisor pooler) ──────────────────
     builder.Services.AddHttpContextAccessor();
@@ -63,13 +85,16 @@ try
 
     // ── Caching + Locking (Redis when configured, else memory / Postgres) ──
     var redisConnection = builder.Configuration["REDIS_CONNECTION"];
+    // Hoisted so the SignalR backplane below can reuse the same parsed options; null ⇒ Redis not configured.
+    ConfigurationOptions? redisOptions = null;
     if (!string.IsNullOrWhiteSpace(redisConnection))
     {
         // Default AbortOnConnectFail=false (unless the string sets abortConnect explicitly): a brief Redis
         // outage at startup must NOT crash the app. The multiplexer reconnects in the background, and any
         // rate-limit call during the outage falls through to the bounded in-process fallback. Parsed once and
-        // shared by the cache and the multiplexer (Connect clones internally, so the instance isn't mutated).
-        var redisOptions = ConfigurationOptions.Parse(redisConnection);
+        // shared by the cache, the multiplexer and the SignalR backplane (Connect clones internally, so the
+        // instance isn't mutated).
+        redisOptions = ConfigurationOptions.Parse(redisConnection);
         if (!redisConnection.Contains("abortConnect", StringComparison.OrdinalIgnoreCase))
             redisOptions.AbortOnConnectFail = false;
 
@@ -92,10 +117,10 @@ try
     // ── Background jobs (Hangfire) ─────────────────────────────────────────
     builder.Services.AddPlatformHangfire(builder.Configuration);
     builder.Services.AddTransient<WabaHealthCheckJob>();
-    builder.Services.AddTransient<SubscriptionPeriodResetJob>();
     builder.Services.AddTransient<TemplateStatusSyncJob>();
     builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookProcessingJob>();
     builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>();
+    builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookRetentionJob>();
 
     // Named HttpClient for Meta Graph API calls (base address set here; auth header per-request).
     builder.Services.AddHttpClient("MetaGraph", c =>
@@ -106,6 +131,25 @@ try
 
     // ── Authentication & Authorization (JWT bearer) ───────────────────────
     builder.Services.AddPlatformAuthentication(builder.Configuration);
+
+    // ── Rate limiting (H8) ─────────────────────────────────────────────────
+    // Brute-force / password-spray protection on the anonymous auth endpoints. Sliding window per client IP
+    // (accurate now that ForwardedHeaders restores the real IP behind Caddy). Rejections return 429. Applied
+    // to /auth/login and /auth/refresh via [EnableRateLimiting("auth")].
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("auth", httpContext =>
+            System.Threading.RateLimiting.RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new System.Threading.RateLimiting.SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 15,
+                    Window = TimeSpan.FromMinutes(5),
+                    SegmentsPerWindow = 5,
+                    QueueLimit = 0,
+                }));
+    });
 
     // ── Feature services ───────────────────────────────────────────────────
     builder.Services.AddScoped<wa_api.Features.Companies.ICompanyService, wa_api.Features.Companies.CompanyService>();
@@ -135,8 +179,15 @@ try
 
     // ── Real-time chat (SignalR) ───────────────────────────────────────────
     // camelCase payloads so the hub matches the REST API's JSON shape on the client.
-    builder.Services.AddSignalR()
+    var signalRBuilder = builder.Services.AddSignalR()
         .AddJsonProtocol(o => o.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
+    // Redis backplane so realtime chat survives horizontal scaling and blue/green deploy overlap. Without it,
+    // a webhook processed on one replica pushes only to that replica's connected clients — tenants pinned to
+    // another replica silently receive nothing until a manual refresh. Reuses the same parsed options
+    // (AbortOnConnectFail=false) as the cache/lock multiplexer, so a brief Redis blip degrades rather than
+    // crashes. No-op on a single instance (and in dev without Redis, where in-process delivery is correct).
+    if (redisOptions is not null)
+        signalRBuilder.AddStackExchangeRedis(o => o.Configuration = redisOptions);
     builder.Services.AddScoped<wa_api.Features.Plans.IPlanService, wa_api.Features.Plans.PlanService>();
     builder.Services.AddScoped<wa_api.Features.Packages.IPackageService, wa_api.Features.Packages.PackageService>();
     builder.Services.AddScoped<wa_api.Features.Subscriptions.ISubscriptionService, wa_api.Features.Subscriptions.SubscriptionService>();
@@ -262,6 +313,7 @@ try
     }
 
     // ── Middleware Pipeline (ORDER MATTERS) ───────────────────────────────
+    app.UseForwardedHeaders();                       // 0. Restore real client IP/scheme from Caddy (before all)
     app.UseMiddleware<GlobalExceptionMiddleware>();  // 1. Catch all exceptions → ApiError
     app.UseMiddleware<CorrelationIdMiddleware>();    // 2. Correlation ID (sets context.Items)
     app.UseSerilogRequestLogging();                  // 3. Log every request with correlation id
@@ -277,6 +329,7 @@ try
     app.UseCors("spa");                              // before auth; SignalR negotiate needs it
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseRateLimiter();                            // after routing/auth; gates [EnableRateLimiting] endpoints
     app.MapControllers();
     app.MapHub<wa_api.Features.Conversations.Realtime.ChatHub>("/hubs/chat");
     app.MapPlatformHealthChecks();
@@ -293,6 +346,7 @@ try
     RecurringJob.RemoveIfExists("subscription-period-reset");
     RecurringJob.AddOrUpdate<TemplateStatusSyncJob>("template-status-sync", j => j.RunAsync(), Cron.MinuteInterval(15));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>("webhook-sweeper", j => j.RunAsync(), Cron.MinuteInterval(5));
+    RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookRetentionJob>("webhook-retention", j => j.RunAsync(CancellationToken.None), "30 3 * * *");
     RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.CampaignSchedulerJob>("campaign-scheduler", j => j.RunAsync(), Cron.Minutely);
     RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>("quota-warning-checker", j => j.RunAsync(CancellationToken.None), "0 6 * * *");
 

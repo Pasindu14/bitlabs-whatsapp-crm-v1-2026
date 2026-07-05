@@ -67,6 +67,14 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
             .AsNoTracking()
             .FirstOrDefaultAsync(w => w.PhoneNumberId == phoneNumberId && w.IsActive, ct);
 
+    public Task<WabaConnection?> GetConnectionByWabaIdAsync(string wabaId, CancellationToken ct = default)
+        // Same cross-tenant bypass as above. Used to verify template-status webhooks, which carry no
+        // phone_number_id — only the WABA id in entry[].id — so we can pick the owning connection's App Secret.
+        => db.WabaConnections
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(w => w.WabaId == wabaId && w.IsActive, ct);
+
     public async Task<WabaConnectionResponse> CreateAsync(CreateWabaConnectionRequest request, CancellationToken ct = default)
     {
         var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == request.CompanyId, ct)

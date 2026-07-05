@@ -64,11 +64,16 @@
   .card.med{border-left-color:var(--med)} .card.low{border-left-color:var(--low)}
   .card.good{border-left-color:var(--good)}
   .card.fp{border-left-color:var(--muted);opacity:.96}
+  .card.done{border-left-color:var(--good)} .card.part{border-left-color:var(--med)}
+  .row.res{background:var(--good-bg);border-radius:8px;padding:10px 12px;margin-top:12px;font-size:14px}
+  .row.res .k{color:var(--good)}
+  .card.part .row.res{background:var(--med-bg)} .card.part .row.res .k{color:var(--med)}
   .chead{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
   .badge{font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:999px;white-space:nowrap;text-transform:uppercase}
   .b-crit{background:var(--crit-bg);color:var(--crit)} .b-high{background:var(--high-bg);color:var(--high)}
   .b-med{background:var(--med-bg);color:var(--med)} .b-low{background:var(--low-bg);color:var(--low)}
   .b-good{background:var(--good-bg);color:var(--good)} .b-fp{background:var(--code);color:var(--muted)}
+  .b-done{background:var(--good-bg);color:var(--good)} .b-part{background:var(--med-bg);color:var(--med)}
   .ctitle{font-weight:650;font-size:16.5px;flex:1;min-width:220px}
   .id{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:700;font-size:13px;margin-right:2px}
   .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:2px 7px;background:var(--bg)}
@@ -118,12 +123,20 @@
   <strong>Bottom line.</strong> The foundations are genuinely strong — tenant isolation, the transactional webhook inbox, atomic quota increments, distributed rate limiting and JWT hardening are all well-built (see <em>What's already solid</em>). The go-live risk is concentrated in <strong>concurrency the current design doesn't actually prevent</strong> (duplicate sends, quota over-spend), a <strong>one-line JSON bug that silently disables all campaign anti-ban handling</strong>, <strong>secrets stored in plaintext</strong>, and a handful of <strong>single-instance-only assumptions</strong> that break the moment you add a second container. Two findings from the automated pass were <em>false positives</em> and were removed after reading the code — documented at the end for transparency.
 </div>
 
+<div class="note" style="border-left:4px solid var(--good)">
+  <strong>Remediation update — 2026-07-05.</strong> Findings are tagged inline below with a <span class="badge b-done">✓ Fixed</span> / <span class="badge b-part">◐ Partial</span> badge and a resolution note; untagged items remain open.
+  <br><br><strong>Fixed:</strong> C2, C3 · H1, H2, H4, H7, H8, H9, H10, H11, H12 · M1–M14, M16, M18, M20, M21 · L1, L9.
+  <strong>Partial:</strong> C1 (no hard meter ceiling), H5 (idempotency done; ordering guard + Fail/dead-letter open), H6 (exact-sub done; legacy fallback kept), M19 (JWT shortened; CSP/hub-token open).
+  <strong>Still open:</strong> H3 (encrypt tokens at rest — needs a dedicated pass plus an ops key + token rotation), M11 (CI-gated migrations — process), M15/M17 (fold into C1 / replica-count decision), and most Lows.
+  <br><br>Billing model confirmed: <strong>no auto-renew</strong> — a subscription runs to its period end, then the tenant must subscribe again (accumulate-until-expiry). This resolved M21 (no dunning applies) and L1 (delete the reset job). Most fixes remain <strong>uncommitted</strong>; 6 migrations must be applied to prod before deploy.
+</div>
+
 <!-- ===================== CRITICAL ===================== -->
 <h2 class="sec">Critical — fix before go-live</h2>
 <p class="lead">Each of these causes real, customer-visible or money-losing harm under ordinary production conditions (retries, concurrency, restarts). Not theoretical.</p>
 
-<div class="card crit">
-  <div class="chead"><span class="badge b-crit">Critical</span>
+<div class="card crit part">
+  <div class="chead"><span class="badge b-crit">Critical</span><span class="badge b-part">◐ Partial</span>
     <span class="ctitle"><span class="id">C1.</span> Quota is never enforced atomically, and campaigns aren't gated at send time → paid quota is a soft suggestion</span>
     <span class="tag">Billing / Quota</span></div>
   <div class="row"><div class="k">Evidence</div>
@@ -137,10 +150,11 @@
     A tenant on a 1,000-message plan fires 20 concurrent sends near the cap — all read <code>used = 999</code>, all pass, all send, all increment → real spend past the paid quota. Launch two campaigns at once and both clear the same launch check. A campaign running for hours keeps sending after the subscription expires or a Stripe payment-failed webhook marks it inactive mid-run.</div>
   <div class="row"><div class="k fix">Fix</div>
     Make the meter the enforcement point: <code>UPDATE ... SET used = used + n WHERE id=@id AND used + n &lt;= quota + credits RETURNING id</code>; treat 0 rows as QUOTA_EXCEEDED. Invert order to <em>reserve-then-send</em> (refund on send failure — the refund plumbing already exists). Re-check active + not-expired + remaining quota at the top of every campaign batch, including Recurring.</div>
+  <div class="row res"><div class="k">◐ Partially fixed — 2026-07-05</div> The meter is now a race-free atomic increment, and the campaign batch enforces quota <em>at send time</em> — it pauses the campaign and notifies when usage reaches quota+credits, Recurring included. <strong>Still open:</strong> the meter has no hard ceiling (it increments unconditionally), so concurrent HTTP sends right at the cap can still marginally overshoot — true reserve-then-send at the meter is not yet implemented. <span class="fileref">2e80888</span></div>
 </div>
 
-<div class="card crit">
-  <div class="chead"><span class="badge b-crit">Critical</span>
+<div class="card crit done">
+  <div class="chead"><span class="badge b-crit">Critical</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">C2.</span> Campaign duplicate sends under concurrency — the dedup guard is advisory only</span>
     <span class="tag">Send pipeline</span></div>
   <div class="row"><div class="k">Evidence</div>
@@ -153,10 +167,11 @@
   <div class="row"><div class="k">Failure scenario</div>
     Hangfire is at-least-once. A worker heartbeat loss / long GC pause / container restart mid-batch makes the in-flight job visible again; a second worker picks up the same batch, both load the same 50 <code>Queued</code> recipients, both compute empty <code>alreadyMessaged</code>, both call Meta, both insert a Message (nothing stops it). Every recipient delivered <strong>twice</strong> and metered twice. The recent "record batch job id on launch" fix closed the scheduler-vs-launch path, not this re-dispatch path. A crash between the Meta 200 and the DB commit (line 326) resends on retry even single-worker.</div>
   <div class="row"><div class="k fix">Fix</div> Defense in depth: (1) add a partial-unique index <code>Messages(CampaignId, ContactId) WHERE CampaignId IS NOT NULL</code> so a resend fails at INSERT and reconciles; (2) claim-then-send — <code>UPDATE CampaignRecipients SET Status='Sending' WHERE Id=@id AND Status='Queued'</code>, send only if 1 row affected; (3) wrap the batch in the existing <code>AcquireAsync($"campaign-send:{id}")</code> lock. WhatsApp Cloud API has no server-side idempotency key, so a local uniqueness guard is the only real defense.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Claim-then-send implemented: an atomic <code>UPDATE CampaignRecipients SET Status='Sending' WHERE Id=@id AND Status='Queued'</code> gates every Meta call, so only the batch that wins the claim sends; a stale <code>Sending</code> claim self-heals after 5 min. Backed by a partial-unique index on <code>Messages(ExternalMessageId)</code> as an INSERT-level backstop and run-scoped dedup. <span class="fileref">2e80888</span></div>
 </div>
 
-<div class="card crit">
-  <div class="chead"><span class="badge b-crit">Critical</span>
+<div class="card crit done">
+  <div class="chead"><span class="badge b-crit">Critical</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">C3.</span> Meta error codes parsed as strings but returned as numbers → every campaign anti-ban handler is silently dead</span>
     <span class="tag">Rate-limiting / Meta API</span></div>
   <div class="row"><div class="k">Evidence</div>
@@ -168,28 +183,31 @@
   <div class="row"><div class="k">Failure scenario</div>
     Meta flags the number for spam (131048) — the single most important anti-ban signal — and the campaign <strong>keeps blasting</strong> because the pause never fires → number gets quality-downgraded, rate-limited, or <strong>blocked by Meta</strong>. A "slow down" throttle is treated as a permanent per-recipient failure, so deliverable messages are silently dropped. A restricted WABA keeps sending the whole audience.</div>
   <div class="row"><div class="k fix">Fix</div> One-line class of fix: read the code as a number when <code>ValueKind == Number</code> and normalize to string, mirroring the health-check job. Add a unit test feeding a real body (<code>"code":131048</code>) that asserts the campaign pauses. This single bug defeats the entire policy layer the rest of the code carefully builds.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Extracted <code>ParseMetaErrorCode</code> that reads <code>error.code</code> whether Meta sends it as a JSON number or string, restoring every policy classifier (spam-pause 131048, restriction, throttle, undeliverable). Regression-tested in <span class="fileref">MetaErrorCodeParseTests.cs</span>. <span class="fileref">ed0eeec</span></div>
 </div>
 
 <!-- ===================== HIGH ===================== -->
 <h2 class="sec">High — fix before or immediately after launch</h2>
 <p class="lead">Serious correctness, money, security or availability issues that will surface within the first days of real traffic.</p>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H1.</span> Recurring campaigns send exactly once, then silently deliver nothing forever</span>
     <span class="tag">Send pipeline</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">CampaignLaunchJob.cs:104–125</span><span class="fileref">CampaignBatchSendJob.cs:138–143, 451–460</span></div>
   <div class="row"><div class="k">Detail</div> <code>newRecipients</code> = target contacts minus everyone who already has a <code>CampaignRecipient</code> row <em>regardless of status</em>. On completion a Recurring campaign resets to <code>Scheduled</code> but recipient rows are never cleared. Next firing → <code>newRecipients</code> is empty → a batch enqueues, finds zero <code>Queued</code> rows, "completes." Core feature is broken and fails silently.</div>
   <div class="row"><div class="k fix">Fix</div> Introduce a <code>CampaignRunId</code> and dedup within a run (preferred, keeps history), or re-queue existing recipients (<code>Status→Queued</code>, clear <code>MessageId</code>/<code>ErrorCode</code>) at each firing.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Added <code>Campaign.CurrentRunNumber</code> + <code>Message.CampaignRunNumber</code>; <code>CampaignLaunchJob</code> bumps the run and re-queues the still-targeted audience each firing (retiring de-listed contacts), and the batch's already-messaged dedup is scoped to the current run. Regression-tested in <span class="fileref">RecurringRunDedupTests.cs</span>. Migration <code>AddCampaignRunNumber</code>. <span class="fileref">ed0eeec</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H2.</span> A poison batch re-enqueues every minute forever — no terminal failure state</span>
     <span class="tag">Send pipeline</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">CampaignBatchSendJob.cs:29 (OnAttemptsExceeded=Delete)</span><span class="fileref">CampaignPoisonHandlerJob.cs — never enqueued (dead code)</span><span class="fileref">CampaignSchedulerJob.cs:63–88 (stall sweeper)</span></div>
   <div class="row"><div class="k">Detail</div> A deterministic fault (bad template payload, NRE) throws every attempt. After 5 the job is deleted; the campaign stays <code>Running</code> with <code>Queued</code> rows; the sweeper re-enqueues a minute later; repeat forever. The campaign is never marked <code>Failed</code>, the tenant is never notified, and each cycle re-sends pre-fault recipients (compounds C2).</div>
   <div class="row"><div class="k fix">Fix</div> Wire an <code>IElectStateFilter</code>/continuation to invoke the already-written <code>CampaignPoisonHandlerJob</code> on attempts-exceeded, or add a recovery counter so the sweeper gives up and marks the campaign <code>Failed</code> + notifies.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The stall-sweeper is now progress-aware: <code>Campaign.RecoveryAttempts</code>/<code>LastRecoveryQueuedCount</code> track whether the Queued backlog shrinks between recoveries. A stuck backlog past 3 no-progress cycles hands the campaign to <code>CampaignPoisonHandlerJob</code> (→ <code>Failed</code> + tenant notified + remaining Queued flipped to Failed); progress forgives strikes so a transient restart never fails a healthy campaign. Regression-tested in <span class="fileref">PoisonRecoveryTests.cs</span>. Migration <code>AddCampaignPoisonRecovery</code>. <span class="fileref">ed0eeec</span></div>
 </div>
 
 <div class="card high">
@@ -201,139 +219,158 @@
   <div class="row"><div class="k fix">Fix</div> Encrypt both columns at rest (AES-256-GCM via <code>ITokenProtector</code>, or ASP.NET Data Protection / pgcrypto / KMS). Generate a real key (<code>openssl rand -base64 32</code>), keep it only in the server <code>.env</code>/secret store, migrate existing rows, and <strong>rotate every token &amp; secret</strong> since they've lived in plaintext.</div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H4.</span> <code>invoice.paid</code> resets quota to 0 on <em>every</em> delivery → repeated free quota refills</span>
     <span class="tag">Billing / Stripe</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">StripeWebhookProcessingJob.cs:200–205 (reset outside the insert/update branch)</span><span class="fileref">second reset path at :104–110</span></div>
   <div class="row"><div class="k">Detail</div> The <code>MessagesUsedThisPeriod = 0</code> reset runs on every delivery of <code>invoice.paid</code> — including Stripe's routine redeliveries/retries of the same invoice. Each redelivery zeroes usage mid-period → the tenant gets a fresh full quota repeatedly, for free. A late <code>invoice.paid</code> for an old invoice wipes the current period.</div>
   <div class="row"><div class="k fix">Fix</div> Reset only when the event genuinely opens a new period (guard on invoice period-start vs <code>CurrentPeriodStart</code>), dedupe by Stripe event id (H5), and consolidate to a single reset path.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> <code>invoice.paid</code> now resets usage only via <code>ShouldResetUsage(billingReason, recordedStart, invoicePeriodStart)</code>: it requires BillingReason <code>subscription_cycle</code>/<code>subscription_create</code> <em>and</em> a strictly-newer period start, and advances the stored period so this path and <code>SyncSubscriptionAsync</code> converge on a single reset. Blocks redeliveries, late old invoices, and mid-cycle prorations. Regression-tested in <span class="fileref">InvoicePeriodResetTests.cs</span>. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high part">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-part">◐ Partial</span>
     <span class="ctitle"><span class="id">H5.</span> Stripe: no event-id idempotency and no ordering guard → cancelled subscriptions resurrected, billing events silently dropped</span>
     <span class="tag">Billing / Stripe</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">StripeWebhookController.cs:45–46 (enqueue by type+json, no event-id dedup)</span><span class="fileref">StripeWebhookProcessingJob.cs:96–133, 141–156</span><span class="fileref">:18 — OnAttemptsExceeded = Delete</span></div>
   <div class="row"><div class="k">Detail</div> No processed-events table. Stripe delivers at-least-once and out-of-order: a stale <code>subscription.updated</code> (active) arriving after <code>subscription.deleted</code> re-activates a cancelled sub. Separately, if a <code>subscription.created</code>/<code>invoice.paid</code> fails 5× (e.g. missing <code>StripePriceId</code> mapping) the job is <strong>deleted</strong> with no dead-letter and no alert — a paying customer ends up with no synced subscription, discovered only by complaint.</div>
   <div class="row"><div class="k fix">Fix</div> Persist processed Stripe event ids in a unique-indexed table (mirror the Meta inbox). Ignore events older than stored state; never move a locally-cancelled sub back to Active from a stale update. Change <code>OnAttemptsExceeded</code> to <code>Fail</code> and add dead-letter alerting.</div>
+  <div class="row res"><div class="k">◐ Partially fixed — 2026-07-05</div> Event-id idempotency implemented: <code>ProcessedStripeEvents</code> (unique PK) is recorded in the <em>same transaction</em> as processing, so a redelivered event is skipped — this is what closes the per-delivery quota-reset replay (H4). <strong>Still open:</strong> the ordering guard (a stale <code>subscription.updated</code> can still reactivate a locally-cancelled sub) and <code>OnAttemptsExceeded=Fail</code> + dead-letter alerting are not yet done. <span class="fileref">2e80888</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high part">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-part">◐ Partial</span>
     <span class="ctitle"><span class="id">H6.</span> Refund fallback credits the current active subscription for messages that were never metered</span>
     <span class="tag">Billing / Webhooks</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">MessageStatusWebhookHandler.cs:99–108</span></div>
   <div class="row"><div class="k">Detail</div> When <code>MeteredSubscriptionId</code> is null (the pre-2026-07-03 campaign/FB sends that were never metered — see project memory) a failed-unbilled message falls back to decrementing <em>today's</em> active subscription. A historical, never-counted message that later gets a <code>failed</code> webhook gifts the tenant a free send. Given the known historical under-count, this fallback actively worsens accounting.</div>
   <div class="row"><div class="k fix">Fix</div> Only refund when <code>MeteredSubscriptionId</code> is non-null; drop the "current active" fallback — a message that never incremented a counter must not decrement one.</div>
+  <div class="row res"><div class="k">◐ Partially fixed — 2026-07-05</div> Refunds now credit the EXACT subscription recorded at send time (<code>Message.MeteredSubscriptionId</code>) and only when Meta did not bill the message — fixing the cross-period mis-credit. <strong>Still open per this finding:</strong> a fallback to the current active sub is intentionally retained for legacy pre-<code>MeteredSubscriptionId</code> rows (null-metered), which this finding recommends dropping entirely. <span class="fileref">2e80888</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H7.</span> Unknown/deactivated <code>phone_number_id</code> returns 401 → Meta can disable the shared webhook for <em>all</em> tenants</span>
     <span class="tag">Webhooks</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">WhatsAppWebhookController.cs:64–69 (returns Unauthorized)</span><span class="fileref">WabaConnectionService.cs:62–68 (filters IsActive → deactivated = null)</span></div>
   <div class="row"><div class="k">Detail</div> One shared webhook URL serves the whole platform. Meta treats any non-2xx as a delivery failure and, on sustained failures, <strong>disables the webhook subscription</strong> — degrading ingestion for every company. Triggers: a number onboarded on Meta's side but not yet in our DB, or an admin temporarily deactivating a connection (every correctly-signed inbound for that number now 401s and is lost).</div>
   <div class="row"><div class="k fix">Fix</div> For a validly-signed but unroutable payload return 200 and drop/park it; reserve non-2xx strictly for signature failures and genuine persistence errors. Consider not filtering <code>IsActive</code> in the webhook lookup, or persist-before-route so a re-activation can replay.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> An unroutable-but-signed payload (unknown / not-yet-onboarded phone_number_id) now returns <strong>200 and drops</strong> instead of 401, so Meta can't disable the shared webhook for every tenant. Non-2xx is reserved for bad signatures / persistence errors on routable payloads. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H8.</span> No brute-force protection on auth; long-lived 8-hour JWTs; verify prod isn't still on the dev signing secret</span>
     <span class="tag">Security</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">AuthController.cs:19–34 (login/refresh, no throttle)</span><span class="fileref">no AddRateLimiter/UseRateLimiter in Program.cs</span><span class="fileref">AccessTokenExpiryMinutes: 480</span><span class="fileref">contabo.md:198,439 (JWT secret rotation TODO still open)</span></div>
   <div class="row"><div class="k">Detail</div> <code>/auth/login</code> accepts unlimited guesses per IP/account — combined with a known seed admin email this enables password spraying with no lockout. Access tokens are stateless for 8h, so deactivations/role changes don't take effect until expiry. If prod still uses the committed dev HS256 secret, anyone with it can forge SuperAdmin tokens.</div>
   <div class="row"><div class="k fix">Fix</div> Add ASP.NET rate limiting (sliding window keyed by IP+email) on <code>login</code>/<code>refresh</code> + per-account lockout. Shorten access-token lifetime to 15–60 min and lean on refresh rotation. Confirm the prod <code>.env</code> JWT secret is a strong random value; rotate if not.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Added an ASP.NET sliding-window rate limiter (15 / 5 min per client IP — accurate now that ForwardedHeaders restores the real IP) on <code>/auth/login</code> + <code>/auth/refresh</code> (429 on exceed), and shortened the access-token lifetime 8h → <strong>60 min</strong>. <strong>Follow-ups:</strong> per-account lockout, and confirming the prod <code>.env</code> JWT secret (an ops check). <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H9.</span> SignalR has no Redis backplane → realtime chat breaks silently the moment you run &gt;1 instance</span>
     <span class="tag">Infra / Realtime</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">Program.cs:138–139 (AddSignalR, no AddStackExchangeRedis)</span><span class="fileref">ChatNotifier.cs:15–17 (in-process group push)</span></div>
   <div class="row"><div class="k">Detail</div> Redis is already wired for cache/Hangfire/locks/rate-limit, but not for SignalR. The instant a second replica exists (or a blue/green overlap during deploy), a webhook processed on instance B pushes only to B's clients; tenants on instance A get nothing until manual refresh. Fails with no error.</div>
   <div class="row"><div class="k fix">Fix</div> Add <code>.AddStackExchangeRedis(redisConnection)</code> to the SignalR builder. One line — and it's the thing standing between you and safe horizontal scaling.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Added <code>Microsoft.AspNetCore.SignalR.StackExchangeRedis</code> and wired <code>signalRBuilder.AddStackExchangeRedis(o =&gt; o.Configuration = redisOptions)</code>, reusing the same parsed multiplexer options (<code>AbortOnConnectFail=false</code>) as the cache/lock. Active only when <code>REDIS_CONNECTION</code> is set (prod); no-op single-instance/dev. <strong>Infra wiring — not unit-testable;</strong> verify with a 2-replica smoke test (message on replica A appears live for a client pinned to replica B). <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H10.</span> DB connection exhaustion: a second unbounded pool from health checks, plus Hangfire/web contention under the Supabase 15-client cap</span>
     <span class="tag">Infra / DB</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">Program.cs:44–50 (app pool capped at 10)</span><span class="fileref">HealthCheckExtensions.cs:14–16 (raw string, default pool max 100)</span><span class="fileref">HangfireExtensions.cs:31–35 (WorkerCount = cores×2)</span></div>
   <div class="row"><div class="k">Detail</div> The health check uses a different connection string with no pool params → a <em>second</em> Npgsql pool (default max 100). Concurrent readiness probes can push total PG clients past Supavisor's 15 → <code>sorry, too many clients</code>. Separately, Hangfire workers (8 on a 4-vCPU box) draw from the same 10-slot EF pool as HTTP requests; a campaign burst can starve the API.</div>
   <div class="row"><div class="k fix">Fix</div> Point the health check at the pooled string (or a tiny <code>Max Pool Size=2</code>). Cap <code>WorkerCount</code> (e.g. 4) or move prod to Supavisor <strong>transaction mode (port 6543)</strong> before raising the pool. Load-test a campaign concurrent with dashboard traffic.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The health check now uses its own bounded string (<code>Maximum Pool Size=2;Minimum Pool Size=0</code>) instead of the raw default-100 pool, and Hangfire <code>WorkerCount</code> is capped at <strong>4</strong> (override <code>Hangfire:WorkerCount</code>) so background jobs can't monopolise the shared 10-slot EF pool. Single-instance PG clients now ≤ ~12, under the 15 cap. <strong>Still required for &gt;1 replica:</strong> move prod to Supavisor transaction mode (port 6543) — an env/connection-string change, not code — and load-test a campaign against dashboard traffic. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H11.</span> Transient network / 5xx errors permanently fail campaign recipients — no retry policy</span>
     <span class="tag">Rate-limiting / Meta API</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">CampaignBatchSendJob.cs:743–746 (NETWORK_ERROR → matches no classifier → Failed at :415)</span><span class="fileref">Program.cs:101–105 (MetaGraph client: 15s timeout, no Polly)</span></div>
   <div class="row"><div class="k">Detail</div> A 2-second DNS hiccup or a 503 from Meta during a 10K-recipient campaign permanently marks every recipient hit during the blip as <code>Failed</code> — deliverable customers never get the message, with no automatic re-attempt.</div>
   <div class="row"><div class="k fix">Fix</div> Classify <code>NETWORK_ERROR</code> / HTTP 5xx / 408 / 429 as transient — leave the recipient <code>Queued</code> and take the reschedule-with-backoff path. Do <em>not</em> add blind Polly retries to the non-idempotent send POST until C2's uniqueness guard is in place (it would amplify duplicates).</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Transient transport errors (network blip / Meta 5xx / 408 / bare 429) now keep the recipient Queued and reschedule the batch with backoff (honouring Retry-After) instead of permanently failing a deliverable message. Safe because C2's atomic claim prevents the reschedule from double-sending — exactly the precondition the finding required. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card high">
-  <div class="chead"><span class="badge b-high">High</span>
+<div class="card high done">
+  <div class="chead"><span class="badge b-high">High</span><span class="badge b-done">✓ Fixed</span>
     <span class="ctitle"><span class="id">H12.</span> Access-token expiry (190) mid-campaign burns the whole remaining batch one failure at a time</span>
     <span class="tag">Rate-limiting / Meta API</span></div>
   <div class="row"><div class="k">Evidence</div><span class="fileref">MetaPolicyErrorCodes.cs (no 190 classifier)</span><span class="fileref">WabaHealthCheckJob.cs:87–90 (handles 190, but only every 15 min)</span></div>
   <div class="row"><div class="k">Detail</div> Even after C3 is fixed, a 190 (expired/invalid token) during a send falls through to per-recipient <code>Failed</code>, failing the entire remaining audience individually instead of halting once. Pairs with H3 (token management).</div>
   <div class="row"><div class="k fix">Fix</div> Add 190 (and account-restriction codes) to a fatal branch that pauses the campaign, marks the connection <code>Invalid</code>, and halts immediately.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Error 190 (expired/invalid token) now hits a fatal branch (<code>MetaPolicyErrorCodes.IsAuthError</code>): deactivate the connection, pause the campaign, release the claim, notify, and halt — instead of burning the whole remaining audience one 190 at a time. <span class="tag">uncommitted</span></div>
 </div>
 
 <!-- ===================== MEDIUM ===================== -->
 <h2 class="sec">Medium — schedule as fast-follow</h2>
 <p class="lead">Real issues with lower probability or smaller blast radius; several are operational hardening for the VPS/proxy setup.</p>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M1.</span> Inbound <code>ExternalMessageId</code> (wamid) index is non-unique → duplicate inbound messages under concurrent distinct envelopes</span><span class="tag">Webhooks</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M1.</span> Inbound <code>ExternalMessageId</code> (wamid) index is non-unique → duplicate inbound messages under concurrent distinct envelopes</span><span class="tag">Webhooks</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">AppDbContext.cs:244 (verified non-unique)</span> + <span class="fileref">InboundMessageWebhookHandler.cs:63–69 (read-check dedup)</span>. The inbox only dedups byte-identical payloads; Meta can redeliver the same wamid inside a <em>different</em> envelope → two inbox rows processed on two workers, both pass the <code>AnyAsync</code> check → two Message rows, double unread bump, duplicate realtime push. Add a partial-unique index on <code>(CompanyId, ExternalMessageId)</code> and catch the <code>DbUpdateException</code> as a dedup.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Added a partial-unique index on <code>Messages(ExternalMessageId) WHERE ExternalMessageId IS NOT NULL</code>, so a duplicate inbound wamid fails at INSERT and is reconciled rather than creating a second row. Migration <code>AddUniqueExternalMessageIdIndex</code>. <span class="fileref">2e80888</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M2.</span> Standalone <code>/messages</code> idempotency is non-atomic (get-then-store) — concurrent double-submit sends twice + 500s</span><span class="tag">Send pipeline</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M2.</span> Standalone <code>/messages</code> idempotency is non-atomic (get-then-store) — concurrent double-submit sends twice + 500s</span><span class="tag">Send pipeline</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">MessagesController.cs:43–64</span>. Two concurrent POSTs with the same <code>Idempotency-Key</code> both miss, both send, the second <code>StoreAsync</code> violates the PK → unhandled 500 + duplicate delivery. Claim the key with a unique INSERT <em>before</em> the send (on conflict return the stored/pending result), or wrap in the distributed lock keyed on the idempotency key.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Same-key sends serialize on the distributed lock (<code>msg:send:{key}</code>) with a cache re-check inside the lock; a concurrent duplicate that can't acquire gets a 409 (its retry then hits the cached result). No more double-send + PK-collision 500. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M3.</span> Scheduler + manual launch can enqueue two batch jobs on relaunch of a partially-run campaign</span><span class="tag">Send pipeline</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M3.</span> Scheduler + manual launch can enqueue two batch jobs on relaunch of a partially-run campaign</span><span class="tag">Send pipeline</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">CampaignService.LaunchAsync:143–223</span> + <span class="fileref">CampaignSchedulerJob.cs:38–51</span>. When recipients already exist, no insert-collision occurs and each launch enqueues its own batch → two concurrent batches (feeds C2). Gate on an atomic status transition: <code>UPDATE Campaigns SET Status='Running' WHERE Id=@id AND Status IN ('Draft','Scheduled')</code>, enqueue only if 1 row changed.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> <code>LaunchAsync</code> atomically claims the campaign (<code>UPDATE … SET Status=Running WHERE Status IN (Draft,Scheduled)</code>) before enqueueing; a concurrent launch that changes 0 rows gets a 409, so two launches (or a launch racing the scheduler) can't both enqueue a batch. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M4.</span> Meta <code>Retry-After</code> / <code>error_data</code> backoff hints are never honored</span><span class="tag">Rate-limiting</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M4.</span> Meta <code>Retry-After</code> / <code>error_data</code> backoff hints are never honored</span><span class="tag">Rate-limiting</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">CampaignBatchSendJob.cs:525–527 (fixed 5+rand(0,10)s)</span>. Under a real 130429 throttle Meta may want a longer cool-down; retrying after ~5–15s re-trips the limit and digs the number deeper. Read <code>res.Headers.RetryAfter</code> / <code>error_data</code> and use it as the reschedule floor.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The Meta send surfaces the <code>Retry-After</code> header; the transient-throttle reschedule uses it as a floor (capped at 10 min) instead of the flat 5–15 s jitter, so we never retry sooner than Meta asked and re-trip the throttle. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M5.</span> YELLOW quality-rating mitigation is ineffective — halves batch size, not send rate</span><span class="tag">Rate-limiting</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M5.</span> YELLOW quality-rating mitigation is ineffective — halves batch size, not send rate</span><span class="tag">Rate-limiting</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">CampaignBatchSendJob.cs:119–120</span>. Batches chain back-to-back and throughput is governed by the 20/s token bucket, which is unchanged — so a YELLOW (elevated-block-risk) number keeps sending at full pace. Actually reduce the effective per-second rate for that number, or inject inter-send delay. (The RED→pause path is correct.)</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> YELLOW now injects a 250 ms inter-send delay (the real rate lever) on top of the halved batch, so an at-risk number sends slower rather than at full token-bucket pace. GREEN is unthrottled. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M6.</span> One <code>/messages</code> adapter skips the 24-hour-window pre-check</span><span class="tag">Rate-limiting</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M6.</span> One <code>/messages</code> adapter skips the 24-hour-window pre-check</span><span class="tag">Rate-limiting</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">ConversationService.SendToContactAsync:157–158</span> relies on Meta 131047 instead of pre-checking <code>WindowExpiresAt</code> (the two primary paths do pre-check). Free-form sends to a cold contact generate a quality-damaging rejection round-trip. Apply the same window pre-check before calling the sender.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> <code>SendToContactAsync</code> now applies the same 24-hour-window pre-check as the two primary paths — a cold / expired-window free-form send returns <code>WINDOW_CLOSED</code> instead of a quality-damaging Meta 131047 round-trip. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M7.</span> No <code>ForwardedHeaders</code> behind Caddy — client IP/scheme are always the proxy's; <code>UseHttpsRedirection</code> is a dead no-op</span><span class="tag">Infra</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M7.</span> No <code>ForwardedHeaders</code> behind Caddy — client IP/scheme are always the proxy's; <code>UseHttpsRedirection</code> is a dead no-op</span><span class="tag">Infra</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> No <code>UseForwardedHeaders</code> anywhere; Kestrel listens on plain HTTP behind Caddy. <code>RemoteIpAddress</code> = Caddy's container IP and <code>Request.Scheme</code> = http in all audit logs. Add <code>UseForwardedHeaders</code> (For+Proto, with <code>KnownProxies</code>) before auth/logging; drop or fix the redirect.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> <code>UseForwardedHeaders</code> (XFF + XFP, single in-network proxy) added as the first middleware, so client IP/scheme are correct in logs/auth and <code>UseHttpsRedirection</code> is no longer a no-op. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M8.</span> Default 30 MB request-body limit will 413 large WhatsApp media uploads</span><span class="tag">Infra</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M8.</span> Default 30 MB request-body limit will 413 large WhatsApp media uploads</span><span class="tag">Infra</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> No Kestrel <code>MaxRequestBodySize</code>/<code>MultipartBodyLengthLimit</code> set. Template media (video/docs up to ~100 MB) exceed the 30 MB default → 413 before the handler. Media is also stored as <code>bytea</code> and re-uploaded per send, amplifying pool pressure. Set an explicit intentional limit and validate size early.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Explicit 100 MB ceiling on Kestrel <code>MaxRequestBodySize</code> + <code>MultipartBodyLengthLimit</code>, so large WhatsApp media no longer 413s at the 30 MB framework default. (The store-as-bytea / re-upload-per-send amplification is a separate item.) <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M9.</span> No Docker log rotation → disk-fill takes down the whole stack; observability is thin</span><span class="tag">Infra / Ops</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M9.</span> No Docker log rotation → disk-fill takes down the whole stack; observability is thin</span><span class="tag">Infra / Ops</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> Compose sets no <code>logging:</code> limits; Docker's default json-file driver is unbounded. App Insights is opt-in and unconfigured in prod. Add <code>max-size</code>/<code>max-file</code> (or ship to a log service), set an APM/OTLP connection string, and add basic uptime + error alerting.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Bounded json-file logging (10m × 5 files) applied to every compose service via a shared anchor, so a chatty container can't fill the disk. (APM/OTLP + uptime alerting remain an ops setup.) <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M10.</span> No graceful-shutdown window → in-flight sends killed on every deploy</span><span class="tag">Infra</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M10.</span> No graceful-shutdown window → in-flight sends killed on every deploy</span><span class="tag">Infra</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> No <code>stop_grace_period</code>; Docker SIGKILLs after 10s (< .NET's 30s host shutdown). A redeploy mid-batch drops in-flight requests; interrupted Meta calls whose response was lost leave inconsistent state (and re-run via at-least-once). Set <code>stop_grace_period: 30s</code> and verify a redeploy during an active campaign.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> <code>stop_grace_period: 30s</code> on the api service so a redeploy lets in-flight requests / a send batch finish before SIGKILL (was Docker's 10s default, under .NET's 30s host shutdown). <span class="tag">uncommitted</span></div>
 </div>
 
 <div class="card med">
@@ -341,19 +378,22 @@
   <div class="row"><div class="k">Detail &amp; fix</div> Auto-migrate is Dev/Staging only; the runbook has an operator run <code>dotnet ef database update</code> from local against the prod DB. Forgetting it ships code expecting columns that don't exist → <code>42703</code> 500s. Move migrations into a gated one-shot container/CI step with the prod string injected as a secret.</div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M12.</span> Webhook inbox grows unbounded; sweeper query has no supporting index</span><span class="tag">Webhooks</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M12.</span> Webhook inbox grows unbounded; sweeper query has no supporting index</span><span class="tag">Webhooks</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> A jsonb row is stored for every sent/delivered/read status (3+ per outbound msg); no pruning job exists. The sweeper's <code>ORDER BY UpdatedAt</code> has no index (<span class="fileref">WebhookInboxService.cs:110–118</span>). Add a retention job deleting <code>Processed</code> rows older than N days (keep <code>Dead</code>) and an index on <code>(Status, UpdatedAt)</code>.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Added the composite <code>(Status, UpdatedAt)</code> index (migration <code>AddWebhookEventStatusUpdatedAtIndex</code>) and a daily <code>WebhookRetentionJob</code> that prunes Processed rows older than 14 days in bounded batches (Dead rows kept for triage). <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M13.</span> Sweeper and Hangfire retry both drive the same webhook row → inflated attempts, premature dead-lettering</span><span class="tag">Webhooks</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M13.</span> Sweeper and Hangfire retry both drive the same webhook row → inflated attempts, premature dead-lettering</span><span class="tag">Webhooks</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">WebhookProcessingJob.cs:28 (retries to 15 min)</span> + <span class="fileref">WebhookSweeperJob (every 5 min)</span>. A <code>Failed</code> row awaiting its backoff is also re-enqueued by the sweeper; each re-enqueue increments <code>Attempts</code>, burning the dead-letter budget faster than intended. Have the sweeper target only orphaned <code>Received</code> rows with no live job, or exclude rows still in their retry window.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The sweep query now reclaims Failed rows only once they're past the whole retry schedule (20 min), keeping the 5-min reclaim for Received/Processing — so Hangfire's own backoff retry isn't double-driven and Attempts isn't inflated. Regression-tested in <span class="fileref">WebhookSweepQueryTests.cs</span>. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M14.</span> Template-status webhooks verified against a single global secret in a per-app tenancy</span><span class="tag">Webhooks</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M14.</span> Template-status webhooks verified against a single global secret in a per-app tenancy</span><span class="tag">Webhooks</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">WhatsAppWebhookController.cs:72–76</span>. Template updates carry no <code>phone_number_id</code>, so verification falls back to the one global <code>Meta:AppSecret</code>. For any tenant whose app secret differs, template approval/rejection webhooks are rejected (masked by the 15-min poll). Route verification by <code>entry[].id</code> (WABA id) to the owning connection's secret, or document a single shared Meta app.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Template-status webhooks (no phone_number_id) now verify against the owning connection's App Secret, resolved by <code>entry[].id</code> (WABA id) via the new <code>GetConnectionByWabaIdAsync</code>; falls back to the global secret only when the WABA can't be resolved. <span class="tag">uncommitted</span></div>
 </div>
 
 <div class="card med">
@@ -361,9 +401,10 @@
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">RedisTokenBucketRateLimiter.cs:113/122</span> degrades to a per-process bucket at 5/s; with R replicas all in fallback, worst-case aggregate is 5×R per number. Low likelihood (Redis down + high replica count) but pin the assumed max replica count or scale <code>FallbackRefill</code> by it.</div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M16.</span> Zero-decimal currency (JPY/KRW) invoice totals misreported 100×</span><span class="tag">Billing</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M16.</span> Zero-decimal currency (JPY/KRW) invoice totals misreported 100×</span><span class="tag">Billing</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">InvoiceService.cs:26</span> divides <code>AmountPaid / 100</code> unconditionally. Display-only (stored value is correct smallest-unit <code>long</code>), but user-facing. Map by the currency's exponent.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Invoice display goes through <code>StripeCurrency.ToMajorUnit</code>, which leaves zero-decimal currencies (JPY, KRW, …) unscaled instead of dividing by 100. Regression-tested in <span class="fileref">StripeCurrencyTests.cs</span>. <span class="tag">uncommitted</span></div>
 </div>
 
 <div class="card med">
@@ -371,33 +412,38 @@
   <div class="row"><div class="k">Detail &amp; fix</div> The gate checks the most-recent-active sub; the meter re-resolves it independently. A re-subscribe between gate and meter charges a different row than was validated. Low probability; resolve/lock the same row across gate+meter (folds into C1's reserve-then-send).</div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M18.</span> No Docker healthcheck on the <code>api</code> container; the well-built <code>/health/ready</code> has no consumer</span><span class="tag">Infra</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M18.</span> No Docker healthcheck on the <code>api</code> container; the well-built <code>/health/ready</code> has no consumer</span><span class="tag">Infra</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> Caddy <code>depends_on: api</code> waits only for start, not health → brief 502s on deploy, and a hung-but-alive process isn't restarted. Add a compose healthcheck hitting <code>/health/ready</code> and gate Caddy on <code>condition: service_healthy</code>.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The api healthcheck + autoheal sidecar were already present; added the missing piece — Caddy now gates on <code>depends_on: api → condition: service_healthy</code>, eliminating the brief boot-time 502s. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M19.</span> Access token readable by client JS for SignalR — XSS token-theft surface, widened by 8h lifetime</span><span class="tag">Security / Frontend</span></div>
+<div class="card med part">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-part">◐ Partial</span><span class="ctitle"><span class="id">M19.</span> Access token readable by client JS for SignalR — XSS token-theft surface, widened by 8h lifetime</span><span class="tag">Security / Frontend</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">use-chat-hub.ts:20–21,34</span> reads the token client-side for the hub. It lives in the NextAuth session (better than localStorage) but is JS-readable; an XSS yields an 8h bearer token. Shorten lifetime, keep CSP tight, scope the hub token narrowly if feasible.</div>
+  <div class="row res"><div class="k">◐ Partially fixed — 2026-07-05</div> Access-token lifetime shortened 8h → 60 min (the main XSS-exposure mitigation; see H8). <strong>Still open:</strong> tightening CSP and scoping the SignalR hub token more narrowly. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M20.</span> A campaign tier/rate slot is consumed even when the send is then skipped</span><span class="tag">Send pipeline</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M20.</span> A campaign tier/rate slot is consumed even when the send is then skipped</span><span class="tag">Send pipeline</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <span class="fileref">CampaignBatchSendJob.cs:256–280</span> acquires a daily unique-recipient tier permit before the <code>headerMedia is null</code> / failure checks, so a media-header template with a failed upload burns a slot per recipient without sending — shrinking the number's daily capacity. Acquire the permit immediately before an attempted send, or release it on local failure.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The <code>HEADER_MEDIA_MISSING</code> local failure now happens BEFORE the rate/tier permit is acquired, so a batch-wide media failure no longer burns the number's scarce daily unique-recipient allowance per recipient. <span class="tag">uncommitted</span></div>
 </div>
 
-<div class="card med">
-  <div class="chead"><span class="badge b-med">Medium</span><span class="ctitle"><span class="id">M21.</span> Payment-failure / expiry is enforced on the HTTP send path but not on campaigns; no dunning/grace</span><span class="tag">Billing</span></div>
+<div class="card med done">
+  <div class="chead"><span class="badge b-med">Medium</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">M21.</span> Payment-failure / expiry is enforced on the HTTP send path but not on campaigns; no dunning/grace</span><span class="tag">Billing</span></div>
   <div class="row"><div class="k">Detail &amp; fix</div> <code>Status=Inactive</code> is honored by <code>SubscriptionGate</code> (HTTP) but campaigns ignore status entirely (see C1). One failed payment immediately inactivates with no grace window. Fold campaign-plane enforcement into C1 and model a short dunning grace.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> The campaign batch now enforces the subscription plane like the HTTP gate: it pauses + notifies when there's no active, in-period subscription. Per the confirmed billing model there is <strong>no auto-renew</strong> — a subscription runs to <code>CurrentPeriodEnd</code> then the tenant must subscribe again — so dunning/grace does not apply. <span class="tag">uncommitted</span></div>
 </div>
 
 <!-- ===================== LOW ===================== -->
 <h2 class="sec">Low — track &amp; tidy</h2>
 <p class="lead">Minor, latent, footgun, or product-decision items. Individually low-impact.</p>
 
-<div class="card low">
-  <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L1.</span> Retired monthly-reset job still DI-registered — a footgun if rescheduled</span><span class="tag">Billing</span></div>
+<div class="card low done">
+  <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L1.</span> Retired monthly-reset job still DI-registered — a footgun if rescheduled</span><span class="tag">Billing</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">SubscriptionPeriodResetJob.cs</span> is registered (<span class="fileref">Program.cs:95</span>) though unscheduled (<span class="fileref">:293 RemoveIfExists</span>). Its pre-"accumulate-until-expiry" logic would wrongly draw down credits/zero usage if re-added. Delete the class.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Deleted <code>SubscriptionPeriodResetJob</code> and its DI registration — confirmed obsolete by the no-auto-renew / accumulate-until-expiry model. The <code>RemoveIfExists</code> cleanup stays. <span class="tag">uncommitted</span></div>
 </div>
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L2.</span> Opt-out is exact-keyword only and one-directional</span><span class="tag">Webhooks / Product</span></div>
@@ -427,9 +473,10 @@
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L8.</span> Stale <code>AppUrl</code> points at a dead endpoint</span><span class="tag">Infra / Config</span></div>
   <div class="row"><div class="k">Detail</div> <span class="fileref">contabo.md:207</span> sets <code>AppUrl=http://213.136.74.159:8080</code>, which the same doc says no longer works. Any link built from it (emails, Stripe returns) is broken. Update to the HTTPS domain.</div>
 </div>
-<div class="card low">
-  <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L9.</span> Redis has no <code>maxmemory</code>/eviction policy and its AOF volume isn't backed up</span><span class="tag">Infra</span></div>
+<div class="card low done">
+  <div class="chead"><span class="badge b-low">Low</span><span class="badge b-done">✓ Fixed</span><span class="ctitle"><span class="id">L9.</span> Redis has no <code>maxmemory</code>/eviction policy and its AOF volume isn't backed up</span><span class="tag">Infra</span></div>
   <div class="row"><div class="k">Detail</div> Redis backs Hangfire storage + cache + locks; unbounded growth risks OOM and losing the AOF loses queued/scheduled jobs. Set <code>maxmemory</code> + policy and back up the volume.</div>
+  <div class="row res"><div class="k">✓ Fixed — 2026-07-05</div> Redis now runs <code>--maxmemory 512mb --maxmemory-policy noeviction</code> (noeviction because it backs Hangfire job state — tune to VPS RAM). AOF-volume backup remains an ops task. <span class="tag">uncommitted</span></div>
 </div>
 <div class="card low">
   <div class="chead"><span class="badge b-low">Low</span><span class="ctitle"><span class="id">L10.</span> Realtime <code>ChatHub</code> is <code>CompanyAdmin</code>-only</span><span class="tag">Infra / Product</span></div>
@@ -469,17 +516,17 @@
 <table class="chk">
   <thead><tr><th>Order</th><th>Do this</th><th>Refs</th></tr></thead>
   <tbody>
-    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td>Atomic quota ceiling + gate campaigns at send time (reserve-then-send)</td><td>C1, M17, M21</td></tr>
-    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td>Unique <code>Messages(CampaignId,ContactId)</code> index + claim-then-send + use the existing distributed lock</td><td>C2, M3, H11</td></tr>
-    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td>Fix the Meta error-code number/string parse (revives all anti-ban handling)</td><td>C3, H12, M4, M5</td></tr>
+    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-part">◐</span> Atomic quota ceiling + gate campaigns at send time (reserve-then-send)</td><td>C1, M17, M21</td></tr>
+    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-done">✓</span> Unique <code>Messages(CampaignId,ContactId)</code> index + claim-then-send + use the existing distributed lock</td><td>C2, M3, H11</td></tr>
+    <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td><span class="badge b-done">✓</span> Fix the Meta error-code number/string parse (revives all anti-ban handling)</td><td>C3, H12, M4, M5</td></tr>
     <tr><td class="p" style="color:var(--crit)">1 · Block launch</td><td>Encrypt WABA tokens/secrets at rest with a real key; rotate all existing values</td><td>H3</td></tr>
-    <tr><td class="p" style="color:var(--high)">2 · Days</td><td>Fix recurring campaigns; wire the poison handler / terminal <code>Failed</code> state</td><td>H1, H2</td></tr>
-    <tr><td class="p" style="color:var(--high)">2 · Days</td><td>Stripe: event-id idempotency + ordering guard; stop per-delivery quota reset; <code>OnAttemptsExceeded=Fail</code>; drop null-metered refund</td><td>H4, H5, H6</td></tr>
-    <tr><td class="p" style="color:var(--high)">2 · Days</td><td>Return 200 for unroutable-but-signed webhooks (protect the shared endpoint)</td><td>H7, M14</td></tr>
-    <tr><td class="p" style="color:var(--high)">2 · Days</td><td>Auth rate-limiting + lockout; shorten JWT lifetime; confirm prod JWT secret</td><td>H8, M19</td></tr>
-    <tr><td class="p" style="color:var(--high)">2 · Days</td><td>SignalR Redis backplane; fix health-check second pool + Hangfire pool contention</td><td>H9, H10</td></tr>
-    <tr><td class="p" style="color:var(--med)">3 · Fast-follow</td><td>ForwardedHeaders, body-size limit, Docker log rotation + grace period, healthcheck, gated migrations, inbox pruning, unique wamid index</td><td>M1–M2, M7–M13, M18</td></tr>
-    <tr><td class="p" style="color:var(--low)">4 · Backlog</td><td>Delete retired reset job, fix cron validation, Redis maxmemory, stale AppUrl, seed-cred hardening</td><td>L1–L10</td></tr>
+    <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-done">✓</span> Fix recurring campaigns; wire the poison handler / terminal <code>Failed</code> state</td><td>H1, H2</td></tr>
+    <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-part">◐</span> Stripe: event-id idempotency + ordering guard; stop per-delivery quota reset; <code>OnAttemptsExceeded=Fail</code>; drop null-metered refund</td><td>H4, H5, H6</td></tr>
+    <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-done">✓</span> Return 200 for unroutable-but-signed webhooks (protect the shared endpoint)</td><td>H7, M14</td></tr>
+    <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-part">◐</span> Auth rate-limiting + lockout; shorten JWT lifetime; confirm prod JWT secret</td><td>H8, M19</td></tr>
+    <tr><td class="p" style="color:var(--high)">2 · Days</td><td><span class="badge b-done">✓</span> SignalR Redis backplane; fix health-check second pool + Hangfire pool contention</td><td>H9, H10</td></tr>
+    <tr><td class="p" style="color:var(--med)">3 · Fast-follow</td><td><span class="badge b-part">◐</span> ForwardedHeaders, body-size limit, Docker log rotation + grace period, healthcheck, gated migrations, inbox pruning, unique wamid index <em>(all but CI-gated migrations M11)</em></td><td>M1–M2, M7–M13, M18</td></tr>
+    <tr><td class="p" style="color:var(--low)">4 · Backlog</td><td><span class="badge b-part">◐</span> Delete retired reset job, fix cron validation, Redis maxmemory, stale AppUrl, seed-cred hardening <em>(L1, L9 done)</em></td><td>L1–L10</td></tr>
   </tbody>
 </table>
 

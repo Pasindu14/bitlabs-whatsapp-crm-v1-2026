@@ -219,16 +219,72 @@ public class StripeWebhookProcessingJob(
             });
         }
 
-        // Reset message quota usage when a new billing period starts (invoice.paid = renewal).
+        // Reset the message-quota counter ONLY when this invoice genuinely opens a NEW billing period.
+        // invoice.paid also fires for redeliveries, late payments of OLD invoices, and mid-period proration
+        // invoices; resetting unconditionally on any of those would wipe an in-progress period and hand the
+        // tenant a free full-quota refill. Guard on the invoice's billing period vs the recorded period start,
+        // and advance the stored period when we reset — so this path and SyncSubscriptionAsync converge:
+        // whichever renewal event (invoice.paid or customer.subscription.updated) arrives first performs the
+        // single reset, and the other then sees the period already advanced and does nothing.
         if (!string.IsNullOrWhiteSpace(stripeSubId))
         {
             var sub = await db.Subscriptions.IgnoreQueryFilters()
                 .FirstOrDefaultAsync(s => s.StripeSubscriptionId == stripeSubId, ct);
-            if (sub is not null) sub.MessagesUsedThisPeriod = 0;
+
+            if (sub is not null && InvoiceBillingPeriod(inv) is { } period
+                && ShouldResetUsage(inv.BillingReason, sub.CurrentPeriodStart, period.Start))
+            {
+                sub.MessagesUsedThisPeriod = 0;
+                sub.CurrentPeriodStart = period.Start;
+                if (period.End > sub.CurrentPeriodEnd) sub.CurrentPeriodEnd = period.End;
+                logger.LogInformation(
+                    "invoice.paid opened new period {Start:o} for subscription {SubId} — usage reset.",
+                    period.Start, stripeSubId);
+            }
         }
 
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Upserted invoice {InvoiceId} for company {CompanyId}", inv.Id, company.Id);
+    }
+
+    /// <summary>
+    /// Whether an <c>invoice.paid</c> should reset the usage counter. True only for a genuine renewal cycle:
+    /// Stripe's <c>BillingReason</c> is <c>subscription_cycle</c> (or <c>subscription_create</c>) AND the
+    /// invoice opens a period STRICTLY newer than the one already recorded. This is a two-part guard because
+    /// neither signal alone is sufficient:
+    /// <list type="bullet">
+    /// <item>Period-start alone would fire on a mid-cycle <b>proration</b> invoice (BillingReason
+    /// <c>subscription_update</c>), whose line period also starts after the recorded period start — wrongly
+    /// wiping the active period. The BillingReason gate excludes those.</item>
+    /// <item>BillingReason alone would fire on a <b>redelivered</b> or <b>late</b> cycle invoice for an old
+    /// period. The strict period-advance gate excludes those (their start is not newer than what we recorded).</item>
+    /// </list>
+    /// </summary>
+    public static bool ShouldResetUsage(
+        string? billingReason, DateTime recordedPeriodStart, DateTime? invoicePeriodStart)
+    {
+        if (billingReason is not ("subscription_cycle" or "subscription_create"))
+            return false;
+
+        return invoicePeriodStart is DateTime start && start > recordedPeriodStart;
+    }
+
+    /// <summary>
+    /// The newest subscription billing period covered by the invoice's line items, or null when it carries
+    /// none. On a renewal this is the new period; a mixed invoice (proration + renewal) yields the latest
+    /// line period so the renewal drives the decision; a pure proration/one-off invoice yields a period that
+    /// falls within the current one and therefore won't advance it.
+    /// </summary>
+    public static (DateTime Start, DateTime End)? InvoiceBillingPeriod(global::Stripe.Invoice inv)
+    {
+        var periods = inv.Lines?.Data?
+            .Where(l => l.Period is not null)
+            .Select(l => (Start: l.Period.Start, End: l.Period.End))
+            .ToList();
+
+        return periods is { Count: > 0 }
+            ? periods.OrderByDescending(p => p.Start).First()
+            : null;
     }
 
     private async Task MarkSubscriptionInactiveAsync(global::Stripe.Invoice inv, CancellationToken ct)
