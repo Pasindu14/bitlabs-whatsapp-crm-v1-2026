@@ -189,25 +189,16 @@ function LaunchCampaignDialog() {
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Launch with consent override?</AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="space-y-2">
-              <p>
-                <span className="font-medium text-destructive">{campaign?.name}</span> will send to
-                contacts <span className="font-medium">without recorded opt-in consent</span>.
-              </p>
-              <p>
-                This can get your WhatsApp number rate-limited or banned if recipients block or report
-                you. Only proceed if you have proof of consent on file outside this system. Opted-out
-                contacts are still never messaged.
-              </p>
-            </div>
+          <AlertDialogTitle>Launch campaign?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will start sending{" "}
+            <span className="font-medium text-foreground">{campaign?.name ?? "this campaign"}</span>{" "}
+            to the selected contacts.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             disabled={isPending}
             onClick={(e) => {
               e.preventDefault();
@@ -215,7 +206,7 @@ function LaunchCampaignDialog() {
             }}
           >
             {isPending && <Spinner className="mr-2" />}
-            Launch anyway
+            Launch
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

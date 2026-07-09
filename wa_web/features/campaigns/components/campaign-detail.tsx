@@ -1,8 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCheck,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Eye,
+  Inbox,
+  Info,
+  Send,
+  SkipForward,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -59,6 +73,49 @@ const RECIPIENT_STATUS_VARIANT: Record<
   Skipped: "secondary",
 };
 
+// Accent colour + icon for each progress stat card. Colours trace the delivery funnel
+// (queued → accepted → sent → delivered → read) with red/slate for the failure/skip off-ramps,
+// so the panel reads at a glance. Full literal class strings so Tailwind's JIT keeps them.
+const STAT_META: Record<
+  string,
+  { icon: ComponentType<{ className?: string }>; pill: string; value?: string }
+> = {
+  Total: {
+    icon: Users,
+    pill: "bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300",
+  },
+  Queued: {
+    icon: Clock,
+    pill: "bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400",
+  },
+  Accepted: {
+    icon: Inbox,
+    pill: "bg-sky-500/10 text-sky-600 dark:bg-sky-400/10 dark:text-sky-400",
+  },
+  Sent: {
+    icon: Send,
+    pill: "bg-violet-500/10 text-violet-600 dark:bg-violet-400/10 dark:text-violet-400",
+  },
+  Delivered: {
+    icon: CheckCheck,
+    pill: "bg-cyan-500/10 text-cyan-600 dark:bg-cyan-400/10 dark:text-cyan-400",
+  },
+  Read: {
+    icon: Eye,
+    pill: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400",
+    value: "text-emerald-600 dark:text-emerald-400",
+  },
+  Failed: {
+    icon: XCircle,
+    pill: "bg-rose-500/10 text-rose-600 dark:bg-rose-400/10 dark:text-rose-400",
+    value: "text-rose-600 dark:text-rose-400",
+  },
+  Skipped: {
+    icon: SkipForward,
+    pill: "bg-slate-500/10 text-slate-500 dark:bg-slate-400/10 dark:text-slate-400",
+  },
+};
+
 // Human labels for the engine's own skip/fail codes AND the Meta Cloud API policy codes we know
 // about (mirrors wa_api MetaPolicyErrorCodes). Anything unmapped falls back to the raw code.
 // https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes
@@ -73,6 +130,7 @@ const ERROR_LABELS: Record<string, string> = {
   HEADER_MEDIA_MISSING: "Template media missing",
   // Meta Cloud API codes
   "131049": "Not delivered — WhatsApp frequency cap",
+  "130472": "Not delivered — recipient in Meta experiment",
   "131048": "Blocked — spam rate limit",
   "131026": "Undeliverable — not a WhatsApp user",
   "131031": "Account suspended by Meta",
@@ -90,6 +148,12 @@ const ERROR_DETAILS: Record<string, ErrorDetail> = {
       "WhatsApp didn't deliver this marketing message because the recipient has already hit their limit of marketing messages recently. WhatsApp sets this limit per person — counting messages from all businesses, not just yours — to reduce spam.",
     action:
       "Nothing is wrong with your number, and you were not charged for it. Try again in a day or two, and avoid sending this contact many marketing messages close together.",
+  },
+  "130472": {
+    meaning:
+      "WhatsApp didn't deliver this marketing message because the recipient's number is part of a Meta experiment. Meta holds out a small share of WhatsApp users from receiving marketing template messages from any business, to measure how marketing affects the user experience — nothing is wrong with your number or your template.",
+    action:
+      "You were not charged, and resending will fail the same way while the number stays in the experiment. This only blocks marketing templates — you can still reach this contact with a utility or authentication template, or with a normal message once they've messaged you first (which opens a 24-hour window).",
   },
   "131048": {
     meaning:
@@ -243,11 +307,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               {campaign.status}
             </Badge>
           )}
-          {campaign?.overrideConsentGate && (
-            <Badge variant="destructive" title="This campaign sends to contacts without recorded opt-in">
-              Consent override
-            </Badge>
-          )}
         </div>
         {campaign && (
           <p className="text-sm text-muted-foreground">
@@ -302,19 +361,23 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       {/* Progress + stats */}
       {stats && (
         <div className="rounded-2xl border p-5">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 font-medium">
+          <div className="mb-3 flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2 font-semibold">
               {isLive ? (
                 <>
-                  <Spinner className="size-3.5" />
+                  <Spinner className="size-4 text-primary" />
                   Sending…
                 </>
               ) : (
-                "Completed"
+                <>
+                  <CheckCircle2 className="size-4 text-primary" />
+                  Completed
+                </>
               )}
             </span>
             <span className="text-muted-foreground">
-              {processed.toLocaleString()} of {total.toLocaleString()} ({percent}%)
+              {processed.toLocaleString()} of {total.toLocaleString()}
+              <span className="ml-1.5 font-semibold text-primary">{percent}%</span>
             </span>
           </div>
           <Progress value={percent} />
@@ -331,21 +394,36 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                 ["Failed", stats.failed],
                 ["Skipped", stats.skipped],
               ] as [string, number][]
-            ).map(([label, count]) => (
-              <div key={label} className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">{label}</div>
-                <div className="mt-1 text-xl font-bold">{count.toLocaleString()}</div>
-              </div>
-            ))}
+            ).map(([label, count]) => {
+              const meta = STAT_META[label];
+              const Icon = meta.icon;
+              const isZero = count === 0;
+              return (
+                <div
+                  key={label}
+                  className="rounded-xl border bg-card p-3 transition-colors hover:border-foreground/20"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-medium text-muted-foreground">
+                      {label}
+                    </span>
+                    <span
+                      className={`flex size-6 shrink-0 items-center justify-center rounded-md ${meta.pill}`}
+                    >
+                      <Icon className="size-3.5" />
+                    </span>
+                  </div>
+                  <div
+                    className={`mt-2 text-2xl font-bold tabular-nums ${
+                      isZero ? "text-muted-foreground/30" : meta.value ?? "text-foreground"
+                    }`}
+                  >
+                    {count.toLocaleString()}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-          {stats.sentWithoutConsent > 0 && (
-            <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-              ⚠ {stats.sentWithoutConsent.toLocaleString()} message
-              {stats.sentWithoutConsent !== 1 ? "s" : ""} sent to contacts without recorded opt-in
-              (consent override).
-            </div>
-          )}
         </div>
       )}
 
@@ -440,11 +518,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                             </PopoverContent>
                           </Popover>
                         </div>
-                      ) : r.sentWithoutConsent ? (
-                        // Sent successfully, but without recorded opt-in — audit annotation only.
-                        <span className="text-amber-600 dark:text-amber-500" title="Sent despite no recorded opt-in">
-                          No consent (sent)
-                        </span>
                       ) : (
                         "—"
                       )}
