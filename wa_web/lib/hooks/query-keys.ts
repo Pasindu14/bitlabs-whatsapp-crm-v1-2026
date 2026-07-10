@@ -99,6 +99,7 @@ export const queryKeys = {
     all: ['my-subscription'] as const,
     current: () => [...queryKeys.mySubscription.all, 'current'] as const,
     invoices: () => [...queryKeys.mySubscription.all, 'invoices'] as const,
+    subscriptionHistory: () => [...queryKeys.mySubscription.all, 'subscription-history'] as const,
     availablePlans: () => [...queryKeys.mySubscription.all, 'available-plans'] as const,
   },
 

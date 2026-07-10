@@ -97,7 +97,7 @@ function CompanyContent({
   companyId: string | null;
 }) {
   const links = [
-    { href: "/messages", title: "Messages", description: "Send and review WhatsApp messages.", icon: Send },
+    { href: "/inbox", title: "Conversations", description: "Send and review WhatsApp messages.", icon: Send },
     { href: "/contacts", title: "Contacts", description: "Manage the people you message.", icon: Contact },
     { href: "/contact-lists", title: "Contact Lists", description: "Group contacts for campaigns.", icon: ListChecks },
     ...(role === "CompanyAdmin"

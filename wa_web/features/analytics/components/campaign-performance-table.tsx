@@ -1,7 +1,15 @@
 "use client";
 
+import { Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { CampaignPerformance } from "@/features/analytics/types";
 
 interface Props {
@@ -25,6 +33,42 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   Paused: "outline",
   Scheduled: "outline",
 };
+
+// Plain-language definitions shown in the header info popovers, so it's clear why the three
+// percentages don't sum to 100% (Delivered includes Read; Failed is its own separate bucket).
+const METRIC_INFO: Record<string, string> = {
+  "Delivered %":
+    "Share of recipients whose message reached their device — this includes messages that were also Read, since a Read message was necessarily delivered first. Calculated as (Delivered + Read) ÷ Recipients.",
+  "Read %":
+    "Share of recipients who opened the message (WhatsApp read receipt). Calculated as Read ÷ Recipients.",
+  "Failed %":
+    "Share of recipients WhatsApp could not deliver to — invalid number, opted out, blocked, or rejected by Meta. Calculated as Failed ÷ Recipients.",
+};
+
+function MetricHeader({ label, align }: { label: string; align: "left" | "right" }) {
+  return (
+    <span className={`inline-flex items-center gap-1 ${align === "right" ? "justify-end" : ""}`}>
+      {label}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="text-muted-foreground/70 transition-colors hover:text-foreground"
+            aria-label={`What is ${label}?`}
+          >
+            <Info className="size-3.5" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align={align === "right" ? "end" : "start"} className="w-72 gap-2">
+          <PopoverHeader>
+            <PopoverTitle>{label}</PopoverTitle>
+          </PopoverHeader>
+          <p className="text-sm text-muted-foreground">{METRIC_INFO[label]}</p>
+        </PopoverContent>
+      </Popover>
+    </span>
+  );
+}
 
 export function CampaignPerformanceTable({ data, isLoading }: Props) {
   if (isLoading) {
@@ -57,9 +101,15 @@ export function CampaignPerformanceTable({ data, isLoading }: Props) {
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Launched</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Recipients</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Delivered %</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Read %</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Failed</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                <MetricHeader label="Delivered %" align="right" />
+              </th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                <MetricHeader label="Read %" align="right" />
+              </th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+                <MetricHeader label="Failed %" align="right" />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -84,7 +134,7 @@ export function CampaignPerformanceTable({ data, isLoading }: Props) {
                   {pct(row.read, row.totalRecipients)}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-destructive">
-                  {numFmt.format(row.failed)}
+                  {pct(row.failed, row.totalRecipients)}
                 </td>
               </tr>
             ))}

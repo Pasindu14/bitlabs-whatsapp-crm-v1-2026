@@ -1,21 +1,13 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  CheckCheck,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  Eye,
-  Inbox,
   Info,
-  Send,
-  SkipForward,
-  Users,
-  XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,6 +36,7 @@ import {
   useCampaignRecipients,
 } from "@/features/campaigns/hooks/use-campaigns";
 import type { CampaignStatus } from "@/features/campaigns/types";
+import { STAT_META } from "@/features/campaigns/lib/stat-meta";
 
 const PAGE_SIZE = 50;
 
@@ -71,49 +64,6 @@ const RECIPIENT_STATUS_VARIANT: Record<
   Read: "default",
   Failed: "destructive",
   Skipped: "secondary",
-};
-
-// Accent colour + icon for each progress stat card. Colours trace the delivery funnel
-// (queued → accepted → sent → delivered → read) with red/slate for the failure/skip off-ramps,
-// so the panel reads at a glance. Full literal class strings so Tailwind's JIT keeps them.
-const STAT_META: Record<
-  string,
-  { icon: ComponentType<{ className?: string }>; pill: string; value?: string }
-> = {
-  Total: {
-    icon: Users,
-    pill: "bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300",
-  },
-  Queued: {
-    icon: Clock,
-    pill: "bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400",
-  },
-  Accepted: {
-    icon: Inbox,
-    pill: "bg-sky-500/10 text-sky-600 dark:bg-sky-400/10 dark:text-sky-400",
-  },
-  Sent: {
-    icon: Send,
-    pill: "bg-violet-500/10 text-violet-600 dark:bg-violet-400/10 dark:text-violet-400",
-  },
-  Delivered: {
-    icon: CheckCheck,
-    pill: "bg-cyan-500/10 text-cyan-600 dark:bg-cyan-400/10 dark:text-cyan-400",
-  },
-  Read: {
-    icon: Eye,
-    pill: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400",
-    value: "text-emerald-600 dark:text-emerald-400",
-  },
-  Failed: {
-    icon: XCircle,
-    pill: "bg-rose-500/10 text-rose-600 dark:bg-rose-400/10 dark:text-rose-400",
-    value: "text-rose-600 dark:text-rose-400",
-  },
-  Skipped: {
-    icon: SkipForward,
-    pill: "bg-slate-500/10 text-slate-500 dark:bg-slate-400/10 dark:text-slate-400",
-  },
 };
 
 // Human labels for the engine's own skip/fail codes AND the Meta Cloud API policy codes we know
@@ -429,18 +379,20 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
 
       {/* Recipient list */}
       <div className="flex flex-col gap-4">
-        <Tabs value={statusFilter ?? "all"} onValueChange={changeFilter}>
-          <TabsList className="flex-wrap">
-            {TABS.map(([value, label, count]) => (
-              <TabsTrigger key={value} value={value}>
-                {label}
-                {count !== undefined && (
-                  <span className="ml-1 text-muted-foreground">{count}</span>
-                )}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="-mx-6 overflow-x-auto px-6 sm:mx-0 sm:px-0">
+          <Tabs value={statusFilter ?? "all"} onValueChange={changeFilter}>
+            <TabsList>
+              {TABS.map(([value, label, count]) => (
+                <TabsTrigger key={value} value={value}>
+                  {label}
+                  {count !== undefined && (
+                    <span className="ml-1 text-muted-foreground">{count}</span>
+                  )}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
 
         <div className="rounded-2xl border">
           <Table>
@@ -474,8 +426,14 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                       {r.contactPhone}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={RECIPIENT_STATUS_VARIANT[r.status] ?? "secondary"}>
-                        {r.status}
+                      <Badge asChild variant={RECIPIENT_STATUS_VARIANT[r.status] ?? "secondary"}>
+                        <button
+                          type="button"
+                          onClick={() => changeFilter(r.status)}
+                          className="cursor-pointer transition-opacity hover:opacity-80"
+                        >
+                          {r.status}
+                        </button>
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -533,7 +491,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>
             Page {page} of {totalPages}
             {recipients ? ` · ${recipients.pagination.total.toLocaleString()} total` : ""}

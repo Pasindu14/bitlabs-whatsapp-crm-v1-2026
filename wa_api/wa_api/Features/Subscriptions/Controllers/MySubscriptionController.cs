@@ -44,6 +44,21 @@ public class MySubscriptionController(
     }
 
     /// <summary>
+    /// GET /api/v1/my-subscription/subscription-history — every SuperAdmin plan
+    /// assignment/change for the calling company, newest first (the manual counterpart to
+    /// Stripe invoices, since assignment in this phase is SuperAdmin-only, not self-checkout).
+    /// </summary>
+    [HttpGet("subscription-history")]
+    public async Task<IActionResult> GetSubscriptionHistory(CancellationToken ct)
+    {
+        if (tenant.CompanyId is not { } companyId)
+            throw new AuthorizationException("subscription-history");
+
+        var result = await service.GetSubscriptionHistoryAsync(companyId, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>
     /// GET /api/v1/my-subscription/available-plans — active plans that have a Stripe Price ID
     /// (purchasable via self-service checkout). Read by any authenticated company user to
     /// populate the "Upgrade" plan picker.

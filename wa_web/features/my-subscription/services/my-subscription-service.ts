@@ -1,7 +1,7 @@
 import client, { type ApiSuccessBody } from "@/lib/api/client";
 import { executeService } from "@/lib/services/wrapper";
 import type { Subscription } from "@/features/subscriptions/types";
-import type { Invoice, AvailablePlan } from "@/features/my-subscription/types";
+import type { Invoice, AvailablePlan, SubscriptionPurchase } from "@/features/my-subscription/types";
 
 /**
  * Talks to wa_api /api/v1/my-subscription. Any authenticated company user may read their
@@ -23,6 +23,18 @@ export const MySubscriptionService = {
       { context: "MySubscriptionService", method: "getInvoices" },
       async () => {
         const res = await client.get<ApiSuccessBody<Invoice[]>>("/api/v1/my-subscription/invoices");
+        return res.data.data;
+      }
+    );
+  },
+
+  async getSubscriptionHistory(): Promise<SubscriptionPurchase[]> {
+    return executeService(
+      { context: "MySubscriptionService", method: "getSubscriptionHistory" },
+      async () => {
+        const res = await client.get<ApiSuccessBody<SubscriptionPurchase[]>>(
+          "/api/v1/my-subscription/subscription-history"
+        );
         return res.data.data;
       }
     );
