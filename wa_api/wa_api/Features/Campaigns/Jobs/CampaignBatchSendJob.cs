@@ -256,6 +256,10 @@ public class CampaignBatchSendJob(
             }
         }
 
+        // Snapshot the cumulative sent count so we can detect crossing a burst-pause boundary during this
+        // batch (see the chain point below). Uses SentCount so the check is batch-size independent.
+        var sentCountAtBatchStart = campaign.SentCount;
+
         foreach (var recipient in batch)
         {
             // Re-check campaign status inside loop — pause/cancel can arrive mid-batch.
@@ -617,13 +621,36 @@ public class CampaignBatchSendJob(
 
         if (remaining > 0 && campaign.Status == CampaignStatus.Running)
         {
-            var nextJobId = jobClient.Enqueue<CampaignBatchSendJob>(
-                j => j.RunAsync(campaignId, CancellationToken.None));
-            campaign.HangfireJobId = nextJobId;
-            await db.SaveChangesAsync(ct);
-            logger.LogInformation(
-                "CampaignBatchSendJob: campaign {Id} — {Remaining} remaining, chaining next batch (job {JobId}).",
-                campaignId, remaining, nextJobId);
+            // Burst smoothing: if this batch pushed the cumulative sent count across a BurstPauseEverySends
+            // boundary, chain the next batch with a brief pause instead of immediately. Breaks a number's
+            // continuous send stream into gentler bursts (eases Meta's quality heuristics) WITHOUT lowering the
+            // per-second rate. Recipients stay Queued, so it is duplicate-safe — the same graceful shape as the
+            // throttle reschedule. No-op when BurstPauseEverySends or BurstPauseMs is 0 (feature disabled).
+            var crossedBurstBoundary = CrossedBurstBoundary(
+                sentCountAtBatchStart, campaign.SentCount, _rateOptions.BurstPauseEverySends);
+
+            string nextJobId;
+            if (crossedBurstBoundary && _rateOptions.BurstPauseMs > 0)
+            {
+                nextJobId = jobClient.Schedule<CampaignBatchSendJob>(
+                    j => j.RunAsync(campaignId, CancellationToken.None),
+                    TimeSpan.FromMilliseconds(_rateOptions.BurstPauseMs));
+                campaign.HangfireJobId = nextJobId;
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation(
+                    "CampaignBatchSendJob: campaign {Id} — {Remaining} remaining, burst pause {PauseMs}ms then next batch (job {JobId}).",
+                    campaignId, remaining, _rateOptions.BurstPauseMs, nextJobId);
+            }
+            else
+            {
+                nextJobId = jobClient.Enqueue<CampaignBatchSendJob>(
+                    j => j.RunAsync(campaignId, CancellationToken.None));
+                campaign.HangfireJobId = nextJobId;
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation(
+                    "CampaignBatchSendJob: campaign {Id} — {Remaining} remaining, chaining next batch (job {JobId}).",
+                    campaignId, remaining, nextJobId);
+            }
         }
         else if (campaign.Status == CampaignStatus.Running)
         {
@@ -959,4 +986,13 @@ public class CampaignBatchSendJob(
         catch { /* not JSON or unexpected shape — fall through to null */ }
         return null;
     }
+
+    /// <summary>
+    /// True when the cumulative sent count moving from <paramref name="before"/> to <paramref name="after"/>
+    /// crossed a multiple of <paramref name="every"/> — i.e. this batch tripped a burst-pause boundary.
+    /// Returns false when the feature is disabled (<paramref name="every"/> &lt;= 0) or no boundary was
+    /// crossed. Pure and batch-size independent, so it is unit-testable in isolation.
+    /// </summary>
+    public static bool CrossedBurstBoundary(int before, int after, int every)
+        => every > 0 && after / every > before / every;
 }
