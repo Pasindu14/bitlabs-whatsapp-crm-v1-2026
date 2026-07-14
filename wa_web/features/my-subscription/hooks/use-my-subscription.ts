@@ -5,6 +5,7 @@ import { queryKeys } from "@/lib/hooks/query-keys";
 import {
   getMySubscriptionAction,
   getInvoicesAction,
+  getSubscriptionHistoryAction,
   getAvailablePlansAction,
 } from "@/features/my-subscription/actions/my-subscription-actions";
 
@@ -27,6 +28,19 @@ export function useInvoices() {
     queryKey: queryKeys.mySubscription.invoices(),
     queryFn: async () => {
       const res = await getInvoicesAction();
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    staleTime: 60_000,
+  });
+}
+
+/** CompanyAdmin — every SuperAdmin plan assignment/change for the caller's company (manual counterpart to Stripe invoices). */
+export function useSubscriptionHistory() {
+  return useQuery({
+    queryKey: queryKeys.mySubscription.subscriptionHistory(),
+    queryFn: async () => {
+      const res = await getSubscriptionHistoryAction();
       if (!res.success) throw new Error(res.error);
       return res.data;
     },

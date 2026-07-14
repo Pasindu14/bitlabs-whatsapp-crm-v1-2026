@@ -20,6 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Progress } from "@/components/ui/progress";
+import { STAT_META } from "@/features/campaigns/lib/stat-meta";
 import {
   useCreateCampaignDialog,
   useEditCampaignDialog,
@@ -189,25 +190,16 @@ function LaunchCampaignDialog() {
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Launch with consent override?</AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="space-y-2">
-              <p>
-                <span className="font-medium text-destructive">{campaign?.name}</span> will send to
-                contacts <span className="font-medium">without recorded opt-in consent</span>.
-              </p>
-              <p>
-                This can get your WhatsApp number rate-limited or banned if recipients block or report
-                you. Only proceed if you have proof of consent on file outside this system. Opted-out
-                contacts are still never messaged.
-              </p>
-            </div>
+          <AlertDialogTitle>Launch campaign?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will start sending{" "}
+            <span className="font-medium text-foreground">{campaign?.name ?? "this campaign"}</span>{" "}
+            to the selected contacts.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             disabled={isPending}
             onClick={(e) => {
               e.preventDefault();
@@ -215,7 +207,7 @@ function LaunchCampaignDialog() {
             }}
           >
             {isPending && <Spinner className="mr-2" />}
-            Launch anyway
+            Launch
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -280,26 +272,44 @@ function RecipientsDialog() {
                 [
                   ["Total", stats.totalRecipients],
                   ["Queued", stats.queued],
+                  ["Accepted", stats.accepted],
                   ["Sent", stats.sent],
                   ["Delivered", stats.delivered],
                   ["Read", stats.read],
                   ["Failed", stats.failed],
                   ["Skipped", stats.skipped],
-                ] as [string, number][]
-              ).map(([label, count]) => (
-                <div key={label} className="rounded-lg border p-3">
-                  <div className="text-xs text-muted-foreground">{label}</div>
-                  <div className="mt-1 text-2xl font-bold">{count.toLocaleString()}</div>
-                </div>
-              ))}
-              <div className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">Delivery rate</div>
-                <div className="mt-1 text-2xl font-bold">{stats.deliveryRate}%</div>
-              </div>
-              <div className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">Read rate</div>
-                <div className="mt-1 text-2xl font-bold">{stats.readRate}%</div>
-              </div>
+                  ["Delivery rate", `${stats.deliveryRate}%`],
+                  ["Read rate", `${stats.readRate}%`],
+                ] as [string, number | string][]
+              ).map(([label, value]) => {
+                const meta = STAT_META[label];
+                const Icon = meta.icon;
+                const isZero = value === 0;
+                return (
+                  <div
+                    key={label}
+                    className="rounded-lg border bg-card p-3 transition-colors hover:border-foreground/20"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs font-medium text-muted-foreground">
+                        {label}
+                      </span>
+                      <span
+                        className={`flex size-6 shrink-0 items-center justify-center rounded-md ${meta.pill}`}
+                      >
+                        <Icon className="size-3.5" />
+                      </span>
+                    </div>
+                    <div
+                      className={`mt-1 text-2xl font-bold tabular-nums ${
+                        isZero ? "text-muted-foreground/30" : meta.value ?? "text-foreground"
+                      }`}
+                    >
+                      {typeof value === "number" ? value.toLocaleString() : value}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : null}

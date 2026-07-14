@@ -77,6 +77,10 @@ export function useCampaign(id: string | null) {
       return res.data;
     },
     enabled: !!id,
+    // While the campaign is actively sending, poll so its status flips (Running → Completed /
+    // Failed / Paused) without a manual refresh. Self-terminating: once a poll returns a
+    // non-Running status, the next interval evaluates to false and polling stops.
+    refetchInterval: (query) => (query.state.data?.status === "Running" ? 4_000 : false),
   });
 }
 
@@ -89,12 +93,13 @@ export function useCampaignStats(id: string | null) {
       return res.data;
     },
     enabled: !!id,
-    // Poll fast while recipients are still being processed; stop once the queue drains
-    // (queued === 0 means every recipient reached a terminal status — nothing left to watch).
+    // Poll fast while recipients are still in flight — queued (not yet dispatched) OR accepted
+    // (handed to Meta, awaiting the 'sent'/delivery webhooks). Stop once both drain, matching the
+    // page's `isLive` definition. (Accepted is NOT terminal, so `queued === 0` alone stops too early.)
     refetchInterval: (query) => {
       const stats = query.state.data;
       if (!stats) return 4_000;
-      return stats.queued > 0 ? 4_000 : false;
+      return stats.queued > 0 || stats.accepted > 0 ? 4_000 : false;
     },
   });
 }

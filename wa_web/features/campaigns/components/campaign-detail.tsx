@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -30,6 +36,7 @@ import {
   useCampaignRecipients,
 } from "@/features/campaigns/hooks/use-campaigns";
 import type { CampaignStatus } from "@/features/campaigns/types";
+import { STAT_META } from "@/features/campaigns/lib/stat-meta";
 
 const PAGE_SIZE = 50;
 
@@ -73,6 +80,7 @@ const ERROR_LABELS: Record<string, string> = {
   HEADER_MEDIA_MISSING: "Template media missing",
   // Meta Cloud API codes
   "131049": "Not delivered — WhatsApp frequency cap",
+  "130472": "Not delivered — recipient in Meta experiment",
   "131048": "Blocked — spam rate limit",
   "131026": "Undeliverable — not a WhatsApp user",
   "131031": "Account suspended by Meta",
@@ -91,6 +99,12 @@ const ERROR_DETAILS: Record<string, ErrorDetail> = {
     action:
       "Nothing is wrong with your number, and you were not charged for it. Try again in a day or two, and avoid sending this contact many marketing messages close together.",
   },
+  "130472": {
+    meaning:
+      "WhatsApp didn't deliver this marketing message because the recipient's number is part of a Meta experiment. Meta holds out a small share of WhatsApp users from receiving marketing template messages from any business, to measure how marketing affects the user experience — nothing is wrong with your number or your template.",
+    action:
+      "You were not charged, and resending will fail the same way while the number stays in the experiment. This only blocks marketing templates — you can still reach this contact with a utility or authentication template, or with a normal message once they've messaged you first (which opens a 24-hour window).",
+  },
   "131048": {
     meaning:
       "WhatsApp blocked this message because your number's recent sending was flagged as spam-like. This is a quality signal on your account.",
@@ -104,23 +118,28 @@ const ERROR_DETAILS: Record<string, ErrorDetail> = {
       "No action needed. The contact is automatically marked so future campaigns skip it.",
   },
   "131031": {
-    meaning: "Meta has suspended your WhatsApp Business account, so no messages can be sent.",
+    meaning:
+      "Meta has suspended your WhatsApp Business account, so no messages can be sent.",
     action:
       "Open Meta Business Suite / WhatsApp Manager to see the reason and resolve the suspension. Sending stays blocked until it's lifted.",
   },
   "368": {
-    meaning: "Meta has placed a temporary restriction on your WhatsApp account.",
+    meaning:
+      "Meta has placed a temporary restriction on your WhatsApp account.",
     action:
       "Check WhatsApp Manager for the restriction details. Sending resumes once Meta lifts it.",
   },
   "130429": {
-    meaning: "Messages were sent too fast and WhatsApp asked us to slow down. The message itself wasn't rejected.",
-    action: "No action needed — the system automatically backs off and retries.",
+    meaning:
+      "Messages were sent too fast and WhatsApp asked us to slow down. The message itself wasn't rejected.",
+    action:
+      "No action needed — the system automatically backs off and retries.",
   },
   "131056": {
     meaning:
       "Too many messages were sent to this one number in a short time, so WhatsApp throttled it. The message wasn't rejected.",
-    action: "No action needed — the system automatically retries after a short delay.",
+    action:
+      "No action needed — the system automatically retries after a short delay.",
   },
   // Engine (our own) reasons
   NO_CONSENT: {
@@ -130,12 +149,15 @@ const ERROR_DETAILS: Record<string, ErrorDetail> = {
       "Collect opt-in from the contact, or enable the consent override on the campaign if you have proof of consent on file.",
   },
   OPT_OUT: {
-    meaning: "This contact has opted out of your messages, so they are never sent to.",
-    action: "No action needed — opted-out contacts are always skipped to keep you compliant.",
+    meaning:
+      "This contact has opted out of your messages, so they are never sent to.",
+    action:
+      "No action needed — opted-out contacts are always skipped to keep you compliant.",
   },
   NOT_ON_WHATSAPP: {
     meaning: "This number isn't reachable on WhatsApp.",
-    action: "No action needed — the contact is marked so future campaigns skip it.",
+    action:
+      "No action needed — the contact is marked so future campaigns skip it.",
   },
   HEADER_MEDIA_MISSING: {
     meaning:
@@ -143,12 +165,16 @@ const ERROR_DETAILS: Record<string, ErrorDetail> = {
     action: "Re-upload the header media on the template, then resend.",
   },
   SEND_FAILED: {
-    meaning: "WhatsApp rejected the send for a reason we couldn't map to a specific cause.",
-    action: "Try resending. If it keeps failing, check the template and the contact's number.",
+    meaning:
+      "WhatsApp rejected the send for a reason we couldn't map to a specific cause.",
+    action:
+      "Try resending. If it keeps failing, check the template and the contact's number.",
   },
   JOB_ERROR: {
-    meaning: "An unexpected internal error happened while sending to this contact.",
-    action: "Try resending. If it persists, contact support with the campaign link.",
+    meaning:
+      "An unexpected internal error happened while sending to this contact.",
+    action:
+      "Try resending. If it persists, contact support with the campaign link.",
   },
   CAMPAIGN_FAILED: {
     meaning: "The campaign was stopped before this contact could be sent to.",
@@ -169,7 +195,8 @@ function errorDetail(code: string | null): ErrorDetail {
     meaning: /^\d+$/.test(code ?? "")
       ? `WhatsApp reported error code ${code} for this contact.`
       : "This message couldn't be delivered to this contact.",
-    action: "Try resending. If it keeps failing, contact support and share this campaign link.",
+    action:
+      "Try resending. If it keeps failing, contact support and share this campaign link.",
   };
 }
 
@@ -181,7 +208,9 @@ const dateTimeFmt = new Intl.DateTimeFormat(undefined, {
 });
 
 export function CampaignDetail({ campaignId }: { campaignId: string }) {
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(
+    undefined,
+  );
   const [page, setPage] = useState(1);
 
   const { data: campaign } = useCampaign(campaignId);
@@ -192,13 +221,8 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   // webhooks) — drives polling so the page shows Accepted → Sent → Delivered/Read/Failed as it settles.
   const isLive = stats ? stats.queued > 0 || stats.accepted > 0 : false;
 
-  const { data: recipients, isLoading: recipientsLoading } = useCampaignRecipients(
-    campaignId,
-    page,
-    PAGE_SIZE,
-    statusFilter,
-    isLive
-  );
+  const { data: recipients, isLoading: recipientsLoading } =
+    useCampaignRecipients(campaignId, page, PAGE_SIZE, statusFilter, isLive);
 
   function changeFilter(value: string) {
     setStatusFilter(value === "all" ? undefined : value);
@@ -232,15 +256,11 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               {campaign.status}
             </Badge>
           )}
-          {campaign?.overrideConsentGate && (
-            <Badge variant="destructive" title="This campaign sends to contacts without recorded opt-in">
-              Consent override
-            </Badge>
-          )}
         </div>
         {campaign && (
           <p className="text-sm text-muted-foreground">
-            Template <span className="font-medium">{campaign.templateName}</span>
+            Template{" "}
+            <span className="font-medium">{campaign.templateName}</span>
           </p>
         )}
       </div>
@@ -263,25 +283,34 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
             </div>
             <div className="rounded-lg border p-3">
               <div className="text-xs text-muted-foreground">No consent</div>
-              <div className="mt-1 text-xl font-bold">{health.noConsent.toLocaleString()}</div>
+              <div className="mt-1 text-xl font-bold">
+                {health.noConsent.toLocaleString()}
+              </div>
             </div>
             <div className="rounded-lg border p-3">
               <div className="text-xs text-muted-foreground">Opted out</div>
-              <div className="mt-1 text-xl font-bold">{health.optedOut.toLocaleString()}</div>
+              <div className="mt-1 text-xl font-bold">
+                {health.optedOut.toLocaleString()}
+              </div>
             </div>
             <div className="rounded-lg border p-3">
-              <div className="text-xs text-muted-foreground">Not on WhatsApp</div>
-              <div className="mt-1 text-xl font-bold">{health.invalid.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">
+                Not on WhatsApp
+              </div>
+              <div className="mt-1 text-xl font-bold">
+                {health.invalid.toLocaleString()}
+              </div>
             </div>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            {health.sendable.toLocaleString()} of {health.total.toLocaleString()} contacts will be
-            messaged; the rest are skipped (no opt-in, opted out, or not reachable on WhatsApp).
+            {health.sendable.toLocaleString()} of{" "}
+            {health.total.toLocaleString()} contacts will be messaged; the rest
+            are skipped (no opt-in, opted out, or not reachable on WhatsApp).
             {health.noConsentOverridden > 0 && (
               <span className="text-destructive">
                 {" "}
-                {health.noConsentOverridden.toLocaleString()} will be sent without recorded consent
-                (override on).
+                {health.noConsentOverridden.toLocaleString()} will be sent
+                without recorded consent (override on).
               </span>
             )}
           </p>
@@ -291,19 +320,25 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       {/* Progress + stats */}
       {stats && (
         <div className="rounded-2xl border p-5">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 font-medium">
+          <div className="mb-3 flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2 font-semibold">
               {isLive ? (
                 <>
-                  <Spinner className="size-3.5" />
+                  <Spinner className="size-4 text-primary" />
                   Sending…
                 </>
               ) : (
-                "Completed"
+                <>
+                  <CheckCircle2 className="size-4 text-primary" />
+                  Completed
+                </>
               )}
             </span>
             <span className="text-muted-foreground">
-              {processed.toLocaleString()} of {total.toLocaleString()} ({percent}%)
+              {processed.toLocaleString()} of {total.toLocaleString()}
+              <span className="ml-1.5 font-semibold text-primary">
+                {percent}%
+              </span>
             </span>
           </div>
           <Progress value={percent} />
@@ -311,61 +346,41 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
             {(
               [
-                ["all", "Total", stats.totalRecipients],
-                ["Queued", "Queued", stats.queued],
-                ["Accepted", "Accepted", stats.accepted],
-                ["Sent", "Sent", stats.sent],
-                ["Delivered", "Delivered", stats.delivered],
-                ["Read", "Read", stats.read],
-                ["Failed", "Failed", stats.failed],
-                ["Skipped", "Skipped", stats.skipped],
-              ] as [string, string, number][]
-            ).map(([value, label, count]) => {
-              const active = (statusFilter ?? "all") === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => changeFilter(value)}
-                  aria-pressed={active}
-                  className={cn(
-                    "rounded-lg border p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50",
-                    active && "border-primary bg-primary/5 ring-1 ring-primary"
-                  )}
-                >
-                  <div className="text-xs text-muted-foreground">{label}</div>
-                  <div className="mt-1 text-xl font-bold">{count.toLocaleString()}</div>
-                </button>
-              );
-            })}
+                ["Total", stats.totalRecipients],
+                ["Queued", stats.queued],
+                ["Accepted", stats.accepted],
+                ["Sent", stats.sent],
+                ["Delivered", stats.delivered],
+                ["Read", stats.read],
+                ["Failed", stats.failed],
+                ["Skipped", stats.skipped],
+              ] as [string, number][]
+            ).map(([label, count]) => (
+              <div key={label} className="rounded-lg border p-3">
+                <div className="text-xs text-muted-foreground">{label}</div>
+                <div className="mt-1 text-xl font-bold">
+                  {count.toLocaleString()}
+                </div>
+              </div>
+            ))}
           </div>
-
-          {stats.sentWithoutConsent > 0 && (
-            <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-              ⚠ {stats.sentWithoutConsent.toLocaleString()} message
-              {stats.sentWithoutConsent !== 1 ? "s" : ""} sent to contacts without recorded opt-in
-              (consent override).
-            </div>
-          )}
         </div>
       )}
 
       {/* Recipient list */}
       <div className="flex flex-col gap-4">
-        {statusFilter && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>
-              Filtered by <span className="font-medium text-foreground">{statusFilter}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => changeFilter("all")}
-              className="text-primary hover:underline"
-            >
-              Clear
-            </button>
-          </div>
-        )}
+        <Tabs value={statusFilter ?? "all"} onValueChange={changeFilter}>
+          <TabsList className="flex-wrap">
+            {TABS.map(([value, label, count]) => (
+              <TabsTrigger key={value} value={value}>
+                {label}
+                {count !== undefined && (
+                  <span className="ml-1 text-muted-foreground">{count}</span>
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
         <div className="rounded-2xl border">
           <Table>
@@ -387,20 +402,37 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    No recipients{statusFilter ? ` with status “${statusFilter}”` : ""}.
+                  <TableCell
+                    colSpan={5}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    No recipients
+                    {statusFilter ? ` with status “${statusFilter}”` : ""}.
                   </TableCell>
                 </TableRow>
               ) : (
                 rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.contactName}</TableCell>
+                    <TableCell className="font-medium">
+                      {r.contactName}
+                    </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {r.contactPhone}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={RECIPIENT_STATUS_VARIANT[r.status] ?? "secondary"}>
-                        {r.status}
+                      <Badge
+                        asChild
+                        variant={
+                          RECIPIENT_STATUS_VARIANT[r.status] ?? "secondary"
+                        }
+                      >
+                        <button
+                          type="button"
+                          onClick={() => changeFilter(r.status)}
+                          className="cursor-pointer transition-opacity hover:opacity-80"
+                        >
+                          {r.status}
+                        </button>
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -408,7 +440,9 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                         // An actual delivery/send failure — show the real reason plus a plain-language
                         // explanation the user can read, instead of a bare code.
                         <div className="flex items-center gap-1.5">
-                          <span className="text-destructive">{errorLabel(r.errorCode)}</span>
+                          <span className="text-destructive">
+                            {errorLabel(r.errorCode)}
+                          </span>
                           <Popover>
                             <PopoverTrigger asChild>
                               <button
@@ -419,35 +453,41 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                                 <Info className="size-3.5" />
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent align="start" className="w-80 gap-3">
+                            <PopoverContent
+                              align="start"
+                              className="w-80 gap-3"
+                            >
                               <PopoverHeader>
-                                <PopoverTitle>{errorLabel(r.errorCode)}</PopoverTitle>
+                                <PopoverTitle>
+                                  {errorLabel(r.errorCode)}
+                                </PopoverTitle>
                               </PopoverHeader>
                               <div className="space-y-3">
                                 <div className="space-y-1">
-                                  <p className="text-xs font-medium text-foreground">Why this happened</p>
+                                  <p className="text-xs font-medium text-foreground">
+                                    Why this happened
+                                  </p>
                                   <p className="text-sm text-muted-foreground">
                                     {errorDetail(r.errorCode).meaning}
                                   </p>
                                 </div>
                                 <div className="space-y-1">
-                                  <p className="text-xs font-medium text-foreground">What to do</p>
+                                  <p className="text-xs font-medium text-foreground">
+                                    What to do
+                                  </p>
                                   <p className="text-sm text-muted-foreground">
                                     {errorDetail(r.errorCode).action}
                                   </p>
                                 </div>
                               </div>
                               <p className="text-[11px] text-muted-foreground/60">
-                                {/^\d+$/.test(r.errorCode) ? `WhatsApp error code ${r.errorCode}` : `Code: ${r.errorCode}`}
+                                {/^\d+$/.test(r.errorCode)
+                                  ? `WhatsApp error code ${r.errorCode}`
+                                  : `Code: ${r.errorCode}`}
                               </p>
                             </PopoverContent>
                           </Popover>
                         </div>
-                      ) : r.sentWithoutConsent ? (
-                        // Sent successfully, but without recorded opt-in — audit annotation only.
-                        <span className="text-amber-600 dark:text-amber-500" title="Sent despite no recorded opt-in">
-                          No consent (sent)
-                        </span>
                       ) : (
                         "—"
                       )}
@@ -463,10 +503,12 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>
             Page {page} of {totalPages}
-            {recipients ? ` · ${recipients.pagination.total.toLocaleString()} total` : ""}
+            {recipients
+              ? ` · ${recipients.pagination.total.toLocaleString()} total`
+              : ""}
           </span>
           <div className="flex gap-2">
             <Button

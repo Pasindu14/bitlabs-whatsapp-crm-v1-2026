@@ -1,3 +1,9 @@
 growchatapi.croissance-digital.com {
+    # Access logging (JSON to stdout → `docker logs wa_api-caddy-1`). Gives per-request client IP,
+    # status and TLS info — needed to see whether requests from a given region even reach the server.
+    log {
+        output stdout
+        format json
+    }
     reverse_proxy api:8080
 }

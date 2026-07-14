@@ -1,5 +1,10 @@
-/** Re-export the shared Subscription shape — the tenant read returns the same DTO. */
-export type { Subscription, SubscriptionStatus } from "@/features/subscriptions/types";
+/** Re-export the shared Subscription/SubscriptionPurchase shapes — the tenant reads return the same DTOs. */
+export type {
+  Subscription,
+  SubscriptionStatus,
+  SubscriptionPurchase,
+  SubscriptionPurchaseMode,
+} from "@/features/subscriptions/types";
 
 /** A Stripe invoice as returned by GET /my-subscription/invoices. */
 export interface Invoice {

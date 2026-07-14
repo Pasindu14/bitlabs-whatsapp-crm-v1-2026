@@ -21,6 +21,13 @@ export const getInvoicesAction = createAction(
   }
 );
 
+export const getSubscriptionHistoryAction = createAction(
+  { name: "getSubscriptionHistoryAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async () => {
+    return MySubscriptionService.getSubscriptionHistory();
+  }
+);
+
 export const getAvailablePlansAction = createAction(
   { name: "getAvailablePlansAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
   async () => {
