@@ -14,7 +14,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -212,17 +212,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const totalPages = recipients?.pagination.totalPages ?? 1;
   const rows = recipients?.items ?? [];
 
-  const TABS: [string, string, number | undefined][] = [
-    ["all", "All", stats?.totalRecipients],
-    ["Queued", "Queued", stats?.queued],
-    ["Accepted", "Accepted", stats?.accepted],
-    ["Sent", "Sent", stats?.sent],
-    ["Delivered", "Delivered", stats?.delivered],
-    ["Read", "Read", stats?.read],
-    ["Failed", "Failed", stats?.failed],
-    ["Skipped", "Skipped", stats?.skipped],
-  ];
-
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       {/* Header */}
@@ -322,21 +311,33 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
             {(
               [
-                ["Total", stats.totalRecipients],
-                ["Queued", stats.queued],
-                ["Accepted", stats.accepted],
-                ["Sent", stats.sent],
-                ["Delivered", stats.delivered],
-                ["Read", stats.read],
-                ["Failed", stats.failed],
-                ["Skipped", stats.skipped],
-              ] as [string, number][]
-            ).map(([label, count]) => (
-              <div key={label} className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">{label}</div>
-                <div className="mt-1 text-xl font-bold">{count.toLocaleString()}</div>
-              </div>
-            ))}
+                ["all", "Total", stats.totalRecipients],
+                ["Queued", "Queued", stats.queued],
+                ["Accepted", "Accepted", stats.accepted],
+                ["Sent", "Sent", stats.sent],
+                ["Delivered", "Delivered", stats.delivered],
+                ["Read", "Read", stats.read],
+                ["Failed", "Failed", stats.failed],
+                ["Skipped", "Skipped", stats.skipped],
+              ] as [string, string, number][]
+            ).map(([value, label, count]) => {
+              const active = (statusFilter ?? "all") === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => changeFilter(value)}
+                  aria-pressed={active}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50",
+                    active && "border-primary bg-primary/5 ring-1 ring-primary"
+                  )}
+                >
+                  <div className="text-xs text-muted-foreground">{label}</div>
+                  <div className="mt-1 text-xl font-bold">{count.toLocaleString()}</div>
+                </button>
+              );
+            })}
           </div>
 
           {stats.sentWithoutConsent > 0 && (
@@ -351,18 +352,20 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
 
       {/* Recipient list */}
       <div className="flex flex-col gap-4">
-        <Tabs value={statusFilter ?? "all"} onValueChange={changeFilter}>
-          <TabsList className="flex-wrap">
-            {TABS.map(([value, label, count]) => (
-              <TabsTrigger key={value} value={value}>
-                {label}
-                {count !== undefined && (
-                  <span className="ml-1 text-muted-foreground">{count}</span>
-                )}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {statusFilter && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              Filtered by <span className="font-medium text-foreground">{statusFilter}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => changeFilter("all")}
+              className="text-primary hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         <div className="rounded-2xl border">
           <Table>
