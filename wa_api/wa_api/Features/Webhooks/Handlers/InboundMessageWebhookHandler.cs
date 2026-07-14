@@ -1,3 +1,4 @@
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.OptOut;
 using wa_api.Features.Contacts.Entities;
@@ -5,6 +6,7 @@ using wa_api.Features.Conversations.Dtos;
 using wa_api.Features.Conversations.Entities;
 using wa_api.Features.Conversations.Realtime;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Messages.InboundMedia;
 using wa_api.Features.WhatsApp.Entities;
 using wa_api.Features.Webhooks.Payloads;
 using wa_api.Infrastructure.Persistence;
@@ -28,6 +30,7 @@ namespace wa_api.Features.Webhooks.Handlers;
 public sealed class InboundMessageWebhookHandler(
     AppDbContext db,
     IChatNotifier notifier,
+    IBackgroundJobClient jobs,
     ILogger<InboundMessageWebhookHandler> logger)
     : IWebhookEventHandler
 {
@@ -73,9 +76,15 @@ public sealed class InboundMessageWebhookHandler(
             var conversation = await FindOrCreateOpenAsync(companyId, wabaId, contact, ct);
 
             var now = DateTime.UtcNow;
-            // Prefer the human-readable text of whatever the customer sent — free text, a tapped
-            // template quick-reply ("button"), or an interactive reply — falling back to the type tag.
+
+            // Media messages (image/video/audio/document/sticker) carry an opaque media id, not text. Detect
+            // which node is present; its bytes are fetched asynchronously after commit (InboundMediaDownloadJob).
+            var (mediaType, mediaNode) = ResolveMedia(m);
+
+            // Prefer the human-readable text of whatever the customer sent — a media caption, free text, a
+            // tapped template quick-reply ("button"), or an interactive reply — falling back to the type tag.
             var body = FirstNonBlank(
+                mediaNode?.Caption,
                 m.Text?.Body,
                 m.Button?.Text,
                 m.Interactive?.ButtonReply?.Title,
@@ -106,6 +115,11 @@ public sealed class InboundMessageWebhookHandler(
                 Direction = MessageDirection.Inbound,
                 Status = MessageStatus.Delivered, // inbound has no delivery lifecycle; the UI ignores it
                 ExternalMessageId = wamid,
+                // Media metadata; the bytes are downloaded post-commit (null MetaMediaId ⇒ plain text, no job).
+                MediaType = mediaType,
+                MediaMimeType = mediaNode?.MimeType,
+                MediaFileName = mediaNode?.Filename,
+                MetaMediaId = mediaNode?.Id,
             };
             db.Messages.Add(message);
 
@@ -117,9 +131,31 @@ public sealed class InboundMessageWebhookHandler(
             conversation.WindowExpiresAt = now.AddHours(24);
 
             await NotifyAsync(companyId, conversation, contact, connection, message, now, ct);
+
+            // Fetch the media bytes AFTER the batch commits — never inside the webhook transaction, which would
+            // pin a pooled DB connection across two slow Meta HTTP calls. Hangfire's enqueue is not part of the
+            // EF transaction; the job tolerates the enqueue→commit race (retries) and a rolled-back batch
+            // (the stale message id no-ops / dead-letters harmlessly).
+            if (mediaType is not null && !string.IsNullOrWhiteSpace(mediaNode!.Id))
+                jobs.Enqueue<InboundMediaDownloadJob>(j => j.RunAsync(message.Id, CancellationToken.None));
         }
 
         // No SaveChanges — WebhookProcessingJob commits the batch once (atomic; discardable on retry).
+    }
+
+    /// <summary>
+    /// Detects which media node an inbound message carries. WhatsApp puts the payload under a type-named
+    /// property (<c>image</c>/<c>video</c>/…); we match on node presence so an unusual/missing <c>type</c>
+    /// tag can't hide media. Returns <c>(null, null)</c> for a non-media (text/button/interactive) message.
+    /// </summary>
+    private static (string? Type, WebhookMedia? Node) ResolveMedia(WebhookInboundMessage m)
+    {
+        if (m.Image is not null) return ("image", m.Image);
+        if (m.Video is not null) return ("video", m.Video);
+        if (m.Audio is not null) return ("audio", m.Audio);
+        if (m.Document is not null) return ("document", m.Document);
+        if (m.Sticker is not null) return ("sticker", m.Sticker);
+        return (null, null);
     }
 
     private async Task<Contact> UpsertContactAsync(Guid companyId, string phone, string? profileName, CancellationToken ct)
@@ -196,7 +232,9 @@ public sealed class InboundMessageWebhookHandler(
 
             var messageDto = new ConversationMessageResponse(
                 message.Id, conversation.Id, message.Body, message.Direction, message.Status,
-                message.ExternalMessageId, message.ErrorMessage, now, null);
+                message.ExternalMessageId, message.ErrorMessage, now, null,
+                // Media not yet downloaded → MediaReady:false. The download job re-pushes with it ready.
+                message.MediaType, message.MediaMimeType, MediaReady: false);
 
             await notifier.MessageAsync(companyId, conversationDto, messageDto, ct);
         }

@@ -71,7 +71,30 @@ public class Message : BaseEntity, ITenantEntity
     /// </summary>
     public Guid? MeteredSubscriptionId { get; set; }
 
+    // ── Inbound media (received from the customer) ─────────────────────────────
+    // Populated only for inbound media messages (image/video/audio/document/sticker). The bytes themselves
+    // live in the 1:1 <see cref="MessageMedia"/> row (kept off this table so ordinary Message reads stay
+    // cheap), fetched asynchronously from Meta by InboundMediaDownloadJob after the webhook batch commits.
+
+    /// <summary>Kind of media on this message — "image" | "video" | "audio" | "document" | "sticker". Null = plain text.</summary>
+    public string? MediaType { get; set; }
+
+    /// <summary>MIME type reported by Meta in the webhook (e.g. "image/jpeg"). Null for text.</summary>
+    public string? MediaMimeType { get; set; }
+
+    /// <summary>Original file name — documents only. Null otherwise.</summary>
+    public string? MediaFileName { get; set; }
+
+    /// <summary>Meta's opaque media id, resolved + downloaded by the media job. Cleared conceptually once stored.</summary>
+    public string? MetaMediaId { get; set; }
+
+    /// <summary>UTC when the media bytes were fetched from Meta and persisted to <see cref="Media"/>. Null = pending/failed.</summary>
+    public DateTime? MediaDownloadedAt { get; set; }
+
     public Contact Contact { get; set; } = null!;
     public WabaConnection WabaConnection { get; set; } = null!;
     public Conversations.Entities.Conversation? Conversation { get; set; }
+
+    /// <summary>1:1 stored media bytes, present once <see cref="MediaDownloadedAt"/> is set.</summary>
+    public MessageMedia? Media { get; set; }
 }

@@ -31,6 +31,14 @@ export interface ConversationMessage {
   errorMessage: string | null;
   createdAt: string;
   statusAt: string | null;
+  /**
+   * Inbound media. `mediaType` is null for plain text; when set ("image" | "video" | "audio" | "document" |
+   * "sticker") the message carries media served from `/api/media/{id}`. `mediaReady` is false until the bytes
+   * have been fetched from Meta — the UI shows a placeholder until the realtime "media ready" event flips it.
+   */
+  mediaType?: string | null;
+  mediaMimeType?: string | null;
+  mediaReady?: boolean;
 }
 
 export interface ConversationListParams {

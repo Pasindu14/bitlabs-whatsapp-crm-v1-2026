@@ -94,7 +94,8 @@ public class ConversationService(
             .Take(pageSize)
             .Select(m => new ConversationMessageResponse(
                 m.Id, m.ConversationId, m.Body, m.Direction, m.Status,
-                m.ExternalMessageId, m.ErrorMessage, m.CreatedAt, m.StatusAt))
+                m.ExternalMessageId, m.ErrorMessage, m.CreatedAt, m.StatusAt,
+                m.MediaType, m.MediaMimeType, m.MediaDownloadedAt != null))
             .ToListAsync(ct);
 
         return (items, total);

@@ -54,6 +54,7 @@ public class AppDbContext(
     public DbSet<ContactList> ContactLists => Set<ContactList>();
     public DbSet<ContactListMember> ContactListMembers => Set<ContactListMember>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<MessageMedia> MessageMedia => Set<MessageMedia>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Plan> Plans => Set<Plan>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
@@ -259,6 +260,11 @@ public class AppDbContext(
             e.Property(x => x.ExternalMessageId).HasMaxLength(128);
             e.Property(x => x.ErrorCode).HasMaxLength(32);
             e.Property(x => x.Category).HasMaxLength(32);
+            // Inbound media metadata (bytes live in MessageMedia). All nullable — text messages leave them null.
+            e.Property(x => x.MediaType).HasMaxLength(20);
+            e.Property(x => x.MediaMimeType).HasMaxLength(128);
+            e.Property(x => x.MediaFileName).HasMaxLength(512);
+            e.Property(x => x.MetaMediaId).HasMaxLength(256);
             e.HasIndex(x => x.CompanyId);
             e.HasIndex(x => x.ContactId);
             // Unique per wamid (filtered to non-null): fast status-webhook lookup AND a hard guard against
@@ -288,6 +294,28 @@ public class AppDbContext(
                 .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<MessageMedia>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ContentType).IsRequired().HasMaxLength(128);
+            e.Property(x => x.Data).IsRequired();
+            // 1:1 with Message — one media blob per media message.
+            e.HasIndex(x => x.MessageId).IsUnique();
+            e.HasIndex(x => x.CompanyId);
+            e.HasOne(x => x.Message)
+                .WithOne(x => x.Media)
+                .HasForeignKey<MessageMedia>(x => x.MessageId)
+                .OnDelete(DeleteBehavior.Cascade);   // blob is a strict child of its message
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Same tenant isolation as Message. The download job writes with CompanyId stamped explicitly +
+            // IgnoreQueryFilters (it runs in the Hangfire scope with no tenant context).
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
 

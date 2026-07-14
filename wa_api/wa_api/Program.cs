@@ -151,6 +151,14 @@ try
         c.Timeout = TimeSpan.FromSeconds(15);
     });
 
+    // Separate client for downloading inbound media bytes — a longer timeout than the 15s API client since a
+    // media payload (image/video/document) can be larger than a JSON call. Absolute lookaside URLs override the base.
+    builder.Services.AddHttpClient("MetaMedia", c =>
+    {
+        c.BaseAddress = new Uri("https://graph.facebook.com/");
+        c.Timeout = TimeSpan.FromSeconds(60);
+    });
+
     // ── Authentication & Authorization (JWT bearer) ───────────────────────
     builder.Services.AddPlatformAuthentication(builder.Configuration);
 
@@ -196,6 +204,9 @@ try
             sp => sp.GetRequiredService<wa_api.Infrastructure.RateLimiting.InProcessTokenBucket>());
     builder.Services.AddScoped<wa_api.Features.Messages.IMessageService, wa_api.Features.Messages.MessageService>();
     builder.Services.AddScoped<wa_api.Features.Messages.IWhatsAppMessageSender, wa_api.Features.Messages.WhatsAppMessageSender>();
+    // Inbound media: the two-step Meta downloader + the async job that persists the bytes off the webhook tx.
+    builder.Services.AddScoped<wa_api.Features.Messages.InboundMedia.IInboundMediaDownloader, wa_api.Features.Messages.InboundMedia.InboundMediaDownloader>();
+    builder.Services.AddTransient<wa_api.Features.Messages.InboundMedia.InboundMediaDownloadJob>();
     builder.Services.AddScoped<wa_api.Features.Conversations.IConversationService, wa_api.Features.Conversations.ConversationService>();
     builder.Services.AddScoped<wa_api.Features.Conversations.Realtime.IChatNotifier, wa_api.Features.Conversations.Realtime.ChatNotifier>();
 

@@ -80,10 +80,34 @@ public sealed class WebhookInboundMessage
     [JsonPropertyName("from")] public string? From { get; set; }
     [JsonPropertyName("id")] public string? Id { get; set; }            // wamid
     [JsonPropertyName("timestamp")] public string? Timestamp { get; set; }
-    [JsonPropertyName("type")] public string? Type { get; set; }        // "text" | "button" | "interactive" | ...
+    [JsonPropertyName("type")] public string? Type { get; set; }        // "text" | "button" | "interactive" | "image" | ...
     [JsonPropertyName("text")] public WebhookText? Text { get; set; }
     [JsonPropertyName("button")] public WebhookButton? Button { get; set; }            // tap on a template quick-reply button
     [JsonPropertyName("interactive")] public WebhookInteractive? Interactive { get; set; } // reply to an interactive message
+
+    // ── Media messages ───────────────────────────────────────────────────────
+    // Meta never sends the bytes inline — each node carries an opaque media `id` that must be resolved to a
+    // short-lived signed URL and downloaded with the WABA token (done asynchronously by InboundMediaDownloadJob).
+    [JsonPropertyName("image")] public WebhookMedia? Image { get; set; }
+    [JsonPropertyName("video")] public WebhookMedia? Video { get; set; }
+    [JsonPropertyName("audio")] public WebhookMedia? Audio { get; set; }
+    [JsonPropertyName("document")] public WebhookMedia? Document { get; set; }
+    [JsonPropertyName("sticker")] public WebhookMedia? Sticker { get; set; }
+}
+
+/// <summary>
+/// A media node on an inbound message (image / video / audio / document / sticker). Only <see cref="Id"/> and
+/// <see cref="MimeType"/> are guaranteed; <see cref="Caption"/> appears on image/video/document, and
+/// <see cref="Filename"/> on document.
+/// </summary>
+public sealed class WebhookMedia
+{
+    [JsonPropertyName("id")] public string? Id { get; set; }             // Meta media id — resolve → download
+    [JsonPropertyName("mime_type")] public string? MimeType { get; set; }
+    [JsonPropertyName("sha256")] public string? Sha256 { get; set; }
+    [JsonPropertyName("caption")] public string? Caption { get; set; }   // image / video / document
+    [JsonPropertyName("filename")] public string? Filename { get; set; } // document
+    [JsonPropertyName("voice")] public bool? Voice { get; set; }         // audio: true when a voice note
 }
 
 public sealed class WebhookText
