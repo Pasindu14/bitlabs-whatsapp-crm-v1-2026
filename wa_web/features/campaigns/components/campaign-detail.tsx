@@ -53,19 +53,6 @@ const CAMPAIGN_STATUS_VARIANT: Record<
   Cancelled: "secondary",
 };
 
-const RECIPIENT_STATUS_VARIANT: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Queued: "secondary",
-  Accepted: "secondary",
-  Sent: "outline",
-  Delivered: "default",
-  Read: "default",
-  Failed: "destructive",
-  Skipped: "secondary",
-};
-
 // Human labels for the engine's own skip/fail codes AND the Meta Cloud API policy codes we know
 // about (mirrors wa_api MetaPolicyErrorCodes). Anything unmapped falls back to the raw code.
 // https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes
@@ -274,17 +261,11 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               {health.total.toLocaleString()} targeted
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
               <div className="text-xs text-muted-foreground">Will send</div>
               <div className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-500">
                 {health.sendable.toLocaleString()}
-              </div>
-            </div>
-            <div className="rounded-lg border p-3">
-              <div className="text-xs text-muted-foreground">No consent</div>
-              <div className="mt-1 text-xl font-bold">
-                {health.noConsent.toLocaleString()}
               </div>
             </div>
             <div className="rounded-lg border p-3">
@@ -305,14 +286,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           <p className="mt-3 text-xs text-muted-foreground">
             {health.sendable.toLocaleString()} of{" "}
             {health.total.toLocaleString()} contacts will be messaged; the rest
-            are skipped (no opt-in, opted out, or not reachable on WhatsApp).
-            {health.noConsentOverridden > 0 && (
-              <span className="text-destructive">
-                {" "}
-                {health.noConsentOverridden.toLocaleString()} will be sent
-                without recorded consent (override on).
-              </span>
-            )}
+            are skipped (opted out or not reachable on WhatsApp).
           </p>
         </div>
       )}
@@ -346,41 +320,62 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
             {(
               [
-                ["Total", stats.totalRecipients],
-                ["Queued", stats.queued],
-                ["Accepted", stats.accepted],
-                ["Sent", stats.sent],
-                ["Delivered", stats.delivered],
-                ["Read", stats.read],
-                ["Failed", stats.failed],
-                ["Skipped", stats.skipped],
-              ] as [string, number][]
-            ).map(([label, count]) => (
-              <div key={label} className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">{label}</div>
-                <div className="mt-1 text-xl font-bold">
-                  {count.toLocaleString()}
-                </div>
-              </div>
-            ))}
+                ["all", "Total", stats.totalRecipients],
+                ["Queued", "Queued", stats.queued],
+                ["Accepted", "Accepted", stats.accepted],
+                ["Sent", "Sent", stats.sent],
+                ["Delivered", "Delivered", stats.delivered],
+                ["Read", "Read", stats.read],
+                ["Failed", "Failed", stats.failed],
+                ["Skipped", "Skipped", stats.skipped],
+              ] as [string, string, number][]
+            ).map(([value, label, count]) => {
+              const meta = STAT_META[label];
+              const Icon = meta.icon;
+              const active = (statusFilter ?? "all") === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => changeFilter(value)}
+                  aria-pressed={active}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50",
+                    active && "border-primary bg-primary/5 ring-1 ring-primary"
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                    <span className={cn("rounded-md p-1", meta.pill)}>
+                      <Icon className="size-3.5" />
+                    </span>
+                  </div>
+                  <div className={cn("mt-1 text-xl font-bold", meta.value)}>
+                    {count.toLocaleString()}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Recipient list */}
       <div className="flex flex-col gap-4">
-        <Tabs value={statusFilter ?? "all"} onValueChange={changeFilter}>
-          <TabsList className="flex-wrap">
-            {TABS.map(([value, label, count]) => (
-              <TabsTrigger key={value} value={value}>
-                {label}
-                {count !== undefined && (
-                  <span className="ml-1 text-muted-foreground">{count}</span>
-                )}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {statusFilter && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              Filtered by <span className="font-medium text-foreground">{statusFilter}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => changeFilter("all")}
+              className="text-primary hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         <div className="rounded-2xl border">
           <Table>
@@ -420,20 +415,17 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                       {r.contactPhone}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        asChild
-                        variant={
-                          RECIPIENT_STATUS_VARIANT[r.status] ?? "secondary"
-                        }
+                      <button
+                        type="button"
+                        onClick={() => changeFilter(r.status)}
+                        className={cn(
+                          "inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80",
+                          STAT_META[r.status]?.pill ??
+                            "bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300"
+                        )}
                       >
-                        <button
-                          type="button"
-                          onClick={() => changeFilter(r.status)}
-                          className="cursor-pointer transition-opacity hover:opacity-80"
-                        >
-                          {r.status}
-                        </button>
-                      </Badge>
+                        {r.status}
+                      </button>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {r.errorCode ? (

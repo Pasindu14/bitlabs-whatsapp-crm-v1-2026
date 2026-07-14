@@ -38,6 +38,7 @@ export const STAT_META: Record<
   Delivered: {
     icon: CheckCheck,
     pill: "bg-cyan-500/10 text-cyan-600 dark:bg-cyan-400/10 dark:text-cyan-400",
+    value: "text-cyan-600 dark:text-cyan-400",
   },
   Read: {
     icon: Eye,
