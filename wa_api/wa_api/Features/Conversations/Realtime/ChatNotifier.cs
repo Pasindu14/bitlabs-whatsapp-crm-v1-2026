@@ -15,4 +15,11 @@ public sealed class ChatNotifier(IHubContext<ChatHub> hub) : IChatNotifier
         => hub.Clients
             .Group(ChatHub.GroupFor(companyId))
             .SendAsync("message", new { conversation, message }, ct);
+
+    public Task MessageDeletedAsync(
+        Guid companyId, Guid conversationId, Guid messageId, ConversationResponse conversation,
+        CancellationToken ct = default)
+        => hub.Clients
+            .Group(ChatHub.GroupFor(companyId))
+            .SendAsync("messageDeleted", new { conversationId, messageId, conversation }, ct);
 }

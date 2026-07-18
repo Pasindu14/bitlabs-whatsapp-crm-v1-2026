@@ -91,6 +91,19 @@ public class Message : BaseEntity, ITenantEntity
     /// <summary>UTC when the media bytes were fetched from Meta and persisted to <see cref="Media"/>. Null = pending/failed.</summary>
     public DateTime? MediaDownloadedAt { get; set; }
 
+    // ── "Delete for me" (CRM-side soft delete) ─────────────────────────────────
+    // WhatsApp's Cloud (Business) API exposes NO way to revoke/unsend a delivered message, so this only
+    // hides the row from the tenant's own inbox + history — it never touches the customer's phone. It's a
+    // shared-inbox action (company-scoped, not per-agent), mirroring how UnreadCount is a shared count.
+    // Deliberately NOT a global query filter: status-webhook lookups by ExternalMessageId must still find a
+    // deleted row, so the two read paths (thread history + message table) filter on this explicitly instead.
+
+    /// <summary>True once an agent deleted this message from the inbox ("delete for me"). Hidden from reads.</summary>
+    public bool IsDeleted { get; set; }
+
+    /// <summary>UTC when the message was deleted from the inbox. Null unless <see cref="IsDeleted"/>.</summary>
+    public DateTime? DeletedAt { get; set; }
+
     public Contact Contact { get; set; } = null!;
     public WabaConnection WabaConnection { get; set; } = null!;
     public Conversations.Entities.Conversation? Conversation { get; set; }

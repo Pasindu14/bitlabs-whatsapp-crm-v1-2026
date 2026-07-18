@@ -37,6 +37,8 @@ public class MessageService(
         var query = db.Messages.AsNoTracking()
             .Include(m => m.Contact)
             .Include(m => m.WabaConnection)
+            // Exclude messages deleted from the inbox ("delete for me").
+            .Where(m => !m.IsDeleted)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))

@@ -24,6 +24,15 @@ public interface IConversationService
     /// <summary>Resets a conversation's unread count to zero (agent opened the thread).</summary>
     Task MarkReadAsync(Guid conversationId, CancellationToken ct = default);
 
+    /// <summary>
+    /// "Delete for me": hides a message from the tenant's inbox + history (soft delete). This is a
+    /// CRM-side action only — WhatsApp's Cloud API can't revoke a delivered message, so the customer's
+    /// copy is untouched. Idempotent (already-deleted is a no-op). Recomputes the conversation preview
+    /// when the deleted message was the latest, then pushes a realtime "messageDeleted" event.
+    /// Throws 404 when the message isn't in the conversation (or isn't visible to the caller).
+    /// </summary>
+    Task DeleteMessageForMeAsync(Guid conversationId, Guid messageId, CancellationToken ct = default);
+
     /// <summary>Standalone-endpoint adapter: send to a contact, auto-threading into their open
     /// conversation so the message appears in the inbox. Returns the legacy <see cref="MessageResponse"/>.</summary>
     Task<MessageResponse> SendToContactAsync(

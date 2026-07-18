@@ -40,6 +40,14 @@ export const markConversationReadAction = createAction(
   },
 );
 
+export const deleteConversationMessageAction = createAction(
+  { name: "deleteConversationMessageAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async (conversationId: string, messageId: string) => {
+    await ConversationService.deleteMessage(conversationId, messageId);
+    return { conversationId, messageId };
+  },
+);
+
 export const startConversationAction = createAction(
   { name: "startConversationAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
   async (raw: unknown) => {

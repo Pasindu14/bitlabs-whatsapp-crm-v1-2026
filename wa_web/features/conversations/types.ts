@@ -52,3 +52,10 @@ export interface ChatEvent {
   conversation: Conversation;
   message: ConversationMessage;
 }
+
+/** Payload of the SignalR "messageDeleted" event — a message was hidden via "delete for me". */
+export interface MessageDeletedEvent {
+  conversationId: string;
+  messageId: string;
+  conversation: Conversation;
+}

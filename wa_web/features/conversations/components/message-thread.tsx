@@ -85,7 +85,7 @@ export function MessageThread() {
                       </span>
                     </div>
                   )}
-                  <MessageBubble message={m} />
+                  <MessageBubble message={m} conversationId={selected.id} />
                 </Fragment>
               );
             })}

@@ -45,6 +45,11 @@ public class InboundMediaWebhookHandlerTests
             Last = message;
             return Task.CompletedTask;
         }
+
+        public Task MessageDeletedAsync(
+            Guid companyId, Guid conversationId, Guid messageId, ConversationResponse conversation,
+            CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 
     /// <summary>Fake job client — Hangfire's Enqueue&lt;T&gt; is an extension over Create(Job, IState).</summary>

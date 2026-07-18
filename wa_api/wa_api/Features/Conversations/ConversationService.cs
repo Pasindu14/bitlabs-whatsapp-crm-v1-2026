@@ -83,7 +83,9 @@ public class ConversationService(
         var exists = await db.Conversations.AnyAsync(c => c.Id == conversationId, ct);
         if (!exists) throw new NotFoundException("Conversation", conversationId);
 
-        var query = db.Messages.AsNoTracking().Where(m => m.ConversationId == conversationId);
+        // Exclude messages an agent deleted from the inbox ("delete for me").
+        var query = db.Messages.AsNoTracking()
+            .Where(m => m.ConversationId == conversationId && !m.IsDeleted);
 
         var total = await query.CountAsync(ct);
         // Newest-first so page 1 is the latest block; the client reverses each page for display
@@ -140,6 +142,52 @@ public class ConversationService(
 
         conversation.UnreadCount = 0;
         await db.SaveChangesAsync(ct);
+    }
+
+    public async Task DeleteMessageForMeAsync(Guid conversationId, Guid messageId, CancellationToken ct = default)
+    {
+        // Tenant filter scopes both loads to the caller's company → a foreign id is a clean 404.
+        var conversation = await db.Conversations
+            .Include(c => c.Contact)
+            .Include(c => c.WabaConnection)
+            .FirstOrDefaultAsync(c => c.Id == conversationId, ct)
+            ?? throw new NotFoundException("Conversation", conversationId);
+
+        var message = await db.Messages
+            .FirstOrDefaultAsync(m => m.Id == messageId && m.ConversationId == conversationId, ct)
+            ?? throw new NotFoundException("Message", messageId);
+
+        if (message.IsDeleted) return; // Idempotent: already deleted → nothing to do.
+
+        message.IsDeleted = true;
+        message.DeletedAt = DateTime.UtcNow;
+
+        // If the deleted message was the conversation's latest, refresh the inbox preview from the newest
+        // remaining (non-deleted) message so the list doesn't keep showing the removed text.
+        var latest = await db.Messages
+            .Where(m => m.ConversationId == conversationId && !m.IsDeleted && m.Id != messageId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Select(m => new { m.CreatedAt, m.Body, m.Direction })
+            .FirstOrDefaultAsync(ct);
+
+        if (latest is not null)
+        {
+            conversation.LastMessageAt = latest.CreatedAt;
+            conversation.LastMessageBody = Truncate(latest.Body);
+            conversation.LastMessageDirection = latest.Direction;
+        }
+        else
+        {
+            // The thread's last visible message was removed — clear the preview (keep LastMessageAt as the
+            // sort anchor so the empty thread doesn't jump around the inbox).
+            conversation.LastMessageBody = null;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        await notifier.MessageDeletedAsync(
+            conversation.CompanyId, conversationId, messageId,
+            MapConversation(conversation, conversation.Contact, conversation.WabaConnection), ct);
     }
 
     public async Task<MessageResponse> SendToContactAsync(

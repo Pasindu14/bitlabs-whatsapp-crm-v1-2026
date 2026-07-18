@@ -4,16 +4,35 @@ import { useState } from "react";
 import {
   Check,
   CheckCheck,
+  ChevronDown,
   Clock,
   Download,
   FileText,
   Image as ImageIcon,
   Mic,
+  Trash2,
   TriangleAlert,
   Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { renderWhatsAppText } from "@/lib/whatsapp-text";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useDeleteConversationMessage } from "@/features/conversations/hooks/use-conversations";
 import type { ConversationMessage, MessageStatus } from "@/features/conversations/types";
 import { formatMessageTime } from "./format";
 
@@ -100,9 +119,18 @@ function MessageMedia({ message }: { message: ConversationMessage }) {
   );
 }
 
-export function MessageBubble({ message }: { message: ConversationMessage }) {
+export function MessageBubble({
+  message,
+  conversationId,
+}: {
+  message: ConversationMessage;
+  conversationId: string;
+}) {
   const outbound = message.direction === "Outbound";
   const failed = outbound && message.status === "Failed";
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const del = useDeleteConversationMessage(conversationId);
 
   const hasMedia = !!message.mediaType;
   // The backend stores "[image]"/"[video]"/… as the body when a media message has no caption; don't show it
@@ -111,7 +139,12 @@ export function MessageBubble({ message }: { message: ConversationMessage }) {
   const showBody = message.body.length > 0 && !isPlaceholderBody;
 
   return (
-    <div className={cn("flex w-full", outbound ? "justify-end" : "justify-start")}>
+    <div className={cn("group flex w-full items-center gap-1", outbound ? "justify-end" : "justify-start")}>
+      {/* Menu sits before the bubble for outbound (right-aligned) so it never overflows the viewport edge. */}
+      {outbound && (
+        <MessageActions message={message} onDelete={() => setConfirmOpen(true)} />
+      )}
+
       <div
         className={cn(
           "max-w-[78%] rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[70%]",
@@ -145,6 +178,61 @@ export function MessageBubble({ message }: { message: ConversationMessage }) {
           {outbound && <StatusTick status={message.status} />}
         </div>
       </div>
+
+      {!outbound && (
+        <MessageActions message={message} onDelete={() => setConfirmOpen(true)} />
+      )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the message from your inbox only. It stays on the customer&apos;s WhatsApp —
+              WhatsApp doesn&apos;t allow businesses to unsend messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => del.mutate(message.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete for me
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+/** Hover-revealed per-message menu. Only action for now: "Delete for me" (CRM-side hide). */
+function MessageActions({
+  message,
+  onDelete,
+}: {
+  message: ConversationMessage;
+  onDelete: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="Message actions"
+        className={cn(
+          "flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground",
+          "opacity-0 transition-opacity hover:bg-muted focus:opacity-100 focus:outline-none",
+          "group-hover:opacity-100 data-[state=open]:opacity-100",
+        )}
+      >
+        <ChevronDown className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align={message.direction === "Outbound" ? "end" : "start"}>
+        <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+          <Trash2 className="size-4" />
+          Delete for me
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

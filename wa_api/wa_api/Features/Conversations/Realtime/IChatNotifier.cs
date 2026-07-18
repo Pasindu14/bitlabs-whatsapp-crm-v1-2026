@@ -13,4 +13,13 @@ public interface IChatNotifier
     Task MessageAsync(
         Guid companyId, ConversationResponse conversation, ConversationMessageResponse message,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Pushes a "messageDeleted" event so every open inbox/thread for the company drops the message
+    /// (and refreshes the list preview) without a manual refresh. Carries the updated conversation
+    /// snapshot (its preview may have changed when the latest message was the one deleted).
+    /// </summary>
+    Task MessageDeletedAsync(
+        Guid companyId, Guid conversationId, Guid messageId, ConversationResponse conversation,
+        CancellationToken ct = default);
 }

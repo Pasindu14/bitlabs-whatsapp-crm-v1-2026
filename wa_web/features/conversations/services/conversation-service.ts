@@ -95,4 +95,17 @@ export const ConversationService = {
       },
     );
   },
+
+  // "Delete for me": hides the message from our inbox only — it stays on the customer's phone (WhatsApp's
+  // Cloud API can't unsend a delivered message).
+  async deleteMessage(conversationId: string, messageId: string): Promise<void> {
+    return executeService(
+      { context: "ConversationService", method: "deleteMessage" },
+      async () => {
+        await client.delete<ApiSuccessBody<unknown>>(
+          `/api/v1/conversations/${conversationId}/messages/${messageId}`,
+        );
+      },
+    );
+  },
 };

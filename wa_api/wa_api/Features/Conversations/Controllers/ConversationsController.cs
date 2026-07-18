@@ -106,4 +106,16 @@ public class ConversationsController(IConversationService service, IIdempotencyS
         await service.MarkReadAsync(id, ct);
         return Ok(ResponseHelper.Ok(new { id }, CorrelationId));
     }
+
+    /// <summary>
+    /// DELETE /api/v1/conversations/{id}/messages/{messageId} — "delete for me": hides the message from
+    /// this company's inbox + history. It does NOT unsend it on the customer's phone (WhatsApp's Cloud API
+    /// has no revoke). Idempotent; 404 when the message isn't in the conversation.
+    /// </summary>
+    [HttpDelete("{id:guid}/messages/{messageId:guid}")]
+    public async Task<IActionResult> DeleteMessage(Guid id, Guid messageId, CancellationToken ct)
+    {
+        await service.DeleteMessageForMeAsync(id, messageId, ct);
+        return Ok(ResponseHelper.Ok(new { id, messageId }, CorrelationId));
+    }
 }

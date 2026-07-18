@@ -10,9 +10,11 @@ import {
   sendConversationMessageAction,
   markConversationReadAction,
   startConversationAction,
+  deleteConversationMessageAction,
 } from "@/features/conversations/actions/conversation-actions";
 import { useConversationStore } from "@/features/conversations/store/conversation-store";
 import type { StartConversationInput } from "@/features/conversations/schema/conversation-schema";
+import type { ConversationMessage } from "@/features/conversations/types";
 
 export function useConversations(search: string) {
   return useQuery({
@@ -68,6 +70,38 @@ export function useMarkConversationRead() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.conversations.lists() });
+    },
+  });
+}
+
+export function useDeleteConversationMessage(conversationId: string) {
+  const qc = useQueryClient();
+  const key = queryKeys.conversations.messages(conversationId);
+
+  return useMutation({
+    mutationFn: async (messageId: string) => {
+      const res = await deleteConversationMessageAction(conversationId, messageId);
+      if (!res.success) throw res;
+      return res.data;
+    },
+    // Optimistically drop the bubble so it disappears instantly (WhatsApp-style); roll back on failure.
+    onMutate: async (messageId: string) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<ConversationMessage[]>(key);
+      qc.setQueryData<ConversationMessage[]>(key, (old) =>
+        old ? old.filter((m) => m.id !== messageId) : old,
+      );
+      return { previous };
+    },
+    onError: (error: ActionFailure, _messageId, context) => {
+      if (context?.previous) qc.setQueryData(key, context.previous);
+      handleErrorToast(error, "Message", "delete");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.conversations.lists() });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: key });
     },
   });
 }

@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { queryKeys } from "@/lib/hooks/query-keys";
 import { useConversationStore } from "@/features/conversations/store/conversation-store";
-import type { ChatEvent } from "@/features/conversations/types";
+import type { ChatEvent, MessageDeletedEvent } from "@/features/conversations/types";
 
 /**
  * Subscribes to the company's real-time chat channel. On every "message" event (inbound from a customer
@@ -43,6 +43,16 @@ export function useChatHub(apiUrl: string) {
         qc.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) });
         // Keep the open thread's header + 24h-window state fresh (inbound resets the window).
         useConversationStore.getState().patchSelected(event.conversation);
+      }
+    });
+
+    // Another agent deleted a message ("delete for me") — drop it from any open thread + refresh the list.
+    connection.on("messageDeleted", (event: MessageDeletedEvent) => {
+      qc.invalidateQueries({ queryKey: queryKeys.conversations.lists() });
+      const conversationId = event?.conversationId;
+      if (conversationId) {
+        qc.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) });
+        if (event.conversation) useConversationStore.getState().patchSelected(event.conversation);
       }
     });
 
