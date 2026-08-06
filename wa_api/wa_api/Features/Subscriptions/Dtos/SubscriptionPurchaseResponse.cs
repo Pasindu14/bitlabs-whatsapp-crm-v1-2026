@@ -16,11 +16,12 @@ public record SubscriptionPurchaseResponse(
     DateTime PeriodEndAfter,
     decimal Price,
     string Currency,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    Guid? PayHereOrderId
 )
 {
     public static SubscriptionPurchaseResponse From(SubscriptionPurchase p)
         => new(p.Id, p.CompanyId, p.SubscriptionId, p.PlanId, p.PlanName, p.Mode,
                p.MessagesAdded, p.PeriodDays, p.BalanceAfter, p.PeriodEndAfter,
-               p.Price, p.Currency, p.CreatedAt);
+               p.Price, p.Currency, p.CreatedAt, p.PayHereOrderId);
 }

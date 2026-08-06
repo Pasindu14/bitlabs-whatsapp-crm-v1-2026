@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, ExternalLink, Receipt, AlertCircle, ShieldCheck } from "lucide-react";
+import { Download, ExternalLink, Receipt, AlertCircle, ShieldCheck, CreditCard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,9 +22,11 @@ type HistoryEntry =
 
 /**
  * CompanyAdmin-only billing history. Merges two sources: Stripe invoices (self-service
- * checkout) and SubscriptionPurchase rows (SuperAdmin manually assigning/changing a plan —
- * the only path in this phase, since Stripe is deferred). Both are "you were placed on a
- * plan" events from the company's point of view, so they read as one timeline.
+ * checkout) and SubscriptionPurchase rows — the latter cover BOTH a SuperAdmin manually
+ * assigning/changing a plan AND a self-service PayHere checkout (distinguished by
+ * `payHereOrderId`, since PayHere purchases apply via the same stack-or-fresh assignment
+ * path, not a Stripe-style invoice). All three read as one "you were placed on a plan"
+ * timeline from the company's point of view.
  */
 export function InvoicesList() {
   const { data: invoices, isLoading: invoicesLoading, isError: invoicesError } = useInvoices();
@@ -124,31 +126,54 @@ export function InvoicesList() {
                 </div>
               </div>
             ) : (
-              <div
-                key={`manual-${entry.data.id}`}
-                className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {entry.data.planName}
-                    <span className="ml-2 font-normal text-muted-foreground">
-                      {currFmt(entry.data.price, entry.data.currency)}
-                    </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {dateFmt.format(new Date(entry.data.createdAt))} ·{" "}
-                    {entry.data.mode === "Stack" ? "Added to existing plan" : "Assigned by admin"}
-                  </p>
-                </div>
+              (() => {
+                const viaPayHere = entry.data.payHereOrderId !== null;
+                const stacked = entry.data.mode === "Stack";
+                return (
+                  <div
+                    key={`manual-${entry.data.id}`}
+                    className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {entry.data.planName}
+                        <span className="ml-2 font-normal text-muted-foreground">
+                          {currFmt(entry.data.price, entry.data.currency)}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {dateFmt.format(new Date(entry.data.createdAt))} ·{" "}
+                        {stacked
+                          ? "Added to existing plan"
+                          : viaPayHere
+                            ? "Subscribed via PayHere"
+                            : "Assigned by admin"}
+                      </p>
+                    </div>
 
-                <Badge
-                  variant="outline"
-                  className="shrink-0 gap-1 text-muted-foreground"
-                >
-                  <ShieldCheck className="size-3" />
-                  Manual
-                </Badge>
-              </div>
+                    <Badge
+                      variant="outline"
+                      className={
+                        viaPayHere
+                          ? "shrink-0 gap-1 border-emerald-600/30 text-emerald-700 dark:text-emerald-400"
+                          : "shrink-0 gap-1 text-muted-foreground"
+                      }
+                    >
+                      {viaPayHere ? (
+                        <>
+                          <CreditCard className="size-3" />
+                          PayHere
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="size-3" />
+                          Manual
+                        </>
+                      )}
+                    </Badge>
+                  </div>
+                );
+              })()
             )
           )}
         </div>

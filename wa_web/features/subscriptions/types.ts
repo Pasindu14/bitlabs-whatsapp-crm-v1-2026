@@ -54,6 +54,8 @@ export interface SubscriptionPurchase {
   price: number;
   currency: string;
   createdAt: string;
+  /** Set when this purchase was a self-service PayHere checkout rather than a SuperAdmin manual assignment. */
+  payHereOrderId: string | null;
 }
 
 /** Filters/pagination the list endpoint accepts. */
