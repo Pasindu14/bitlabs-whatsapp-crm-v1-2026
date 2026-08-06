@@ -43,9 +43,9 @@ public class Plan : BaseEntity
     public string? StripePriceId { get; set; }
 
     /// <summary>
-    /// Whether this plan is offered for self-service online payment. Surfaced to customers on the
-    /// online-payment/checkout flow once that is configured; until then it is SuperAdmin-only metadata.
-    /// Defaults to <c>false</c>.
+    /// Whether this plan is offered for self-service online payment via PayHere. Surfaced on
+    /// <c>GET /my-subscription/available-plans</c> (alongside Stripe-purchasable plans, gated by
+    /// <see cref="StripePriceId"/>) once true. Defaults to <c>false</c>.
     /// </summary>
     public bool IsOnline { get; set; }
 }

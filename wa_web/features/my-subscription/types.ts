@@ -19,7 +19,7 @@ export interface Invoice {
   createdAt: string;
 }
 
-/** A self-service plan (has StripePriceId) as returned by GET /my-subscription/available-plans. */
+/** A self-service plan as returned by GET /my-subscription/available-plans. */
 export interface AvailablePlan {
   id: string;
   name: string;
@@ -27,4 +27,36 @@ export interface AvailablePlan {
   price: number;
   currency: string;
   stripePriceId: string | null;
+  payHereEnabled: boolean;
+}
+
+/** Billing details collected in the PayHere checkout dialog — sent fresh on every checkout. */
+export interface PayHereBillingDetails {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+}
+
+/** The signed payload returned by POST /my-subscription/payhere-checkout, fed straight into payhere.startPayment(). */
+export interface PayHereCheckoutPayload {
+  merchantId: string;
+  orderId: string;
+  items: string;
+  amount: string;
+  currency: string;
+  hash: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  notifyUrl: string;
+  returnUrl: string;
+  cancelUrl: string;
+  sandbox: boolean;
 }

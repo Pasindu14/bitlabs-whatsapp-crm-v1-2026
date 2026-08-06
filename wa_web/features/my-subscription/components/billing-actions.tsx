@@ -1,30 +1,75 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Zap, Settings2, Loader2 } from "lucide-react";
+import Script from "next/script";
+import { ExternalLink, Zap, Settings2, Loader2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAvailablePlans } from "@/features/my-subscription/hooks/use-my-subscription";
+import { useAvailablePlans, useCreatePayHereCheckout, useRefreshAfterPayHere } from "@/features/my-subscription/hooks/use-my-subscription";
 import {
   createCheckoutSessionAction,
   createPortalSessionAction,
 } from "@/features/my-subscription/actions/my-subscription-actions";
+import { PayHereBillingDetailsDialog } from "@/features/my-subscription/components/payhere-billing-details-dialog";
+import type { AvailablePlan, PayHereCheckoutPayload } from "@/features/my-subscription/types";
+import type { PayHereBillingInput } from "@/features/my-subscription/schema/payhere-checkout-schema";
 
 const currFmt = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
 const numFmt = new Intl.NumberFormat("en-US");
 
+const PAYHERE_SCRIPT_SRC = "https://www.payhere.lk/lib/payhere.js";
+
+// PayHere's onsite JS expects snake_case fields, distinct from our camelCase API payload.
+declare global {
+  interface Window {
+    payhere?: {
+      startPayment: (payload: Record<string, unknown>) => void;
+      onCompleted?: (orderId: string) => void;
+      onDismissed?: () => void;
+      onError?: (error: string) => void;
+    };
+  }
+}
+
+function toPayHerePayload(payload: PayHereCheckoutPayload) {
+  return {
+    sandbox: payload.sandbox,
+    merchant_id: payload.merchantId,
+    return_url: payload.returnUrl,
+    cancel_url: payload.cancelUrl,
+    notify_url: payload.notifyUrl,
+    order_id: payload.orderId,
+    items: payload.items,
+    amount: payload.amount,
+    currency: payload.currency,
+    hash: payload.hash,
+    first_name: payload.firstName,
+    last_name: payload.lastName,
+    email: payload.email,
+    phone: payload.phone,
+    address: payload.address,
+    city: payload.city,
+    country: payload.country,
+  };
+}
+
 /**
  * CompanyAdmin-only billing controls.
- * Renders available plans (Stripe checkout) and a "Manage Billing" portal link.
+ * Renders available plans (Stripe checkout and/or PayHere onsite popup) and a "Manage Billing" portal link.
  */
 export function BillingActionsCard() {
   const { data: plans, isLoading, isError } = useAvailablePlans();
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [payHerePlan, setPayHerePlan] = useState<AvailablePlan | null>(null);
+  const [payHereReady, setPayHereReady] = useState(false);
 
-  async function handleCheckout(planId: string) {
+  const createPayHereCheckout = useCreatePayHereCheckout();
+  const refreshAfterPayHere = useRefreshAfterPayHere();
+
+  async function handleStripeCheckout(planId: string) {
     setLoadingPlanId(planId);
     try {
       const res = await createCheckoutSessionAction(planId);
@@ -56,8 +101,41 @@ export function BillingActionsCard() {
     }
   }
 
+  async function handlePayHereConfirm(billing: PayHereBillingInput) {
+    if (!payHerePlan) return;
+
+    if (!payHereReady || !window.payhere) {
+      toast.error("Payment provider is still loading — try again in a moment.");
+      return;
+    }
+
+    try {
+      const payload = await createPayHereCheckout.mutateAsync({ planId: payHerePlan.id, billing });
+
+      window.payhere.onCompleted = () => {
+        toast.success("Payment successful — your plan will update shortly.");
+        refreshAfterPayHere();
+      };
+      window.payhere.onDismissed = () => {
+        toast.info("Checkout dismissed.");
+      };
+      window.payhere.onError = (error: string) => {
+        toast.error(`Payment error: ${error}`);
+      };
+
+      setPayHerePlan(null);
+      window.payhere.startPayment(toPayHerePayload(payload));
+    } catch {
+      // createPayHereCheckout's onError already toasts the specific failure.
+    }
+  }
+
+  const anyLoading = loadingPlanId !== null;
+
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
+      <Script src={PAYHERE_SCRIPT_SRC} strategy="afterInteractive" onLoad={() => setPayHereReady(true)} />
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-muted-foreground" />
@@ -105,28 +183,51 @@ export function BillingActionsCard() {
                   {numFmt.format(plan.monthlyMessageQuota)} messages / month
                 </p>
               </div>
-              <div className="flex items-end justify-between">
+              <div className="flex items-end justify-between gap-2">
                 <p className="text-lg font-bold">
                   {currFmt(plan.price, plan.currency)}
                   <span className="text-xs font-normal text-muted-foreground"> /mo</span>
                 </p>
-                <Button
-                  size="sm"
-                  onClick={() => handleCheckout(plan.id)}
-                  disabled={loadingPlanId !== null}
-                >
-                  {loadingPlanId === plan.id ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                <div className="flex flex-col gap-1.5">
+                  {plan.stripePriceId && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleStripeCheckout(plan.id)}
+                      disabled={anyLoading}
+                    >
+                      {loadingPlanId === plan.id ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Subscribe
+                    </Button>
                   )}
-                  Subscribe
-                </Button>
+                  {plan.payHereEnabled && (
+                    <Button
+                      size="sm"
+                      variant={plan.stripePriceId ? "outline" : "default"}
+                      onClick={() => setPayHerePlan(plan)}
+                      disabled={anyLoading}
+                    >
+                      <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                      Pay with PayHere
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <PayHereBillingDetailsDialog
+        open={payHerePlan !== null}
+        onOpenChange={(open) => !open && setPayHerePlan(null)}
+        planName={payHerePlan?.name ?? ""}
+        onConfirm={handlePayHereConfirm}
+        isLoading={createPayHereCheckout.isPending}
+      />
     </div>
   );
 }

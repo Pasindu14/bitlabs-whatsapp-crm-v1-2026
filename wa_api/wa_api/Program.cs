@@ -248,6 +248,12 @@ try
     builder.Services.AddScoped<wa_api.Features.Billing.IInvoiceService, wa_api.Features.Billing.InvoiceService>();
     builder.Services.AddTransient<wa_api.Features.Billing.Jobs.StripeWebhookProcessingJob>();
 
+    // ── PayHere (self-service checkout, one-time payment per subscribe/renew) ──
+    builder.Services.Configure<wa_api.Infrastructure.PayHere.PayHereOptions>(
+        builder.Configuration.GetSection("PayHere"));
+    builder.Services.AddScoped<wa_api.Infrastructure.PayHere.IPayHereService, wa_api.Infrastructure.PayHere.PayHereService>();
+    builder.Services.AddTransient<wa_api.Features.Subscriptions.Jobs.PayHereWebhookProcessingJob>();
+
     // ── Webhooks (Meta inbound: template status 5.2 + delivery status 6.4; inbound stub → Phase 7) ──
     builder.Services.AddScoped<wa_api.Features.Webhooks.Signature.IMetaSignatureVerifier, wa_api.Features.Webhooks.Signature.MetaSignatureVerifier>();
     builder.Services.AddScoped<wa_api.Features.Webhooks.Ingestion.IWebhookInboxService, wa_api.Features.Webhooks.Ingestion.WebhookInboxService>();

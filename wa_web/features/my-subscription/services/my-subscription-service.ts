@@ -1,7 +1,13 @@
 import client, { type ApiSuccessBody } from "@/lib/api/client";
 import { executeService } from "@/lib/services/wrapper";
 import type { Subscription } from "@/features/subscriptions/types";
-import type { Invoice, AvailablePlan, SubscriptionPurchase } from "@/features/my-subscription/types";
+import type {
+  Invoice,
+  AvailablePlan,
+  SubscriptionPurchase,
+  PayHereBillingDetails,
+  PayHereCheckoutPayload,
+} from "@/features/my-subscription/types";
 
 /**
  * Talks to wa_api /api/v1/my-subscription. Any authenticated company user may read their
@@ -66,6 +72,22 @@ export const MySubscriptionService = {
       async () => {
         const res = await client.post<ApiSuccessBody<{ url: string }>>("/api/v1/my-subscription/portal", {});
         return res.data.data.url;
+      }
+    );
+  },
+
+  async createPayHereCheckout(
+    planId: string,
+    billing: PayHereBillingDetails
+  ): Promise<PayHereCheckoutPayload> {
+    return executeService(
+      { context: "MySubscriptionService", method: "createPayHereCheckout" },
+      async () => {
+        const res = await client.post<ApiSuccessBody<PayHereCheckoutPayload>>(
+          "/api/v1/my-subscription/payhere-checkout",
+          { planId, ...billing }
+        );
+        return res.data.data;
       }
     );
   },

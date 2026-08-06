@@ -25,4 +25,5 @@ public record AvailablePlanResponse(
     int MonthlyMessageQuota,
     decimal Price,
     string Currency,
-    string? StripePriceId);
+    string? StripePriceId,
+    bool PayHereEnabled);

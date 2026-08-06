@@ -61,6 +61,7 @@ public class AppDbContext(
     public DbSet<MessagePackage> MessagePackages => Set<MessagePackage>();
     public DbSet<PackagePurchase> PackagePurchases => Set<PackagePurchase>();
     public DbSet<SubscriptionPurchase> SubscriptionPurchases => Set<SubscriptionPurchase>();
+    public DbSet<PayHereOrder> PayHereOrders => Set<PayHereOrder>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
     public DbSet<Template> Templates => Set<Template>();
@@ -463,8 +464,36 @@ public class AppDbContext(
                 .WithMany()
                 .HasForeignKey(x => x.PlanId)
                 .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PayHereOrder)
+                .WithMany()
+                .HasForeignKey(x => x.PayHereOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Tenant-scoped audit history — same filter as Subscription.
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<PayHereOrder>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Amount).HasColumnType("numeric(12,2)");
+            e.Property(x => x.Currency).IsRequired().HasMaxLength(3).HasDefaultValue("USD");
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
+            e.Property(x => x.PayHerePaymentId).HasMaxLength(100);
+            e.Property(x => x.StatusMessage).HasMaxLength(500);
+            e.HasIndex(x => x.CompanyId);
+            e.HasIndex(x => new { x.CompanyId, x.CreatedAt });   // history list, newest first
+            e.HasOne(x => x.Company)
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Plan)
+                .WithMany()
+                .HasForeignKey(x => x.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Written by the webhook job (no HTTP tenant context) via IgnoreQueryFilters + explicit
+            // CompanyId — same pattern as SubscriptionPurchase/Invoice.
             e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
 

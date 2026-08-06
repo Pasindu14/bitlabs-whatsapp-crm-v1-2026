@@ -5,6 +5,9 @@ using wa_api.Common.Errors;
 using wa_api.Common.Tenancy;
 using wa_api.Features.Billing;
 using wa_api.Features.Billing.Dtos;
+using wa_api.Features.Subscriptions.Dtos;
+using wa_api.Features.Subscriptions.Entities;
+using wa_api.Infrastructure.PayHere;
 using wa_api.Infrastructure.Persistence;
 using wa_api.Infrastructure.Stripe;
 
@@ -22,6 +25,7 @@ public class MySubscriptionController(
     ISubscriptionService service,
     IInvoiceService invoiceService,
     IStripeService stripeService,
+    IPayHereService payHereService,
     AppDbContext db,
     ITenantContext tenant) : ControllerBase
 {
@@ -59,19 +63,19 @@ public class MySubscriptionController(
     }
 
     /// <summary>
-    /// GET /api/v1/my-subscription/available-plans — active plans that have a Stripe Price ID
-    /// (purchasable via self-service checkout). Read by any authenticated company user to
-    /// populate the "Upgrade" plan picker.
+    /// GET /api/v1/my-subscription/available-plans — active plans purchasable via self-service
+    /// checkout, either through Stripe (<c>StripePriceId</c> set) or PayHere (<c>IsOnline</c>).
+    /// Read by any authenticated company user to populate the "Upgrade" plan picker.
     /// </summary>
     [HttpGet("available-plans")]
     public async Task<IActionResult> GetAvailablePlans(CancellationToken ct)
     {
         var plans = await db.Plans
             .AsNoTracking()
-            .Where(p => p.IsActive && p.StripePriceId != null)
+            .Where(p => p.IsActive && (p.StripePriceId != null || p.IsOnline))
             .OrderBy(p => p.Price)
             .Select(p => new AvailablePlanResponse(
-                p.Id, p.Name, p.MonthlyMessageQuota, p.Price, p.Currency, p.StripePriceId))
+                p.Id, p.Name, p.MonthlyMessageQuota, p.Price, p.Currency, p.StripePriceId, p.IsOnline))
             .ToListAsync(ct);
 
         return Ok(ResponseHelper.Ok(plans, CorrelationId));
@@ -133,5 +137,46 @@ public class MySubscriptionController(
 
         var url = await stripeService.CreatePortalSessionAsync(company.StripeCustomerId, ct);
         return Ok(ResponseHelper.Ok(new PortalSessionResponse(url), CorrelationId));
+    }
+
+    /// <summary>
+    /// POST /api/v1/my-subscription/payhere-checkout — creates a Pending <see cref="PayHereOrder"/>
+    /// and returns the signed payload for <c>payhere.startPayment()</c>. <b>CompanyAdmin only.</b>
+    /// Unlike Stripe this is a one-time payment (no recurring auto-billing): the outcome is applied
+    /// by <c>PayHereWebhookProcessingJob</c> once PayHere's notify callback confirms payment.
+    /// </summary>
+    [HttpPost("payhere-checkout")]
+    [Authorize(Roles = "CompanyAdmin")]
+    public async Task<IActionResult> CreatePayHereCheckout([FromBody] PayHereCheckoutRequest request, CancellationToken ct)
+    {
+        if (tenant.CompanyId is not { } companyId)
+            throw new AuthorizationException("payhere-checkout");
+
+        var plan = await db.Plans.FindAsync([request.PlanId], ct)
+            ?? throw new NotFoundException("Plan", request.PlanId);
+
+        if (!plan.IsActive)
+            throw new BusinessRuleException("PLAN_INACTIVE", "The selected plan is inactive.");
+
+        if (!plan.IsOnline)
+            throw new BusinessRuleException(
+                "PLAN_NOT_SELF_SERVICE",
+                "This plan cannot be purchased via self-service checkout. Contact your platform administrator.");
+
+        var company = await db.Companies.FindAsync([companyId], ct)
+            ?? throw new NotFoundException("Company", companyId);
+
+        var order = new PayHereOrder
+        {
+            CompanyId = companyId,
+            PlanId = plan.Id,
+            Amount = plan.Price,
+            Currency = plan.Currency,
+        };
+        db.PayHereOrders.Add(order);
+        await db.SaveChangesAsync(ct);
+
+        var payload = payHereService.BuildCheckoutPayload(order, plan, company, request);
+        return Ok(ResponseHelper.Ok(payload, CorrelationId));
     }
 }

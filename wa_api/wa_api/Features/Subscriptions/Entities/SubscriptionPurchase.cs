@@ -65,6 +65,13 @@ public class SubscriptionPurchase : BaseEntity, ITenantEntity
     /// <summary>Currency at purchase time (snapshot).</summary>
     public string Currency { get; set; } = "USD";
 
+    /// <summary>
+    /// The PayHere order this purchase resulted from, when self-serve. Null for SuperAdmin
+    /// manual assignments (and any future non-PayHere gateway) — the only signal distinguishing
+    /// how a given row was purchased.
+    /// </summary>
+    public Guid? PayHereOrderId { get; set; }
+
     /// <summary>Owning company navigation.</summary>
     public Company Company { get; set; } = null!;
 
@@ -73,4 +80,7 @@ public class SubscriptionPurchase : BaseEntity, ITenantEntity
 
     /// <summary>Subscribed catalog plan navigation.</summary>
     public Plan Plan { get; set; } = null!;
+
+    /// <summary>The PayHere order navigation, when <see cref="PayHereOrderId"/> is set.</summary>
+    public PayHereOrder? PayHereOrder { get; set; }
 }

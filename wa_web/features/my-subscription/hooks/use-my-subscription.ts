@@ -1,13 +1,17 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/hooks/query-keys";
+import { handleErrorToast } from "@/lib/hooks/use-error-toast";
+import type { ActionFailure } from "@/lib/types/actions";
 import {
   getMySubscriptionAction,
   getInvoicesAction,
   getSubscriptionHistoryAction,
   getAvailablePlansAction,
+  createPayHereCheckoutAction,
 } from "@/features/my-subscription/actions/my-subscription-actions";
+import type { PayHereBillingDetails } from "@/features/my-subscription/types";
 
 /** The caller's own active subscription + usage. `hasSubscription` is false when none. */
 export function useMySubscription() {
@@ -48,7 +52,7 @@ export function useSubscriptionHistory() {
   });
 }
 
-/** CompanyAdmin — plans that have a StripePriceId set (self-service checkout). */
+/** CompanyAdmin — plans purchasable via self-service checkout (Stripe and/or PayHere). */
 export function useAvailablePlans() {
   return useQuery({
     queryKey: queryKeys.mySubscription.availablePlans(),
@@ -59,4 +63,29 @@ export function useAvailablePlans() {
     },
     staleTime: 5 * 60_000,
   });
+}
+
+/**
+ * CompanyAdmin — creates a Pending PayHereOrder and returns the signed payload for
+ * payhere.startPayment(). The subscription itself is applied later by the notify webhook, so
+ * success here only invalidates current/history once the caller's onCompleted callback fires.
+ */
+export function useCreatePayHereCheckout() {
+  return useMutation({
+    mutationFn: async ({ planId, billing }: { planId: string; billing: PayHereBillingDetails }) => {
+      const res = await createPayHereCheckoutAction(planId, billing);
+      if (!res.success) throw res;
+      return res.data;
+    },
+    onError: (error: ActionFailure) => handleErrorToast(error, "Checkout", "create"),
+  });
+}
+
+/** Invalidates subscription state after a PayHere payment completes (call from onCompleted). */
+export function useRefreshAfterPayHere() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: queryKeys.mySubscription.current() });
+    qc.invalidateQueries({ queryKey: queryKeys.mySubscription.subscriptionHistory() });
+  };
 }
