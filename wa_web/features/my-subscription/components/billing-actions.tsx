@@ -12,6 +12,8 @@ import {
   createPortalSessionAction,
 } from "@/features/my-subscription/actions/my-subscription-actions";
 import { PayHereBillingDetailsDialog } from "@/features/my-subscription/components/payhere-billing-details-dialog";
+import { useUsdToAedRate } from "@/features/fx/hooks/use-fx";
+import { formatAedApprox } from "@/features/fx/format";
 import type { AvailablePlan, PayHereCheckoutPayload } from "@/features/my-subscription/types";
 import type { PayHereBillingInput } from "@/features/my-subscription/schema/payhere-checkout-schema";
 
@@ -61,6 +63,7 @@ function toPayHerePayload(payload: PayHereCheckoutPayload) {
  */
 export function BillingActionsCard() {
   const { data: plans, isLoading, isError } = useAvailablePlans();
+  const { data: fxRate } = useUsdToAedRate();
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [payHerePlan, setPayHerePlan] = useState<AvailablePlan | null>(null);
@@ -172,7 +175,9 @@ export function BillingActionsCard() {
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {plans.map((plan) => (
+          {plans.map((plan) => {
+            const aedApprox = formatAedApprox(plan.price, plan.currency, fxRate?.rate);
+            return (
             <div
               key={plan.id}
               className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4"
@@ -184,10 +189,15 @@ export function BillingActionsCard() {
                 </p>
               </div>
               <div className="flex items-end justify-between gap-2">
-                <p className="text-lg font-bold">
-                  {currFmt(plan.price, plan.currency)}
-                  <span className="text-xs font-normal text-muted-foreground"> /mo</span>
-                </p>
+                <div>
+                  <p className="text-lg font-bold">
+                    {currFmt(plan.price, plan.currency)}
+                    <span className="text-xs font-normal text-muted-foreground"> /mo</span>
+                  </p>
+                  {aedApprox && (
+                    <p className="text-xs text-muted-foreground">{aedApprox}</p>
+                  )}
+                </div>
                 <div className="flex flex-col gap-1.5">
                   {plan.stripePriceId && (
                     <Button
@@ -217,8 +227,17 @@ export function BillingActionsCard() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
+      )}
+
+      {/* Disclosure: PayHere settles in USD only, so the dirham figures above are indicative. */}
+      {fxRate && plans?.some((p) => p.currency?.toUpperCase() === "USD") && (
+        <p className="text-xs text-muted-foreground">
+          Dirham amounts are indicative, converted at {fxRate.rate} AED per USD. You are charged in
+          USD; your bank may apply its own conversion or foreign-transaction fee.
+        </p>
       )}
 
       <PayHereBillingDetailsDialog

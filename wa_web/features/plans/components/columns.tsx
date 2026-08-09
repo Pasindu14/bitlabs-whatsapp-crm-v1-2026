@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import { permissionLabel } from "@/features/team/permissions";
+import { useUsdToAedRate } from "@/features/fx/hooks/use-fx";
+import { formatAedApprox } from "@/features/fx/format";
 import type { Plan } from "@/features/plans/types";
 
 const dateFmt = new Intl.DateTimeFormat(undefined, {
@@ -31,6 +33,31 @@ function formatPrice(price: number, currency: string): string {
   }
 }
 
+/**
+ * Own component rather than inline JSX so the FX hook has a real component to live in. Renders the
+ * dirham equivalent only for USD plans — `formatAedApprox` returns null otherwise, which keeps the
+ * existing AED-priced plans showing their true price instead of a 3.7×-inflated conversion.
+ */
+function PlanIdentityCell({ plan }: { plan: Plan }) {
+  const { data: fxRate } = useUsdToAedRate();
+  const aedApprox = formatAedApprox(plan.price, plan.currency, fxRate?.rate);
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Layers className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <div className="truncate font-medium">{plan.name}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {formatPrice(plan.price, plan.currency)} / mo
+          {aedApprox && <span className="ml-1.5">({aedApprox})</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export interface PlanColumnActions {
   openEdit: (id: string) => void;
   openActivate: (id: string) => void;
@@ -44,22 +71,7 @@ export function getPlanColumns(actions: PlanColumnActions): ColumnDef<Plan>[] {
     {
       accessorKey: "name",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Plan" />,
-      cell: ({ row }) => {
-        const p = row.original;
-        return (
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <Layers className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="truncate font-medium">{p.name}</div>
-              <div className="truncate text-xs text-muted-foreground">
-                {formatPrice(p.price, p.currency)} / mo
-              </div>
-            </div>
-          </div>
-        );
-      },
+      cell: ({ row }) => <PlanIdentityCell plan={row.original} />,
       size: 220,
     },
     {

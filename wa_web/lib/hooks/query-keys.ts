@@ -103,6 +103,12 @@ export const queryKeys = {
     availablePlans: () => [...queryKeys.mySubscription.all, 'available-plans'] as const,
   },
 
+  // FX (display-only reference rates for showing a dirham equivalent beside USD prices)
+  fx: {
+    all: ['fx'] as const,
+    usdToAed: () => [...queryKeys.fx.all, 'usd-aed'] as const,
+  },
+
   // Contacts (CompanyAdmin — the caller's own company)
   contacts: {
     all: ['contacts'] as const,

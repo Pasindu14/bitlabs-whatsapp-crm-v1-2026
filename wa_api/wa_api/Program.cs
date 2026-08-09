@@ -254,6 +254,17 @@ try
     builder.Services.AddScoped<wa_api.Infrastructure.PayHere.IPayHereService, wa_api.Infrastructure.PayHere.PayHereService>();
     builder.Services.AddTransient<wa_api.Features.Subscriptions.Jobs.PayHereWebhookProcessingJob>();
 
+    // ── FX (display-only USD→AED, for showing a dirham equivalent to the UAE audience) ──
+    // Short timeout on purpose: this decorates a price, so a slow provider must never hold up the
+    // plans response — FxRateService falls back to the peg instead.
+    builder.Services.AddMemoryCache();
+    builder.Services.AddHttpClient(wa_api.Infrastructure.Fx.FxRateService.HttpClientName, c =>
+    {
+        c.BaseAddress = new Uri("https://open.er-api.com/");
+        c.Timeout = TimeSpan.FromSeconds(5);
+    });
+    builder.Services.AddScoped<wa_api.Infrastructure.Fx.IFxRateService, wa_api.Infrastructure.Fx.FxRateService>();
+
     // ── Webhooks (Meta inbound: template status 5.2 + delivery status 6.4; inbound stub → Phase 7) ──
     builder.Services.AddScoped<wa_api.Features.Webhooks.Signature.IMetaSignatureVerifier, wa_api.Features.Webhooks.Signature.MetaSignatureVerifier>();
     builder.Services.AddScoped<wa_api.Features.Webhooks.Ingestion.IWebhookInboxService, wa_api.Features.Webhooks.Ingestion.WebhookInboxService>();
