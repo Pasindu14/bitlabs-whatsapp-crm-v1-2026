@@ -13,7 +13,7 @@ import {
 } from "@/features/my-subscription/actions/my-subscription-actions";
 import { PayHereBillingDetailsDialog } from "@/features/my-subscription/components/payhere-billing-details-dialog";
 import { useUsdToAedRate } from "@/features/fx/hooks/use-fx";
-import { formatAedApprox } from "@/features/fx/format";
+import { formatDirhamFirst } from "@/features/fx/format";
 import type { AvailablePlan, PayHereCheckoutPayload } from "@/features/my-subscription/types";
 import type { PayHereBillingInput } from "@/features/my-subscription/schema/payhere-checkout-schema";
 
@@ -176,7 +176,7 @@ export function BillingActionsCard() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {plans.map((plan) => {
-            const aedApprox = formatAedApprox(plan.price, plan.currency, fxRate?.rate);
+            const dirhamFirst = formatDirhamFirst(plan.price, plan.currency, fxRate?.rate);
             return (
             <div
               key={plan.id}
@@ -190,12 +190,15 @@ export function BillingActionsCard() {
               </div>
               <div className="flex items-end justify-between gap-2">
                 <div>
+                  {/* Dirhams lead for the UAE audience, but the USD line below is the real charge. */}
                   <p className="text-lg font-bold">
-                    {currFmt(plan.price, plan.currency)}
+                    {dirhamFirst ? dirhamFirst.aed : currFmt(plan.price, plan.currency)}
                     <span className="text-xs font-normal text-muted-foreground"> /mo</span>
                   </p>
-                  {aedApprox && (
-                    <p className="text-xs text-muted-foreground">{aedApprox}</p>
+                  {dirhamFirst && (
+                    <p className="text-xs text-muted-foreground">
+                      {dirhamFirst.usd} charged in USD
+                    </p>
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -232,11 +235,11 @@ export function BillingActionsCard() {
         </div>
       )}
 
-      {/* Disclosure: PayHere settles in USD only, so the dirham figures above are indicative. */}
+      {/* Disclosure: dirhams are the headline but PayHere settles in USD only, so say so plainly. */}
       {fxRate && plans?.some((p) => p.currency?.toUpperCase() === "USD") && (
         <p className="text-xs text-muted-foreground">
-          Dirham amounts are indicative, converted at {fxRate.rate} AED per USD. You are charged in
-          USD; your bank may apply its own conversion or foreign-transaction fee.
+          Dirham prices are indicative, converted at {fxRate.rate} AED per USD. Your card is charged
+          the USD amount shown; your bank may apply its own conversion or foreign-transaction fee.
         </p>
       )}
 
