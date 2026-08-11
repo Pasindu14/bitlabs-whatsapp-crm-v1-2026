@@ -14,7 +14,7 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/column-header";
 import { permissionLabel } from "@/features/team/permissions";
 import { useUsdToAedRate } from "@/features/fx/hooks/use-fx";
-import { formatDirhamFirst } from "@/features/fx/format";
+import { formatDirhamFirst, formatUsdApprox } from "@/features/fx/format";
 import type { Plan } from "@/features/plans/types";
 
 const dateFmt = new Intl.DateTimeFormat(undefined, {
@@ -35,13 +35,13 @@ function formatPrice(price: number, currency: string): string {
 
 /**
  * Own component rather than inline JSX so the FX hook has a real component to live in. USD plans
- * lead with the dirham figure and show the charged USD amount beside it; `formatDirhamFirst`
- * returns null for anything else, which keeps AED-priced plans showing their true price rather
- * than a 3.7×-inflated conversion.
+ * lead with the dirham figure and show the charged USD amount beside it; AED plans keep their true
+ * price as the headline and show an approximate USD figure beside it instead.
  */
 function PlanIdentityCell({ plan }: { plan: Plan }) {
   const { data: fxRate } = useUsdToAedRate();
   const dirhamFirst = formatDirhamFirst(plan.price, plan.currency, fxRate?.rate);
+  const usdApprox = !dirhamFirst ? formatUsdApprox(plan.price, plan.currency, fxRate?.rate) : null;
 
   return (
     <div className="flex items-center gap-3">
@@ -53,7 +53,9 @@ function PlanIdentityCell({ plan }: { plan: Plan }) {
         <div className="truncate text-xs text-muted-foreground">
           {dirhamFirst
             ? `${dirhamFirst.aed} / mo (${dirhamFirst.usd} charged)`
-            : `${formatPrice(plan.price, plan.currency)} / mo`}
+            : usdApprox
+              ? `${formatPrice(plan.price, plan.currency)} / mo (${usdApprox})`
+              : `${formatPrice(plan.price, plan.currency)} / mo`}
         </div>
       </div>
     </div>

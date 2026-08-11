@@ -13,7 +13,7 @@ import {
 } from "@/features/my-subscription/actions/my-subscription-actions";
 import { PayHereBillingDetailsDialog } from "@/features/my-subscription/components/payhere-billing-details-dialog";
 import { useUsdToAedRate } from "@/features/fx/hooks/use-fx";
-import { formatDirhamFirst } from "@/features/fx/format";
+import { formatDirhamFirst, formatUsdApprox } from "@/features/fx/format";
 import type { AvailablePlan, PayHereCheckoutPayload } from "@/features/my-subscription/types";
 import type { PayHereBillingInput } from "@/features/my-subscription/schema/payhere-checkout-schema";
 
@@ -177,6 +177,7 @@ export function BillingActionsCard() {
         <div className="grid gap-3 sm:grid-cols-2">
           {plans.map((plan) => {
             const dirhamFirst = formatDirhamFirst(plan.price, plan.currency, fxRate?.rate);
+            const usdApprox = !dirhamFirst ? formatUsdApprox(plan.price, plan.currency, fxRate?.rate) : null;
             return (
             <div
               key={plan.id}
@@ -195,10 +196,14 @@ export function BillingActionsCard() {
                     {dirhamFirst ? dirhamFirst.aed : currFmt(plan.price, plan.currency)}
                     <span className="text-xs font-normal text-muted-foreground"> /mo</span>
                   </p>
-                  {dirhamFirst && (
+                  {dirhamFirst ? (
                     <p className="text-xs text-muted-foreground">
                       {dirhamFirst.usd} charged in USD
                     </p>
+                  ) : (
+                    usdApprox && (
+                      <p className="text-xs text-muted-foreground">{usdApprox}</p>
+                    )
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -235,11 +240,13 @@ export function BillingActionsCard() {
         </div>
       )}
 
-      {/* Disclosure: dirhams are the headline but PayHere settles in USD only, so say so plainly. */}
-      {fxRate && plans?.some((p) => p.currency?.toUpperCase() === "USD") && (
+      {/* Disclosure: whichever currency isn't the plan's native one is an indicative conversion,
+          not the charge — say so plainly for both directions. */}
+      {fxRate && plans?.some((p) => ["USD", "AED"].includes(p.currency?.toUpperCase())) && (
         <p className="text-xs text-muted-foreground">
-          Dirham prices are indicative, converted at {fxRate.rate} AED per USD. Your card is charged
-          the USD amount shown; your bank may apply its own conversion or foreign-transaction fee.
+          Prices shown in a currency other than the plan&apos;s own are indicative, converted at{" "}
+          {fxRate.rate} AED per USD. You&apos;re charged in the plan&apos;s listed currency; your bank
+          may apply its own conversion or foreign-transaction fee.
         </p>
       )}
 

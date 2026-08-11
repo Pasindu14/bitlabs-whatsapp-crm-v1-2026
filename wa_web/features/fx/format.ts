@@ -36,3 +36,18 @@ export function formatDirhamFirst(
   if (!rate || currency?.toUpperCase() !== "USD") return null;
   return { aed: AED_FMT.format(price * rate), usd: USD_FMT.format(price) };
 }
+
+/**
+ * Reverse of {@link formatDirhamFirst}: for an AED-priced plan, an approximate USD figure to show
+ * alongside the real (AED) charge. Divides by the rate rather than multiplying — `rate` is AED
+ * per USD. Labelled "approx" rather than "charged", since PayHere settles this plan in AED, not
+ * USD — unlike the USD-plan case where the USD figure IS the real charge.
+ */
+export function formatUsdApprox(
+  price: number,
+  currency: string,
+  rate: number | undefined
+): string | null {
+  if (!rate || currency?.toUpperCase() !== "AED") return null;
+  return `≈ ${USD_FMT.format(price / rate)} USD`;
+}
