@@ -11,11 +11,9 @@ import {
   createCheckoutSessionAction,
   createPortalSessionAction,
 } from "@/features/my-subscription/actions/my-subscription-actions";
-import { PayHereBillingDetailsDialog } from "@/features/my-subscription/components/payhere-billing-details-dialog";
 import { useUsdToAedRate } from "@/features/fx/hooks/use-fx";
 import { formatDirhamFirst, formatUsdApprox } from "@/features/fx/format";
 import type { AvailablePlan, PayHereCheckoutPayload } from "@/features/my-subscription/types";
-import type { PayHereBillingInput } from "@/features/my-subscription/schema/payhere-checkout-schema";
 
 const currFmt = (amount: number, currency: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
@@ -66,7 +64,7 @@ export function BillingActionsCard() {
   const { data: fxRate } = useUsdToAedRate();
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [payHerePlan, setPayHerePlan] = useState<AvailablePlan | null>(null);
+  const [payHereLoadingId, setPayHereLoadingId] = useState<string | null>(null);
   const [payHereReady, setPayHereReady] = useState(false);
 
   const createPayHereCheckout = useCreatePayHereCheckout();
@@ -104,16 +102,15 @@ export function BillingActionsCard() {
     }
   }
 
-  async function handlePayHereConfirm(billing: PayHereBillingInput) {
-    if (!payHerePlan) return;
-
+  async function handlePayHereCheckout(plan: AvailablePlan) {
     if (!payHereReady || !window.payhere) {
       toast.error("Payment provider is still loading — try again in a moment.");
       return;
     }
 
+    setPayHereLoadingId(plan.id);
     try {
-      const payload = await createPayHereCheckout.mutateAsync({ planId: payHerePlan.id, billing });
+      const payload = await createPayHereCheckout.mutateAsync({ planId: plan.id });
 
       window.payhere.onCompleted = () => {
         toast.success("Payment successful — your plan will update shortly.");
@@ -126,14 +123,15 @@ export function BillingActionsCard() {
         toast.error(`Payment error: ${error}`);
       };
 
-      setPayHerePlan(null);
       window.payhere.startPayment(toPayHerePayload(payload));
     } catch {
       // createPayHereCheckout's onError already toasts the specific failure.
+    } finally {
+      setPayHereLoadingId(null);
     }
   }
 
-  const anyLoading = loadingPlanId !== null;
+  const anyLoading = loadingPlanId !== null || payHereLoadingId !== null;
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
@@ -225,11 +223,15 @@ export function BillingActionsCard() {
                     <Button
                       size="sm"
                       variant={plan.stripePriceId ? "outline" : "default"}
-                      onClick={() => setPayHerePlan(plan)}
+                      onClick={() => handlePayHereCheckout(plan)}
                       disabled={anyLoading}
                     >
-                      <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-                      Pay with PayHere
+                      {payHereLoadingId === plan.id ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Pay Now
                     </Button>
                   )}
                 </div>
@@ -249,14 +251,6 @@ export function BillingActionsCard() {
           may apply its own conversion or foreign-transaction fee.
         </p>
       )}
-
-      <PayHereBillingDetailsDialog
-        open={payHerePlan !== null}
-        onOpenChange={(open) => !open && setPayHerePlan(null)}
-        planName={payHerePlan?.name ?? ""}
-        onConfirm={handlePayHereConfirm}
-        isLoading={createPayHereCheckout.isPending}
-      />
     </div>
   );
 }

@@ -19,12 +19,12 @@ public sealed class PayHereService(IOptions<PayHereOptions> options) : IPayHereS
 {
     private readonly PayHereOptions _opts = options.Value;
 
-    public PayHereCheckoutResponse BuildCheckoutPayload(
-        PayHereOrder order, Plan plan, Company company, PayHereCheckoutRequest request)
+    public PayHereCheckoutResponse BuildCheckoutPayload(PayHereOrder order, Plan plan, Company company)
     {
         var orderId = order.Id.ToString();
         var amount = FormatAmount(order.Amount);
         var hash = ComputeCheckoutHash(orderId, amount, order.Currency);
+        var (firstName, lastName) = SplitCompanyName(company.Name);
 
         return new PayHereCheckoutResponse(
             MerchantId: _opts.MerchantId,
@@ -33,17 +33,33 @@ public sealed class PayHereService(IOptions<PayHereOptions> options) : IPayHereS
             Amount: amount,
             Currency: order.Currency,
             Hash: hash,
-            FirstName: request.FirstName,
-            LastName: request.LastName,
+            FirstName: firstName,
+            LastName: lastName,
             Email: company.Email ?? "",
-            Phone: request.Phone,
-            Address: request.Address,
-            City: request.City,
-            Country: request.Country,
+            // PayHere rejects empty phone/address/city/country, but the app has no billing-profile
+            // fields on Company beyond Phone — these are receipt metadata only, never re-collected
+            // or validated by PayHere's own onsite widget (it only asks for card details), so a
+            // fixed placeholder is fine where Company doesn't have real data.
+            Phone: string.IsNullOrWhiteSpace(company.Phone) ? "0000000000" : company.Phone,
+            Address: "N/A",
+            City: "N/A",
+            Country: "United Arab Emirates",
             NotifyUrl: _opts.NotifyUrl,
             ReturnUrl: _opts.ReturnUrl,
             CancelUrl: _opts.CancelUrl,
             Sandbox: _opts.Sandbox);
+    }
+
+    /// <summary>Company has one Name field; PayHere wants first/last separately.</summary>
+    private static (string FirstName, string LastName) SplitCompanyName(string companyName)
+    {
+        var parts = companyName.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => ("Customer", "Account"),
+            1 => (parts[0], "Account"),
+            _ => (parts[0], parts[1]),
+        };
     }
 
     public bool VerifyNotifySignature(IFormCollection form)

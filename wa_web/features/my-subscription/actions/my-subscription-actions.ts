@@ -2,7 +2,6 @@
 
 import { createAction } from "@/lib/actions/wrapper";
 import { MySubscriptionService } from "@/features/my-subscription/services/my-subscription-service";
-import type { PayHereBillingDetails } from "@/features/my-subscription/types";
 
 const COMPANY_ADMIN = "CompanyAdmin";
 
@@ -52,7 +51,7 @@ export const createPortalSessionAction = createAction(
 
 export const createPayHereCheckoutAction = createAction(
   { name: "createPayHereCheckoutAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
-  async (planId: string, billing: PayHereBillingDetails) => {
-    return MySubscriptionService.createPayHereCheckout(planId, billing);
+  async (planId: string) => {
+    return MySubscriptionService.createPayHereCheckout(planId);
   }
 );

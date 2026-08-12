@@ -176,7 +176,7 @@ public class MySubscriptionController(
         db.PayHereOrders.Add(order);
         await db.SaveChangesAsync(ct);
 
-        var payload = payHereService.BuildCheckoutPayload(order, plan, company, request);
+        var payload = payHereService.BuildCheckoutPayload(order, plan, company);
         return Ok(ResponseHelper.Ok(payload, CorrelationId));
     }
 }

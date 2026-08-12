@@ -30,16 +30,6 @@ export interface AvailablePlan {
   payHereEnabled: boolean;
 }
 
-/** Billing details collected in the PayHere checkout dialog — sent fresh on every checkout. */
-export interface PayHereBillingDetails {
-  firstName: string;
-  lastName: string;
-  phone: string;
-  address: string;
-  city: string;
-  country: string;
-}
-
 /** The signed payload returned by POST /my-subscription/payhere-checkout, fed straight into payhere.startPayment(). */
 export interface PayHereCheckoutPayload {
   merchantId: string;

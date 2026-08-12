@@ -5,7 +5,6 @@ import type {
   Invoice,
   AvailablePlan,
   SubscriptionPurchase,
-  PayHereBillingDetails,
   PayHereCheckoutPayload,
 } from "@/features/my-subscription/types";
 
@@ -76,16 +75,13 @@ export const MySubscriptionService = {
     );
   },
 
-  async createPayHereCheckout(
-    planId: string,
-    billing: PayHereBillingDetails
-  ): Promise<PayHereCheckoutPayload> {
+  async createPayHereCheckout(planId: string): Promise<PayHereCheckoutPayload> {
     return executeService(
       { context: "MySubscriptionService", method: "createPayHereCheckout" },
       async () => {
         const res = await client.post<ApiSuccessBody<PayHereCheckoutPayload>>(
           "/api/v1/my-subscription/payhere-checkout",
-          { planId, ...billing }
+          { planId }
         );
         return res.data.data;
       }

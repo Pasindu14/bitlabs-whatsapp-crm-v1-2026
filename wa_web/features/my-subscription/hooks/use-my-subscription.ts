@@ -11,7 +11,6 @@ import {
   getAvailablePlansAction,
   createPayHereCheckoutAction,
 } from "@/features/my-subscription/actions/my-subscription-actions";
-import type { PayHereBillingDetails } from "@/features/my-subscription/types";
 
 /** The caller's own active subscription + usage. `hasSubscription` is false when none. */
 export function useMySubscription() {
@@ -72,8 +71,8 @@ export function useAvailablePlans() {
  */
 export function useCreatePayHereCheckout() {
   return useMutation({
-    mutationFn: async ({ planId, billing }: { planId: string; billing: PayHereBillingDetails }) => {
-      const res = await createPayHereCheckoutAction(planId, billing);
+    mutationFn: async ({ planId }: { planId: string }) => {
+      const res = await createPayHereCheckoutAction(planId);
       if (!res.success) throw res;
       return res.data;
     },
