@@ -57,13 +57,25 @@ public class PayHereWebhookProcessingJob(
             switch (statusCode)
             {
                 case "2": // success
-                    if (order.Status != PayHereOrderStatus.Pending)
+                    if (order.Status == PayHereOrderStatus.Completed)
                     {
                         logger.LogInformation(
-                            "PayHere order {OrderId} already {Status} — skipping success replay.",
-                            order.Id, order.Status);
+                            "PayHere order {OrderId} already Completed — skipping duplicate success notify.",
+                            order.Id);
                         break;
                     }
+                    if (order.Status == PayHereOrderStatus.ChargedBack)
+                    {
+                        logger.LogWarning(
+                            "PayHere order {OrderId} got a success notify after ChargedBack — ignoring stale replay.",
+                            order.Id);
+                        break;
+                    }
+                    // Pending (normal case), Cancelled, or Failed → PayHere can send an earlier
+                    // decline/cancel notify and then a later success notify for the SAME order_id
+                    // when the customer retries with corrected card details in the same checkout
+                    // session. Only Completed/ChargedBack are terminal; a prior Failed/Cancelled
+                    // must not block a genuine later success from applying the subscription.
                     await ApplySuccessAsync(order, paymentId, ct);
                     break;
 
@@ -106,8 +118,9 @@ public class PayHereWebhookProcessingJob(
 
     /// <summary>
     /// Applies the same "stack or fresh" assignment the manual SuperAdmin path uses, then records
-    /// the purchase and marks the order Completed. Called only once per order (guarded by the
-    /// Pending check in <see cref="ProcessAsync"/>).
+    /// the purchase and marks the order Completed. Called at most once per order — guarded in
+    /// <see cref="ProcessAsync"/> against Completed/ChargedBack, not just Pending, so a genuine
+    /// later success notify still applies after an earlier Failed/Cancelled one on the same order.
     /// </summary>
     private async Task ApplySuccessAsync(PayHereOrder order, string? paymentId, CancellationToken ct)
     {
