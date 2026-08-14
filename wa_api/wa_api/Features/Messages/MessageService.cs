@@ -73,9 +73,11 @@ public class MessageService(
 
     public async Task<MessageResponse> SendAsync(SendMessageRequest request, CancellationToken ct = default)
     {
-        // Enforce the caller company's active, in-quota subscription BEFORE any send work.
-        // Throws SUBSCRIPTION_INACTIVE / QUOTA_EXCEEDED; SuperAdmin bypasses inside the gate.
-        await subscriptionGate.EnsureCanSendAsync(ct);
+        // Enforce the caller company's active subscription BEFORE any send work. Deliberately NOT the
+        // in-quota check: this endpoint only sends inside an open 24-hour window, which is free, so an
+        // exhausted balance must not block it. The meter is still the hard ceiling for a charged send.
+        // Throws SUBSCRIPTION_INACTIVE; SuperAdmin bypasses inside the gate.
+        await subscriptionGate.EnsureActiveAsync(ct);
 
         var contact = await db.Contacts.AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == request.ContactId, ct)
@@ -115,13 +117,23 @@ public class MessageService(
             waba.PhoneNumberId, recipientContactId: null, dailyTierLimit: 0,
             maxWait: TimeSpan.FromMilliseconds(_rateOptions.InteractiveMaxWaitMs), ct);
 
+        // Billing: this endpoint only reaches here inside an open customer-service window (checked above),
+        // and Meta bills that window as one conversation rather than per message — so the send is free and
+        // takes no reservation. The branch is kept for symmetry with WhatsAppMessageSender: if the window
+        // pre-check above is ever relaxed, charging resumes on its own instead of silently going free.
+        var chargeCredit = windowExpiresAt is null || windowExpiresAt <= DateTime.UtcNow;
+
         // Reserve quota atomically BEFORE sending (C1 reserve-then-send): the meter enforces a hard ceiling so
         // concurrent sends near the cap can't overshoot the plan. The [RequireActiveSubscription] gate has
         // already ensured an active sub, so null here means the ceiling was reached. Refunded below if the
         // send then fails.
-        var reservedSubId = await meter.TryReserveAsync(contact.CompanyId, 1, ct);
-        if (reservedSubId is null)
-            throw new BusinessRuleException("QUOTA_EXCEEDED", "Your message quota has been reached.");
+        Guid? reservedSubId = null;
+        if (chargeCredit)
+        {
+            reservedSubId = await meter.TryReserveAsync(contact.CompanyId, 1, ct);
+            if (reservedSubId is null)
+                throw new BusinessRuleException("QUOTA_EXCEEDED", "Your message quota has been reached.");
+        }
 
         var (externalId, errorMessage) = await CallMetaApiAsync(waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, request.Body, ct);
 
@@ -143,9 +155,13 @@ public class MessageService(
         if (message.Status == MessageStatus.Failed)
         {
             // Send failed — return the reservation, drop the stamp, then surface the error.
-            await meter.RefundAsync(reservedSubId.Value, 1, ct);
-            message.MeteredSubscriptionId = null;
-            await db.SaveChangesAsync(ct);
+            // A free send never reserved, so there is nothing to give back.
+            if (reservedSubId is not null)
+            {
+                await meter.RefundAsync(reservedSubId.Value, 1, ct);
+                message.MeteredSubscriptionId = null;
+                await db.SaveChangesAsync(ct);
+            }
             throw new BusinessRuleException("WHATSAPP_SEND_FAILED", errorMessage ?? "Failed to send message via WhatsApp.");
         }
 

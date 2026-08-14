@@ -31,7 +31,7 @@ public class WhatsAppMessageSender(
 
     public async Task<Message> SendAsync(
         Contact contact, WabaConnection waba, string body, Guid? conversationId,
-        CancellationToken ct = default)
+        bool chargeCredit, CancellationToken ct = default)
     {
         // Session/service reply (within the 24h window): per-second pacing only, no tier consumption.
         await rateLimiter.AcquireOrThrowAsync(
@@ -41,9 +41,15 @@ public class WhatsAppMessageSender(
         // Reserve quota atomically BEFORE sending (C1 reserve-then-send): the meter enforces a hard ceiling,
         // so concurrent sends near the cap can't overshoot the plan. Null ⇒ ceiling reached (the caller's
         // active-subscription gate has already ensured a sub exists). Refunded below if the send then fails.
-        var reservedSubId = await meter.TryReserveAsync(contact.CompanyId, 1, ct);
-        if (reservedSubId is null)
-            throw new BusinessRuleException("QUOTA_EXCEEDED", "Your message quota has been reached.");
+        // A free in-window reply skips this entirely — no reservation, so nothing to refund and no ceiling
+        // to hit, which is what lets an agent keep replying on an exhausted balance.
+        Guid? reservedSubId = null;
+        if (chargeCredit)
+        {
+            reservedSubId = await meter.TryReserveAsync(contact.CompanyId, 1, ct);
+            if (reservedSubId is null)
+                throw new BusinessRuleException("QUOTA_EXCEEDED", "Your message quota has been reached.");
+        }
 
         var (externalId, errorMessage) = await CallMetaApiAsync(
             waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, body, ct);
@@ -68,7 +74,8 @@ public class WhatsAppMessageSender(
         await db.SaveChangesAsync(ct);
 
         // Send failed at the API level — give the reservation back and drop the (unused) metered stamp.
-        if (externalId is null)
+        // Nothing to give back on a free send, which never reserved.
+        if (externalId is null && reservedSubId is not null)
         {
             await meter.RefundAsync(reservedSubId.Value, 1, ct);
             message.MeteredSubscriptionId = null;

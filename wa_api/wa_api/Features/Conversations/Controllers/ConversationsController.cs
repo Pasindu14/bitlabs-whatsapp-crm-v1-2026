@@ -53,11 +53,14 @@ public class ConversationsController(IConversationService service, IIdempotencyS
 
     /// <summary>
     /// POST /api/v1/conversations — start (or reuse) a conversation with a contact and send the first
-    /// message. Gated by an active subscription. Returns the conversation so the client can open the thread.
-    /// A closed-window send failure is recorded on the message (shown in the thread), not surfaced as an error.
+    /// message. Gated by an active subscription; the quota check is left to the meter because this endpoint
+    /// can REUSE an existing thread whose 24-hour window is still open, and that send is free. A genuine
+    /// cold-contact start still consumes a credit and so still fails with QUOTA_EXCEEDED at the ceiling.
+    /// Returns the conversation so the client can open the thread. A closed-window send failure is recorded
+    /// on the message (shown in the thread), not surfaced as an error.
     /// </summary>
     [HttpPost]
-    [RequireActiveSubscription]
+    [RequireActiveSubscription(SkipQuotaCheck = true)]
     public async Task<IActionResult> Start(StartConversationRequest request, CancellationToken ct)
     {
         var result = await service.StartConversationAsync(request.ContactId, request.WabaConnectionId, request.Body, ct);
@@ -66,11 +69,13 @@ public class ConversationsController(IConversationService service, IIdempotencyS
 
     /// <summary>
     /// POST /api/v1/conversations/{id}/messages — reply in a conversation.
-    /// Gated by an active subscription. Supports at-most-once delivery via the optional
-    /// <c>Idempotency-Key</c> header (a client-generated UUID), remembered for 24 hours.
+    /// Gated by an active subscription, but NOT by the quota: a reply here only happens inside the open
+    /// 24-hour customer-service window, which is free, so an exhausted balance must not block it.
+    /// Supports at-most-once delivery via the optional <c>Idempotency-Key</c> header (a client-generated
+    /// UUID), remembered for 24 hours.
     /// </summary>
     [HttpPost("{id:guid}/messages")]
-    [RequireActiveSubscription]
+    [RequireActiveSubscription(SkipQuotaCheck = true)]
     public async Task<IActionResult> SendMessage(Guid id, SendConversationMessageRequest request, CancellationToken ct)
     {
         var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();

@@ -12,11 +12,29 @@ namespace wa_api.Common.Subscriptions;
 /// </summary>
 public class SubscriptionGate(AppDbContext db, ITenantContext tenant) : ISubscriptionGate
 {
+    public async Task EnsureActiveAsync(CancellationToken ct = default)
+        => await LoadActiveOrThrowAsync(ct);
+
     public async Task EnsureCanSendAsync(CancellationToken ct = default)
+    {
+        var sub = await LoadActiveOrThrowAsync(ct);
+        if (sub is null)
+            return; // SuperAdmin — not a tenant, not subject to plan quotas.
+
+        if (sub.MessagesUsedThisPeriod >= sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits)
+            throw new BusinessRuleException("QUOTA_EXCEEDED",
+                "Your monthly message quota has been reached.");
+    }
+
+    /// <summary>
+    /// Returns the caller's active subscription (with its plan loaded), or null for SuperAdmin.
+    /// Throws SUBSCRIPTION_INACTIVE when there is none or its period has ended.
+    /// </summary>
+    private async Task<Subscription?> LoadActiveOrThrowAsync(CancellationToken ct)
     {
         // Platform plane: SuperAdmin isn't a tenant and isn't subject to plan quotas.
         if (tenant.IsSuperAdmin)
-            return;
+            return null;
 
         if (tenant.CompanyId is null)
             throw new AuthorizationException("subscription");
@@ -36,9 +54,7 @@ public class SubscriptionGate(AppDbContext db, ITenantContext tenant) : ISubscri
             throw new BusinessRuleException("SUBSCRIPTION_INACTIVE",
                 "Your subscription period has ended. Contact your platform administrator.");
 
-        if (sub.MessagesUsedThisPeriod >= sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits)
-            throw new BusinessRuleException("QUOTA_EXCEEDED",
-                "Your monthly message quota has been reached.");
+        return sub;
     }
 
     public async Task EnsureCanSendBatchAsync(int count, CancellationToken ct = default)

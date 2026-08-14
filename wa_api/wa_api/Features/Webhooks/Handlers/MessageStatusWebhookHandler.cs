@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Campaigns.Entities;
 using wa_api.Features.Messages;
 using wa_api.Features.Messages.Entities;
-using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.Webhooks.Payloads;
 using wa_api.Infrastructure.Persistence;
 
@@ -96,25 +95,18 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
                 if (MetaPolicyErrorCodes.IsUndeliverableRecipient(message.ErrorCode))
                     await MarkContactNotOnWhatsAppAsync(message.ContactId, ct);
 
-                // Refund the quota ONLY when Meta did not bill this message. Pricing (captured above into
-                // message.Billable) is authoritative: if Meta charged for it, crediting the quota back would
-                // under-count real usage. Credit the EXACT subscription that was metered (recorded at send
-                // time); fall back to the company's current active sub only for legacy rows that predate the
-                // MeteredSubscriptionId column.
+                // Refund the quota ONLY when Meta did not bill this message AND we actually charged a credit
+                // for it. Pricing (captured above into message.Billable) is authoritative: if Meta charged
+                // for it, crediting the quota back would under-count real usage. MeteredSubscriptionId is
+                // the record of what we charged — a free reply inside the 24-hour customer-service window
+                // never reserves, so it is null and there is nothing to give back. The old "fall back to the
+                // company's current active sub" branch is gone: with free sends it would hand back quota
+                // that was never consumed. Legacy rows predating the MeteredSubscriptionId column are no
+                // longer refunded — they're indistinguishable from free sends, and bounded in number.
                 var metaBilled = message.Billable == true;
-                if (!metaBilled)
-                {
-                    var refundSubId = message.MeteredSubscriptionId
-                        ?? await db.Subscriptions.IgnoreQueryFilters()
-                            .Where(sub => sub.CompanyId == message.CompanyId && sub.Status == SubscriptionStatus.Active)
-                            .OrderByDescending(sub => sub.CreatedAt)
-                            .Select(sub => (Guid?)sub.Id)
-                            .FirstOrDefaultAsync(ct);
-
-                    if (refundSubId is not null)
-                        refundsBySubscription[refundSubId.Value] =
-                            refundsBySubscription.GetValueOrDefault(refundSubId.Value) + 1;
-                }
+                if (!metaBilled && message.MeteredSubscriptionId is { } refundSubId)
+                    refundsBySubscription[refundSubId] =
+                        refundsBySubscription.GetValueOrDefault(refundSubId) + 1;
 
                 if (message.CampaignId.HasValue)
                     campaignMessageUpdates[message.Id] = (MessageStatus.Failed, message.ErrorCode);

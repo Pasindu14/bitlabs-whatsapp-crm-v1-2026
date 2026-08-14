@@ -17,7 +17,15 @@ namespace wa_api.Features.Messages;
 /// </summary>
 public interface IWhatsAppMessageSender
 {
+    /// <param name="chargeCredit">
+    /// Whether this send consumes one message credit. False for a reply inside an open 24-hour
+    /// customer-service window — Meta bills that window as a single conversation, so only the
+    /// business-initiated send that opens a thread is charged. A free send takes no reservation at
+    /// all, leaving <see cref="Message.MeteredSubscriptionId"/> null so a later delivery-failure
+    /// webhook can't refund a credit that was never taken. Intentionally has no default: adding one
+    /// would let a new call site compile with accidental billing semantics.
+    /// </param>
     Task<Message> SendAsync(
         Contact contact, WabaConnection waba, string body, Guid? conversationId,
-        CancellationToken ct = default);
+        bool chargeCredit, CancellationToken ct = default);
 }

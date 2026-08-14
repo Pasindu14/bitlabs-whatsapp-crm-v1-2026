@@ -78,8 +78,10 @@ export function handleErrorToast(
       toast.error(errorMessage || 'Your subscription is inactive. Contact your administrator.')
       break
 
+    // Replies inside the 24-hour customer service window are free, so this can only fire on a
+    // credit-consuming send — a campaign, or the first message to a new contact.
     case 'QUOTA_EXCEEDED':
-      toast.error(errorMessage || 'Monthly message quota reached.')
+      toast.error(errorMessage || 'Message quota reached. Replies to customers stay free, but new outreach needs credits.')
       break
 
     case 'PLAN_INACTIVE':

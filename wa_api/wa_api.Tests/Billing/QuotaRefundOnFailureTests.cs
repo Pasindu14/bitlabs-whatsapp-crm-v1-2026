@@ -45,7 +45,12 @@ public class QuotaRefundOnFailureTests
         IsActive = true,
     };
 
-    private static Message NewMessage(Guid companyId, string wamid, MessageStatus status) => new()
+    /// <param name="meteredSubId">
+    /// The subscription this send reserved a credit against. Null models a send that consumed nothing —
+    /// a free reply inside the 24-hour customer-service window — which must never be refunded.
+    /// </param>
+    private static Message NewMessage(
+        Guid companyId, string wamid, MessageStatus status, Guid? meteredSubId = null) => new()
     {
         Id = Guid.NewGuid(),
         CompanyId = companyId,
@@ -55,6 +60,7 @@ public class QuotaRefundOnFailureTests
         Direction = MessageDirection.Outbound,
         Status = status,
         ExternalMessageId = wamid,
+        MeteredSubscriptionId = meteredSubId,
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow,
         IsActive = true,
@@ -92,8 +98,9 @@ public class QuotaRefundOnFailureTests
     {
         var companyId = Guid.NewGuid();
         await using var db = NewDb(companyId);
-        db.Subscriptions.Add(NewSub(companyId, used: 5));
-        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent));
+        var sub0 = NewSub(companyId, used: 5);
+        db.Subscriptions.Add(sub0);
+        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent, sub0.Id));
         await db.SaveChangesAsync();
 
         await NewHandler(db).HandleAsync(Status("wamid-1", "failed", 131049));
@@ -111,8 +118,9 @@ public class QuotaRefundOnFailureTests
     {
         var companyId = Guid.NewGuid();
         await using var db = NewDb(companyId);
-        db.Subscriptions.Add(NewSub(companyId, used: 5));
-        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent));
+        var sub0 = NewSub(companyId, used: 5);
+        db.Subscriptions.Add(sub0);
+        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent, sub0.Id));
         await db.SaveChangesAsync();
 
         var handler = NewHandler(db);
@@ -131,8 +139,9 @@ public class QuotaRefundOnFailureTests
     {
         var companyId = Guid.NewGuid();
         await using var db = NewDb(companyId);
-        db.Subscriptions.Add(NewSub(companyId, used: 5));
-        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent));
+        var sub0 = NewSub(companyId, used: 5);
+        db.Subscriptions.Add(sub0);
+        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent, sub0.Id));
         await db.SaveChangesAsync();
 
         await NewHandler(db).HandleAsync(Status("wamid-1", "delivered"));
@@ -149,8 +158,9 @@ public class QuotaRefundOnFailureTests
     {
         var companyId = Guid.NewGuid();
         await using var db = NewDb(companyId);
-        db.Subscriptions.Add(NewSub(companyId, used: 0));
-        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent));
+        var sub0 = NewSub(companyId, used: 0);
+        db.Subscriptions.Add(sub0);
+        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent, sub0.Id));
         await db.SaveChangesAsync();
 
         await NewHandler(db).HandleAsync(Status("wamid-1", "failed", 131049));
@@ -165,8 +175,10 @@ public class QuotaRefundOnFailureTests
     {
         var companyId = Guid.NewGuid();
         await using var db = NewDb(companyId);
-        db.Subscriptions.Add(NewSub(companyId, used: 5));
-        var m = NewMessage(companyId, "wamid-1", MessageStatus.Sent);
+        var sub0 = NewSub(companyId, used: 5);
+        db.Subscriptions.Add(sub0);
+        // Stamped as metered, so Billable is the ONLY reason the refund is withheld.
+        var m = NewMessage(companyId, "wamid-1", MessageStatus.Sent, sub0.Id);
         m.Billable = true; // Meta charged for it
         db.Messages.Add(m);
         await db.SaveChangesAsync();
@@ -183,8 +195,9 @@ public class QuotaRefundOnFailureTests
     {
         var companyId = Guid.NewGuid();
         await using var db = NewDb(companyId);
-        db.Subscriptions.Add(NewSub(companyId, used: 5));
-        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Delivered));
+        var sub0 = NewSub(companyId, used: 5);
+        db.Subscriptions.Add(sub0);
+        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Delivered, sub0.Id));
         await db.SaveChangesAsync();
 
         await NewHandler(db).HandleAsync(Status("wamid-1", "failed", 131049));
@@ -204,7 +217,7 @@ public class QuotaRefundOnFailureTests
         var subA = NewSub(companyId, used: 5);
         subA.CreatedAt = DateTime.UtcNow.AddDays(-10); // older — the one that was charged
         var subB = NewSub(companyId, used: 2);
-        subB.CreatedAt = DateTime.UtcNow;              // newer active (would be picked by the fallback)
+        subB.CreatedAt = DateTime.UtcNow;              // newer active — must NOT be touched
         db.Subscriptions.AddRange(subA, subB);
         var m = NewMessage(companyId, "wamid-1", MessageStatus.Sent);
         m.MeteredSubscriptionId = subA.Id;
@@ -218,5 +231,24 @@ public class QuotaRefundOnFailureTests
         var b = await db.Subscriptions.IgnoreQueryFilters().FirstAsync(s => s.Id == subB.Id);
         Assert.Equal(4, a.MessagesUsedThisPeriod); // metered sub refunded
         Assert.Equal(2, b.MessagesUsedThisPeriod); // newer active untouched
+    }
+
+    [Fact] // A free 24h-window reply reserved nothing, so a later failure must not credit quota back.
+    public async Task UnmeteredMessage_ThatFails_IsNotRefunded()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb(companyId);
+        db.Subscriptions.Add(NewSub(companyId, used: 5));
+        // MeteredSubscriptionId left null — the free-send signature.
+        db.Messages.Add(NewMessage(companyId, "wamid-1", MessageStatus.Sent));
+        await db.SaveChangesAsync();
+
+        await NewHandler(db).HandleAsync(Status("wamid-1", "failed", 131049));
+        await db.SaveChangesAsync();
+
+        var msg = await db.Messages.IgnoreQueryFilters().FirstAsync();
+        var sub = await db.Subscriptions.IgnoreQueryFilters().FirstAsync();
+        Assert.Equal(MessageStatus.Failed, msg.Status); // status still advances
+        Assert.Equal(5, sub.MessagesUsedThisPeriod);    // but no phantom credit
     }
 }

@@ -253,7 +253,13 @@ public class ConversationService(
         Conversation conversation, Contact contact, WabaConnection waba, string body, CancellationToken ct,
         bool throwOnFailure = true)
     {
-        var message = await sender.SendAsync(contact, waba, body, conversation.Id, ct);
+        // Billing: a reply inside the open 24-hour customer-service window is FREE. Meta bills that whole
+        // window as one conversation, not per message, so only the business-initiated send that opens a
+        // cold thread (WindowExpiresAt still null) costs a credit. Read-only — the outbound path must never
+        // write WindowExpiresAt, or the SaveChanges below would clobber the inbound webhook's anchor.
+        var chargeCredit = conversation.WindowExpiresAt is null || conversation.WindowExpiresAt <= DateTime.UtcNow;
+
+        var message = await sender.SendAsync(contact, waba, body, conversation.Id, chargeCredit, ct);
 
         conversation.LastMessageAt = message.CreatedAt;
         conversation.LastMessageBody = Truncate(body);

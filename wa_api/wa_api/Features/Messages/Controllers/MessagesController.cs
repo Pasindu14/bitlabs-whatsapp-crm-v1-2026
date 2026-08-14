@@ -36,12 +36,14 @@ public class MessagesController(
 
     /// <summary>POST /api/v1/messages — send a WhatsApp message to a contact.</summary>
     /// <remarks>
-    /// Gated: blocked when the company's subscription is inactive or over quota (PRD 3.1 stub).
+    /// Gated: blocked when the company's subscription is inactive. NOT blocked by an exhausted quota —
+    /// this endpoint sends free-form text, which is only permitted inside the open 24-hour
+    /// customer-service window, and replies in that window are free.
     /// Supports idempotency via the optional <c>Idempotency-Key</c> header — supply a client-generated
     /// UUID to guarantee at-most-once delivery even on retries. Keys are remembered for 24 hours.
     /// </remarks>
     [HttpPost]
-    [RequireActiveSubscription]
+    [RequireActiveSubscription(SkipQuotaCheck = true)]
     public async Task<IActionResult> Send(SendMessageRequest request, CancellationToken ct)
     {
         var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();

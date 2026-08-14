@@ -15,10 +15,23 @@ namespace wa_api.Common.Subscriptions;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
 public sealed class RequireActiveSubscriptionAttribute : Attribute, IAsyncActionFilter
 {
+    /// <summary>
+    /// When true, verify only an active, in-period subscription and SKIP the quota check — the endpoint
+    /// decides per send whether a credit is consumed, and a free reply inside the open 24-hour
+    /// customer-service window must still go through on an exhausted balance. Sends that DO consume a
+    /// credit remain blocked by <see cref="ISubscriptionMeter"/>'s atomic ceiling, which throws the same
+    /// QUOTA_EXCEEDED. Leave false on endpoints where every send is charged (campaigns).
+    /// </summary>
+    public bool SkipQuotaCheck { get; init; }
+
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var gate = context.HttpContext.RequestServices.GetRequiredService<ISubscriptionGate>();
-        await gate.EnsureCanSendAsync(context.HttpContext.RequestAborted);
+        var ct = context.HttpContext.RequestAborted;
+
+        if (SkipQuotaCheck) await gate.EnsureActiveAsync(ct);
+        else await gate.EnsureCanSendAsync(ct);
+
         await next();
     }
 }
