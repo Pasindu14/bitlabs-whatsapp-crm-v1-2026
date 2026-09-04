@@ -50,7 +50,13 @@ public class WabaHealthCheckJob(
 
     private async Task CheckConnectionAsync(HttpClient client, WabaConnection conn, DateTime checkedAt)
     {
-        var url = $"{MetaApiVersion}/{conn.PhoneNumberId}?fields=id,quality_rating,messaging_limit_tier,code_verification_status";
+        // NOTE: the messaging limit is read from `whatsapp_business_manager_messaging_limit`. Meta DEPRECATED
+        // the old `messaging_limit_tier` field — it is still accepted by the Graph API but silently returns
+        // nothing, which is what pinned every number at the Tier1K entity default. The deprecated field is no
+        // longer requested: it buys us nothing today and would 400 the whole request (taking quality_rating and
+        // the status check down with it) the day Meta finishes removing it.
+        var url = $"{MetaApiVersion}/{conn.PhoneNumberId}" +
+                  "?fields=id,quality_rating,whatsapp_business_manager_messaging_limit,code_verification_status";
 
         try
         {
@@ -71,7 +77,9 @@ public class WabaHealthCheckJob(
                 // Auto-sync the messaging tier so the rate limiter self-tunes as Meta upgrades the number.
                 // Conservative: only a recognized tier string updates the cap; unknown values are left as-is
                 // (we never raise a number's cap based on an unrecognized response).
-                var mappedTier = MapMessagingTier(ParseStringField(body, "messaging_limit_tier"));
+                var mappedTier = MapMessagingTier(
+                    ParseStringField(body, "whatsapp_business_manager_messaging_limit")
+                    ?? ParseStringField(body, "messaging_limit_tier"));
                 if (mappedTier is { } tier && tier != conn.MessagingTier)
                 {
                     logger.LogInformation(
@@ -147,10 +155,12 @@ public class WabaHealthCheckJob(
     }
 
     /// <summary>
-    /// Map Meta's <c>messaging_limit_tier</c> string (e.g. <c>TIER_1K</c>, <c>TIER_100K</c>,
-    /// <c>TIER_UNLIMITED</c>) to <see cref="MessagingTier"/>. Tokens are matched most-specific-first.
-    /// Returns null for unrecognized values (<c>TIER_NOT_SET</c>, future tiers, etc.) so the caller leaves
-    /// the existing tier untouched — we never raise a number's cap on an unrecognized response.
+    /// Map Meta's messaging-limit string (e.g. <c>TIER_1K</c>, <c>TIER_10K</c>, <c>TIER_100K</c>,
+    /// <c>TIER_UNLIMITED</c>) to <see cref="MessagingTier"/>. The numeric magnitude is parsed rather than
+    /// token-matched, so a tier Meta words differently (<c>TIER_10000</c>) or introduces later still lands on
+    /// a sane cap. The result FLOORS to the largest tier we model, so an unfamiliar tier never grants more
+    /// than Meta actually allows. Returns null for values carrying no magnitude (<c>TIER_NOT_SET</c>, an
+    /// absent field) so the caller leaves the existing tier untouched.
     /// </summary>
     private static MessagingTier? MapMessagingTier(string? raw)
     {
@@ -158,11 +168,22 @@ public class WabaHealthCheckJob(
         var t = raw.ToUpperInvariant();
 
         if (t.Contains("UNLIMITED")) return MessagingTier.Unlimited;
-        if (t.Contains("100K")) return MessagingTier.Tier100K;
-        if (t.Contains("10K")) return MessagingTier.Tier10K;
-        if (t.Contains("1K")) return MessagingTier.Tier1K;
-        // TIER_250 and the lower TIER_50 both floor to our smallest modelled tier.
-        if (t.Contains("250") || t.Contains("50")) return MessagingTier.Tier250;
-        return null;
+
+        // Pull the digits out of TIER_250 / TIER_1K / TIER_100K / TIER_10000 …
+        var digits = new string(t.Where(char.IsAsciiDigit).ToArray());
+        if (digits.Length == 0 || !long.TryParse(digits, out var limit)) return null;
+
+        // …then apply the magnitude suffix the digits were abbreviated with.
+        if (t.EndsWith('K')) limit *= 1_000;
+        else if (t.EndsWith('M')) limit *= 1_000_000;
+
+        return limit switch
+        {
+            >= 100_000 => MessagingTier.Tier100K,
+            >= 10_000 => MessagingTier.Tier10K,
+            >= 1_000 => MessagingTier.Tier1K,
+            // TIER_250 and the lower TIER_50 both floor to our smallest modelled tier.
+            _ => MessagingTier.Tier250,
+        };
     }
 }
