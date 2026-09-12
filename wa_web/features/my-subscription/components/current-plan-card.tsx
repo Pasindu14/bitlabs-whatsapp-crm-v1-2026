@@ -21,10 +21,16 @@ const numFmt = new Intl.NumberFormat("en-US");
 export function CurrentPlanCard() {
   const { data, isLoading, isError } = useMySubscription();
 
+  // Effective quota = plan quota + purchased extra credits. This is the ceiling the meter actually
+  // enforces and the base `messagesRemaining` is derived from, so the bar and the "x / y used" line
+  // must divide by it too — dividing by the bare plan quota showed a full bar next to a large
+  // "remaining" figure on any subscription carrying stacked credits.
+  const quota = data?.hasSubscription
+    ? data.effectiveMessageQuota || data.monthlyMessageQuota
+    : 0;
+
   const pct =
-    data?.hasSubscription && data.monthlyMessageQuota > 0
-      ? Math.min(100, Math.round((data.messagesUsedThisPeriod / data.monthlyMessageQuota) * 100))
-      : 0;
+    quota > 0 ? Math.min(100, Math.round(((data?.messagesUsedThisPeriod ?? 0) / quota) * 100)) : 0;
 
   const barColor =
     pct >= 90
@@ -78,7 +84,7 @@ export function CurrentPlanCard() {
             <div>
               <p className="text-3xl font-bold tracking-tight">{data.planName}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {numFmt.format(data.monthlyMessageQuota)} messages / period
+                {numFmt.format(quota)} messages / period
               </p>
             </div>
             <div className="text-right">
@@ -89,7 +95,7 @@ export function CurrentPlanCard() {
             </div>
           </div>
 
-          {data.monthlyMessageQuota > 0 && (
+          {quota > 0 && (
             <div className="space-y-1.5">
               <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
@@ -102,7 +108,7 @@ export function CurrentPlanCard() {
               </div>
               <div className="flex items-center justify-between text-xs text-muted-foreground tabular-nums">
                 <span>
-                  {numFmt.format(data.messagesUsedThisPeriod)} / {numFmt.format(data.monthlyMessageQuota)} used
+                  {numFmt.format(data.messagesUsedThisPeriod)} / {numFmt.format(quota)} used
                 </span>
                 <span>{pct}%</span>
               </div>

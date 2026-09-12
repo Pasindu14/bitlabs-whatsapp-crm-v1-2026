@@ -116,7 +116,10 @@ public class AdminReportsService(AppDbContext db)
             planById.TryGetValue(s.PlanId, out var plan);
             // Effective quota = plan's monthly quota + purchased extra-credit balance.
             var quota = (plan?.MonthlyMessageQuota ?? 0) + s.ExtraMessageCredits;
-            var remaining = quota - s.MessagesUsedThisPeriod;
+            // Floored at 0, matching SubscriptionService.Map — the two surfaces show the same number
+            // for the same company, and an admin whose plan quota was edited below current usage never
+            // sees a negative balance.
+            var remaining = Math.Max(0, quota - s.MessagesUsedThisPeriod);
             var isLow = quota > 0 && remaining < quota * LowBalanceThreshold;
 
             return new BalanceRow(
