@@ -47,3 +47,19 @@ yarn-error.log*
 # ---- OS ----
 .DS_Store
 Thumbs.db
+
+# ---- Media ----
+# Screen recordings, render output and frame grabs — heavy binaries that bloat the repo.
+*.mp4
+*.png
+# ...but the web app's own image assets are real source, not capture output. Scoped to *.png
+# on purpose: a bare `!wa_web/app/**` would sit after the env/log rules above and re-include
+# anything they ignore under that path.
+!wa_web/public/**/*.png
+!wa_web/app/**/*.png
+
+# Hyperframes ad project
+ad/node_modules/
+ad/out/
+ad/assets/shots/
+ad/.hyperframes/
