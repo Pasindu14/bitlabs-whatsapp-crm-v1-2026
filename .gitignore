@@ -51,14 +51,22 @@ Thumbs.db
 # ---- Media ----
 # Screen recordings, render output and frame grabs — heavy binaries that bloat the repo.
 *.mp4
+*.mov
 *.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
 *.mp3
 *.m4a
 # ...but the web app's own image assets are real source, not capture output. Scoped to *.png
 # on purpose: a bare `!wa_web/app/**` would sit after the env/log rules above and re-include
 # anything they ignore under that path.
 !wa_web/public/**/*.png
+!wa_web/public/**/*.jpg
+!wa_web/public/**/*.svg
 !wa_web/app/**/*.png
+!wa_web/app/**/*.jpg
 
 # Hyperframes ad project
 ad/node_modules/
