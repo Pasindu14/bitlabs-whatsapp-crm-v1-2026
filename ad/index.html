@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Growchat — 45s motion ad</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #041d15;
+      }
+      body {
+        font-family: "Jost", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      :root {
+        --brand: #008236;
+        --wa: #25d366;
+        --deep-1: #064e3b;
+        --mint: #a7f3d0;
+        --mint-2: #6ee7b7;
+        --paper: #f2f6f2;
+        --ink: #14241b;
+        --ink-soft: #5c6b62;
+        --line: rgba(20, 36, 27, 0.09);
+      }
+
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* ── Grounds ─────────────────────────────────────────────────── */
+      .g-deep {
+        background:
+          radial-gradient(900px 760px at 80% 8%, rgba(18, 160, 74, 0.34) 0%, rgba(18, 160, 74, 0) 62%),
+          radial-gradient(820px 700px at 8% 92%, rgba(4, 120, 87, 0.4) 0%, rgba(4, 120, 87, 0) 60%),
+          linear-gradient(160deg, #052b1f 0%, var(--deep-1) 52%, #03150f 100%);
+      }
+      .g-paper {
+        background:
+          radial-gradient(900px 700px at 78% 10%, #dcf1e4 0%, rgba(220, 241, 228, 0) 62%),
+          radial-gradient(760px 640px at 10% 90%, #e6f4ea 0%, rgba(230, 244, 234, 0) 60%),
+          var(--paper);
+      }
+
+      /* ── Type ────────────────────────────────────────────────────── */
+      .eyebrow {
+        position: absolute;
+        left: 84px;
+        width: 912px;
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: 0.26em;
+        text-transform: uppercase;
+      }
+      .head {
+        position: absolute;
+        left: 84px;
+        width: 912px;
+        font-weight: 700;
+        letter-spacing: -0.032em;
+        line-height: 1.03;
+      }
+      .cap {
+        position: absolute;
+        left: 84px;
+        width: 912px;
+        font-size: 34px;
+        font-weight: 500;
+        line-height: 1.3;
+        letter-spacing: -0.01em;
+      }
+      .on-deep .eyebrow {
+        color: var(--mint-2);
+      }
+      .on-deep .head {
+        color: #fff;
+      }
+      .on-deep .head .hl {
+        color: var(--mint);
+      }
+      .on-deep .cap {
+        color: rgba(255, 255, 255, 0.72);
+      }
+      .on-paper .eyebrow {
+        color: var(--brand);
+      }
+      .on-paper .head {
+        color: var(--ink);
+      }
+      .on-paper .head .hl {
+        color: var(--brand);
+      }
+      .on-paper .cap {
+        color: var(--ink-soft);
+      }
+
+      /* ── Surfaces ────────────────────────────────────────────────── */
+      .panel {
+        position: absolute;
+        border-radius: 28px;
+      }
+      .on-deep .panel {
+        background: rgba(255, 255, 255, 0.055);
+        border: 1px solid rgba(167, 243, 208, 0.18);
+      }
+      .on-paper .panel {
+        background: #fff;
+        border: 1px solid var(--line);
+        box-shadow:
+          0 2px 4px rgba(6, 78, 59, 0.05),
+          0 22px 52px rgba(6, 78, 59, 0.11);
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 24px;
+        border-radius: 999px;
+        font-size: 26px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .pill-ok {
+        background: var(--brand);
+        color: #fff;
+      }
+      .pill-wait {
+        background: rgba(255, 255, 255, 0.12);
+        color: var(--mint);
+        border: 1px solid rgba(167, 243, 208, 0.3);
+      }
+      .pill-soft {
+        background: rgba(0, 130, 54, 0.1);
+        color: var(--brand);
+      }
+      .dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--mint-2);
+        flex: none;
+      }
+
+      .mark {
+        display: block;
+      }
+      .wordmark {
+        font-size: 124px;
+        font-weight: 700;
+        letter-spacing: -0.038em;
+        color: #fff;
+        line-height: 1;
+      }
+      .lockup {
+        position: absolute;
+        left: 0;
+        width: 1080px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* ── S1 · hook ───────────────────────────────────────────────── */
+      #s1-count {
+        position: absolute;
+        left: 84px;
+        top: 280px;
+        width: 912px;
+        font-size: 190px;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        line-height: 1;
+        color: #fff;
+        font-variant-numeric: tabular-nums;
+      }
+      #s1-of {
+        position: absolute;
+        left: 92px;
+        top: 560px;
+        font-size: 40px;
+        font-weight: 500;
+        color: var(--mint);
+      }
+      .stamp {
+        position: absolute;
+        right: 84px;
+        width: 430px;
+        height: 78px;
+        border-radius: 22px 22px 6px 22px;
+        background: rgba(37, 211, 102, 0.16);
+        border: 1px solid rgba(110, 231, 183, 0.34);
+        display: flex;
+        align-items: center;
+        padding: 0 26px;
+        font-size: 25px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.74);
+        white-space: nowrap;
+      }
+
+      /* ── S4 · company grid ───────────────────────────────────────── */
+      .co {
+        position: absolute;
+        width: 420px;
+        height: 168px;
+        border-radius: 26px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(167, 243, 208, 0.2);
+        padding: 26px 28px;
+      }
+      .co-badge {
+        width: 52px;
+        height: 52px;
+        border-radius: 15px;
+        background: var(--brand);
+        color: #fff;
+        font-size: 24px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .co-name {
+        margin-top: 14px;
+        font-size: 27px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .co-meta {
+        margin-top: 4px;
+        font-size: 21px;
+        color: var(--mint-2);
+      }
+
+      /* ── bars / tracks ───────────────────────────────────────────── */
+      .track {
+        position: absolute;
+        height: 18px;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .on-deep .track {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .on-paper .track {
+        background: rgba(0, 130, 54, 0.12);
+      }
+      .fill {
+        width: 100%;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--brand) 0%, var(--wa) 100%);
+        transform-origin: 0% 50%;
+      }
+
+      .logline {
+        font-size: 23px;
+        line-height: 46px;
+        color: var(--mint-2);
+        font-family: monospace;
+        white-space: nowrap;
+      }
+      .logline b {
+        color: #fff;
+        font-weight: 600;
+      }
+
+      /* ── chat bubbles ────────────────────────────────────────────── */
+      .bub {
+        position: absolute;
+        max-width: 560px;
+        padding: 24px 30px;
+        font-size: 30px;
+        line-height: 1.28;
+        border-radius: 26px;
+      }
+      .bub-in {
+        left: 0;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-bottom-left-radius: 8px;
+        color: var(--ink);
+      }
+      .bub-out {
+        right: 0;
+        background: var(--brand);
+        color: #fff;
+        border-bottom-right-radius: 8px;
+      }
+
+      .barwrap {
+        position: absolute;
+        bottom: 0;
+        width: 92px;
+        border-radius: 12px 12px 4px 4px;
+        transform-origin: 50% 100%;
+      }
+
+      .perm {
+        position: absolute;
+        padding: 18px 30px;
+        border-radius: 999px;
+        font-size: 30px;
+        font-weight: 600;
+        background: #ffffff;
+        border: 1px solid var(--line);
+        color: var(--ink);
+        white-space: nowrap;
+        box-shadow: 0 12px 30px rgba(6, 78, 59, 0.1);
+      }
+
+      .claim {
+        position: absolute;
+        left: 84px;
+        width: 912px;
+        font-size: 46px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: -0.018em;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+      }
+      .claim .tick {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--brand);
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-width="1080"
+      data-height="1920"
+      data-duration="45"
+      data-fps="30"
+    >
+      <!-- Music bed. No data-volume: the file is already levelled to -15 LUFS, so the
+           timeline's volume tweens work against a baseline of 1. -->
+      <audio
+        id="bgm"
+        src="assets/audio/bed.m4a"
+        data-start="0"
+        data-duration="45"
+        data-track-index="9"
+      ></audio>
+
+      <!-- ═══ S1 · Hook ═══ -->
+      <section id="s1" class="clip g-deep on-deep" data-start="0" data-duration="2.7" data-track-index="1">
+        <div id="s1-count">1</div>
+        <div id="s1-of">of 4,982 contacts</div>
+        <div class="stamp" id="st1" style="top: 700px">Weekend sale — 25% off →</div>
+        <div class="stamp" id="st2" style="top: 802px">Weekend sale — 25% off →</div>
+        <div class="stamp" id="st3" style="top: 904px">Weekend sale — 25% off →</div>
+        <div class="stamp" id="st4" style="top: 1006px">Weekend sale — 25% off →</div>
+        <div class="stamp" id="st5" style="top: 1108px">Weekend sale — 25% off →</div>
+        <div class="head" id="s1-head" style="top: 1300px; font-size: 92px">
+          Still sending them<span class="hl"> one by one?</span>
+        </div>
+      </section>
+
+      <!-- ═══ S2 · Turn ═══ -->
+      <section id="s2" class="clip g-deep on-deep" data-start="2.5" data-duration="2.9" data-track-index="1" style="opacity: 0">
+        <div class="lockup" id="s2-lock" style="top: 700px">
+          <svg class="mark" id="s2-mark" width="176" height="176" viewBox="0 0 32 32" aria-label="Growchat">
+            <rect width="32" height="32" rx="7" fill="#008236" />
+            <rect x="6" y="8" width="20" height="13" rx="4" fill="#ffffff" />
+            <path d="M11 20 L11 25.5 L16.5 20 Z" fill="#ffffff" />
+            <path d="M11.5 14.4 l3 3 l6 -6.1" fill="none" stroke="#008236" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <div class="wordmark" id="s2-word" style="margin-top: 40px">Growchat</div>
+          <div id="s2-sub" style="margin-top: 26px; font-size: 40px; font-weight: 500; color: #a7f3d0">
+            One platform. Every client. Every message.
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ S3 · Divider · platform ═══ -->
+      <section id="s3" class="clip g-deep on-deep" data-start="5.3" data-duration="1.9" data-track-index="1" style="opacity: 0">
+        <div class="eyebrow" id="s3-eye" style="top: 790px">Part one</div>
+        <div class="head" id="s3-head" style="top: 846px; font-size: 108px">
+          You run the<span class="hl"> platform.</span>
+        </div>
+      </section>
+
+      <!-- ═══ S4 · Companies ═══ -->
+      <section id="s4" class="clip g-deep on-deep" data-start="7.1" data-duration="3.2" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Super admin</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          Spin up a client<span class="hl"> in seconds.</span>
+        </div>
+        <div class="co" id="co1" style="left: 84px; top: 640px">
+          <div class="co-badge">NT</div>
+          <div class="co-name">Northwind Trading</div>
+          <div class="co-meta">Active · 10,000/mo</div>
+        </div>
+        <div class="co" id="co2" style="left: 576px; top: 640px">
+          <div class="co-badge">AF</div>
+          <div class="co-name">Al Fardan Group</div>
+          <div class="co-meta">Active · 100,000/mo</div>
+        </div>
+        <div class="co" id="co3" style="left: 84px; top: 838px">
+          <div class="co-badge">CC</div>
+          <div class="co-name">Cedar Clinics</div>
+          <div class="co-meta">Active · 10,000/mo</div>
+        </div>
+        <div class="co" id="co4" style="left: 576px; top: 838px">
+          <div class="co-badge">OF</div>
+          <div class="co-name">Orbit Fitness</div>
+          <div class="co-meta">Active · 1,000/mo</div>
+        </div>
+        <div class="co" id="co5" style="left: 84px; top: 1036px">
+          <div class="co-badge">BM</div>
+          <div class="co-name">Bayside Motors</div>
+          <div class="co-meta">Active · 10,000/mo</div>
+        </div>
+        <div class="co" id="co6" style="left: 576px; top: 1036px">
+          <div class="co-badge">SB</div>
+          <div class="co-name">Sana Boutique</div>
+          <div class="co-meta">Active · 1,000/mo</div>
+        </div>
+        <div class="cap" style="top: 1300px">
+          Every company fully isolated — one tenant can never see another's data.
+        </div>
+      </section>
+
+      <!-- ═══ S5 · WABA connect ═══ -->
+      <section id="s5" class="clip g-deep on-deep" data-start="10.2" data-duration="3.2" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Super admin</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          Connect their<span class="hl"> WhatsApp number.</span>
+        </div>
+        <div class="panel" id="s5-card" style="left: 84px; top: 660px; width: 912px; height: 420px">
+          <div style="padding: 44px 48px">
+            <div style="font-size: 26px; color: #6ee7b7; letter-spacing: 0.14em; text-transform: uppercase">
+              WhatsApp Business Account
+            </div>
+            <div id="s5-phone" style="margin-top: 22px; font-size: 62px; font-weight: 700; color: #fff; letter-spacing: -0.02em">
+              +971 4 555 0142
+            </div>
+            <div style="margin-top: 14px; font-size: 28px; color: rgba(255, 255, 255, 0.6)">
+              Northwind Trading · WABA 1029384756
+            </div>
+            <div style="margin-top: 44px; position: relative; height: 60px">
+              <span class="pill pill-wait" id="s5-wait" style="position: absolute; left: 0; top: 0">Verifying</span>
+              <span class="pill pill-ok" id="s5-ok" style="position: absolute; left: 0; top: 0; opacity: 0"><span class="dot"></span>Connected</span>
+            </div>
+          </div>
+        </div>
+        <div class="cap" style="top: 1180px">
+          Access tokens encrypted at rest. Official Meta Cloud API — no unofficial libraries.
+        </div>
+      </section>
+
+      <!-- ═══ S6 · Plans and quota ═══ -->
+      <section id="s6" class="clip g-deep on-deep" data-start="13.3" data-duration="3.3" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Super admin</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          Set the plan.<span class="hl"> Set the quota.</span>
+        </div>
+        <div class="panel" id="pl1" style="left: 84px; top: 640px; width: 288px; height: 280px">
+          <div style="padding: 34px 30px">
+            <div style="font-size: 30px; font-weight: 600; color: #fff">Free</div>
+            <div style="margin-top: 18px; font-size: 52px; font-weight: 700; color: #a7f3d0">1k</div>
+            <div style="font-size: 24px; color: rgba(255, 255, 255, 0.55)">messages / mo</div>
+          </div>
+        </div>
+        <div class="panel" id="pl2" style="left: 396px; top: 640px; width: 288px; height: 280px">
+          <div style="padding: 34px 30px">
+            <div style="font-size: 30px; font-weight: 600; color: #fff">Starter</div>
+            <div style="margin-top: 18px; font-size: 52px; font-weight: 700; color: #a7f3d0">10k</div>
+            <div style="font-size: 24px; color: rgba(255, 255, 255, 0.55)">messages / mo</div>
+          </div>
+        </div>
+        <div class="panel" id="pl3" style="left: 708px; top: 640px; width: 288px; height: 280px">
+          <div style="padding: 34px 30px">
+            <div style="font-size: 30px; font-weight: 600; color: #fff">Pro</div>
+            <div style="margin-top: 18px; font-size: 52px; font-weight: 700; color: #a7f3d0">100k</div>
+            <div style="font-size: 24px; color: rgba(255, 255, 255, 0.55)">messages / mo</div>
+          </div>
+        </div>
+        <div class="panel" id="s6-quota" style="left: 84px; top: 980px; width: 912px; height: 220px">
+          <div style="padding: 40px 48px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline">
+              <div style="font-size: 30px; font-weight: 600; color: #fff">This period</div>
+              <div id="s6-num" style="font-size: 38px; font-weight: 700; color: #a7f3d0; font-variant-numeric: tabular-nums">
+                0 / 10,000
+              </div>
+            </div>
+            <div class="track" id="s6-track" style="left: 48px; top: 130px; width: 816px">
+              <div class="fill" id="s6-fill"></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap" style="top: 1280px">
+          Out of quota? Sell them a top-up pack. Sends stop until they're paid up.
+        </div>
+      </section>
+
+      <!-- ═══ S7 · Monitoring ═══ -->
+      <section id="s7" class="clip g-deep on-deep" data-start="16.5" data-duration="3.4" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Super admin</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          Watch every tenant<span class="hl"> from one screen.</span>
+        </div>
+        <div class="panel" id="s7-card" style="left: 84px; top: 660px; width: 912px; height: 540px; overflow: hidden">
+          <div style="padding: 36px 44px">
+            <div style="font-size: 26px; color: #6ee7b7; letter-spacing: 0.14em; text-transform: uppercase">Live logs</div>
+            <!-- Own clipping box so the crawling feed vanishes before it reaches the header. -->
+            <div style="margin-top: 20px; height: 386px; overflow: hidden">
+              <!-- The crawl moves lines above the clip box; overflow hides them but the audit
+                   still measures their boxes, so exclude the feed from layout checks. -->
+              <div id="s7-stream" data-layout-ignore>
+              <div class="logline"><b>webhook</b> delivered · Northwind Trading</div>
+              <div class="logline"><b>campaign</b> 225/231 sent · Al Fardan Group</div>
+              <div class="logline"><b>template</b> APPROVED · Cedar Clinics</div>
+              <div class="logline"><b>webhook</b> read · Orbit Fitness</div>
+              <div class="logline"><b>quota</b> 82% used · Bayside Motors</div>
+              <div class="logline"><b>campaign</b> scheduled 09:00 · Sana Boutique</div>
+              <div class="logline"><b>webhook</b> delivered · Northwind Trading</div>
+              <div class="logline"><b>billing</b> renewed · Al Fardan Group</div>
+              <div class="logline"><b>template</b> submitted · Orbit Fitness</div>
+              <div class="logline"><b>webhook</b> delivered · Cedar Clinics</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cap" style="top: 1280px">
+          Platform reports, per-tenant usage, and every webhook as it lands.
+        </div>
+      </section>
+
+      <!-- ═══ S8 · Divider · client ═══ -->
+      <section id="s8" class="clip g-paper on-paper" data-start="19.8" data-duration="1.9" data-track-index="1" style="opacity: 0">
+        <div class="eyebrow" id="s8-eye" style="top: 790px">Part two</div>
+        <div class="head" id="s8-head" style="top: 846px; font-size: 108px">
+          They run the<span class="hl"> messaging.</span>
+        </div>
+      </section>
+
+      <!-- ═══ S9 · Campaigns ═══ -->
+      <section id="s9" class="clip g-paper on-paper" data-start="21.6" data-duration="3.3" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Client workspace</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          One template.<span class="hl"> Thousands of sends.</span>
+        </div>
+        <div class="panel" id="s9-card" style="left: 84px; top: 660px; width: 912px; height: 450px">
+          <div style="padding: 42px 48px">
+            <div style="font-size: 26px; color: #008236; letter-spacing: 0.14em; text-transform: uppercase">
+              Campaign · weekend_sale_promo
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 16px; flex-wrap: wrap">
+              <span class="pill pill-soft aud">Aug–Sep inquiries</span>
+              <span class="pill pill-soft aud">VIP customers</span>
+              <span class="pill pill-soft aud">Walk-ins</span>
+            </div>
+            <div id="s9-num" style="margin-top: 30px; font-size: 76px; font-weight: 700; color: #14241b; letter-spacing: -0.03em; font-variant-numeric: tabular-nums">
+              0 sent
+            </div>
+            <div class="track" id="s9-track" style="left: 48px; top: 340px; width: 816px">
+              <div class="fill" id="s9-fill"></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap" style="top: 1190px">
+          Paced in small batches by background jobs — never all at once, so the number stays healthy.
+        </div>
+      </section>
+
+      <!-- ═══ S10 · Live inbox ═══ -->
+      <section id="s10" class="clip g-paper on-paper" data-start="24.8" data-duration="3.3" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Client workspace</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          And every reply<span class="hl"> comes back.</span>
+        </div>
+        <div style="position: absolute; left: 110px; top: 640px; width: 860px; height: 540px">
+          <div class="bub bub-in" id="bb1" style="top: 0">Is the sale still on today?</div>
+          <div class="bub bub-out" id="bb2" style="top: 130px">Yes — until Sunday. Want the catalogue?</div>
+          <div class="bub bub-in" id="bb3" style="top: 300px">Yes please 🙏</div>
+          <div class="bub bub-out" id="bb4" style="top: 400px">Sent! Reply here any time.</div>
+        </div>
+        <div class="panel" id="s10-win" style="left: 84px; top: 1220px; width: 912px; height: 150px">
+          <div style="padding: 0 44px; height: 100%; display: flex; align-items: center; gap: 26px">
+            <svg width="76" height="76" viewBox="0 0 76 76">
+              <circle cx="38" cy="38" r="32" fill="none" stroke="rgba(0,130,54,0.16)" stroke-width="8" />
+              <g id="s10-hand" style="transform-origin: 38px 38px">
+                <circle cx="38" cy="6" r="7" fill="#008236" />
+              </g>
+            </svg>
+            <div>
+              <div style="font-size: 32px; font-weight: 600; color: #14241b">24-hour service window · open</div>
+              <div style="font-size: 26px; color: #5c6b62">Tracked per conversation, automatically.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ S11 · Templates ═══ -->
+      <section id="s11" class="clip g-paper on-paper" data-start="28.0" data-duration="3.1" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Client workspace</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          Templates, straight<span class="hl"> to Meta.</span>
+        </div>
+        <div class="panel" id="s11-card" style="left: 84px; top: 660px; width: 912px; height: 460px">
+          <div style="padding: 42px 48px">
+            <div style="display: flex; justify-content: space-between; align-items: center">
+              <div style="font-size: 34px; font-weight: 600; color: #14241b">weekend_sale_promo</div>
+              <div style="position: relative; width: 230px; height: 56px">
+                <span class="pill pill-soft" id="s11-pending" style="position: absolute; right: 0; top: 0">Pending review</span>
+                <span class="pill pill-ok" id="s11-approved" style="position: absolute; right: 0; top: 0; opacity: 0"><span class="dot"></span>Approved</span>
+              </div>
+            </div>
+            <div style="margin-top: 28px; background: #e5ddd5; border-radius: 20px; padding: 28px">
+              <div class="bub bub-in" style="position: relative; max-width: 100%; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08)">
+                Our weekend sale is live — 25% off the whole Home range until Sunday. Reply CATALOGUE and we'll send it over.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cap" style="top: 1200px">
+          Submitted, tracked to approval, and re-synced when Meta changes its mind.
+        </div>
+      </section>
+
+      <!-- ═══ S12 · Contacts and lists ═══ -->
+      <section id="s12" class="clip g-paper on-paper" data-start="31.0" data-duration="3.1" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Client workspace</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          Their audience,<span class="hl"> organised.</span>
+        </div>
+        <div class="panel" id="s12-card" style="left: 84px; top: 660px; width: 912px; height: 470px">
+          <div style="padding: 42px 48px">
+            <div style="font-size: 26px; color: #008236; letter-spacing: 0.14em; text-transform: uppercase">
+              Import from Excel
+            </div>
+            <div id="xl1" style="margin-top: 24px; height: 62px; border-radius: 14px; background: rgba(0, 130, 54, 0.07); display: flex; align-items: center; padding: 0 26px; font-size: 27px; color: #5c6b62">
+              contacts-september.xlsx · 4,982 rows
+            </div>
+            <div style="margin-top: 32px; display: flex; gap: 16px; flex-wrap: wrap">
+              <span class="pill pill-soft lst" id="ls1">Aug–Sep inquiries · 231</span>
+              <span class="pill pill-soft lst" id="ls2">VIP customers · 704</span>
+              <span class="pill pill-soft lst" id="ls3">Walk-ins · 1,108</span>
+              <span class="pill pill-soft lst" id="ls4">Lapsed 90d · 588</span>
+              <span class="pill pill-soft lst" id="ls5">Newsletter · 2,351</span>
+            </div>
+          </div>
+        </div>
+        <div class="cap" style="top: 1210px">
+          Column mapping, duplicate detection, and a report of every row that failed.
+        </div>
+      </section>
+
+      <!-- ═══ S13 · Analytics ═══ -->
+      <section id="s13" class="clip g-paper on-paper" data-start="34.0" data-duration="3.2" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Client workspace</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          And proof it<span class="hl"> actually landed.</span>
+        </div>
+        <div class="panel" id="s13-card" style="left: 84px; top: 660px; width: 912px; height: 540px">
+          <div style="padding: 42px 48px; position: relative; height: 100%">
+            <div style="display: flex; gap: 64px">
+              <div>
+                <div style="font-size: 24px; color: #5c6b62; letter-spacing: 0.1em; text-transform: uppercase">Sent</div>
+                <div id="k1" style="font-size: 60px; font-weight: 700; color: #14241b; font-variant-numeric: tabular-nums">0</div>
+              </div>
+              <div>
+                <div style="font-size: 24px; color: #5c6b62; letter-spacing: 0.1em; text-transform: uppercase">Delivered</div>
+                <div id="k2" style="font-size: 60px; font-weight: 700; color: #008236; font-variant-numeric: tabular-nums">0</div>
+              </div>
+              <div>
+                <div style="font-size: 24px; color: #5c6b62; letter-spacing: 0.1em; text-transform: uppercase">Read</div>
+                <div id="k3" style="font-size: 60px; font-weight: 700; color: #3b82f6; font-variant-numeric: tabular-nums">0</div>
+              </div>
+            </div>
+            <div style="position: absolute; left: 48px; bottom: 44px; width: 816px; height: 250px">
+              <div class="barwrap" id="ba1" style="left: 0; height: 210px; background: #008236"></div>
+              <div class="barwrap" id="ba2" style="left: 106px; height: 190px; background: #3b82f6"></div>
+              <div class="barwrap" id="ba3" style="left: 212px; height: 140px; background: #8b5cf6"></div>
+              <div class="barwrap" id="ba4" style="left: 318px; height: 56px; background: #ef4444"></div>
+              <div class="barwrap" id="ba5" style="left: 448px; height: 172px; background: #008236"></div>
+              <div class="barwrap" id="ba6" style="left: 554px; height: 152px; background: #3b82f6"></div>
+              <div class="barwrap" id="ba7" style="left: 660px; height: 108px; background: #8b5cf6"></div>
+              <div class="barwrap" id="ba8" style="left: 766px; height: 40px; background: #ef4444"></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap" style="top: 1250px">
+          Delivery and cost, per campaign — including what each message cost you at Meta.
+        </div>
+      </section>
+
+      <!-- ═══ S14 · Permissions ═══ -->
+      <section id="s14" class="clip g-paper on-paper" data-start="37.1" data-duration="3.6" data-track-index="2" style="opacity: 0">
+        <div class="eyebrow" style="top: 300px">Client workspace</div>
+        <div class="head" style="top: 356px; font-size: 82px">
+          They choose who<span class="hl"> can do what.</span>
+        </div>
+        <div class="perm" id="p1" style="left: 84px; top: 680px">Live inbox</div>
+        <div class="perm" id="p2" style="left: 344px; top: 680px">Templates</div>
+        <div class="perm" id="p3" style="left: 620px; top: 680px">Campaigns</div>
+        <div class="perm" id="p4" style="left: 84px; top: 790px">Contacts &amp; lists</div>
+        <div class="perm" id="p5" style="left: 434px; top: 790px">Analytics</div>
+        <div class="perm" id="p6" style="left: 686px; top: 790px">Top-ups</div>
+        <div class="perm" id="p7" style="left: 84px; top: 900px">Manage team</div>
+        <div class="cap" style="top: 1060px">
+          Seven permissions, granted one by one — and checked server-side on every single
+          request, never trusted from the browser.
+        </div>
+      </section>
+
+      <!-- ═══ S15 · Close ═══ -->
+      <section id="s15" class="clip g-deep on-deep" data-start="40.6" data-duration="4.4" data-track-index="1" style="opacity: 0">
+        <div class="claim" id="cl1" style="top: 430px">
+          <span class="tick"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 12.5 l5 5 l11 -11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+          Official Meta Cloud API
+        </div>
+        <div class="claim" id="cl2" style="top: 520px">
+          <span class="tick"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 12.5 l5 5 l11 -11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+          Multi-tenant and fully isolated
+        </div>
+        <div class="claim" id="cl3" style="top: 610px">
+          <span class="tick"><svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 12.5 l5 5 l11 -11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+          Throttled, metered, yours to resell
+        </div>
+        <div class="lockup" id="s15-lock" style="top: 880px">
+          <svg class="mark" id="s15-mark" width="176" height="176" viewBox="0 0 32 32" aria-label="Growchat">
+            <rect width="32" height="32" rx="7" fill="#008236" />
+            <rect x="6" y="8" width="20" height="13" rx="4" fill="#ffffff" />
+            <path d="M11 20 L11 25.5 L16.5 20 Z" fill="#ffffff" />
+            <path d="M11.5 14.4 l3 3 l6 -6.1" fill="none" stroke="#008236" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <div class="wordmark" id="s15-word" style="margin-top: 40px">Growchat</div>
+          <div id="s15-cta" style="margin-top: 30px; font-size: 54px; font-weight: 600; color: #fff">Talk to us.</div>
+          <div id="s15-url" style="margin-top: 22px; font-size: 34px; font-weight: 500; color: rgba(255, 255, 255, 0.66)">
+            growchatapp.croissance-digital.com
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+
+      /* Cross-dissolve a scene in and out, with a hard kill at the boundary so a
+         non-linear seek can never land on stale visibility state. */
+      function scene(sel, start, dur, fadeIn) {
+        const fi = fadeIn === undefined ? 0.24 : fadeIn;
+        if (fi > 0) tl.fromTo(sel, { autoAlpha: 0 }, { autoAlpha: 1, duration: fi, ease: "power1.out" }, start);
+        tl.to(sel, { autoAlpha: 0, duration: 0.22 }, start + dur - 0.24);
+        tl.set(sel, { autoAlpha: 0 }, start + dur - 0.01);
+      }
+
+      /* Count a number up into an element. Deterministic — the value is a pure
+         function of timeline progress, never of a clock. */
+      function countTo(sel, from, to, start, dur, suffix, ease) {
+        const o = { v: from };
+        tl.to(
+          o,
+          {
+            v: to,
+            duration: dur,
+            ease: ease || "power2.out",
+            onUpdate: () => {
+              const n = document.querySelector(sel);
+              if (n) n.textContent = Math.round(o.v).toLocaleString("en-US") + (suffix || "");
+            },
+          },
+          start
+        );
+      }
+
+      /* Shared header entrance for every capability beat. */
+      function header(sel, start) {
+        tl.fromTo(sel + " .eyebrow", { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.34 }, start + 0.08);
+        tl.fromTo(sel + " .head", { y: 38, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.46, ease: "power3.out" }, start + 0.16);
+        tl.fromTo(sel + " .cap", { y: 22, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, ease: "power2.out" }, start + 0.86);
+      }
+
+      /* ═══ S1 · Hook — the counter sprints, then stalls. That stall is the joke. ═══ */
+      tl.fromTo("#s1-count", { scale: 0.7, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.34, ease: "back.out(2)" }, 0.06);
+      tl.fromTo("#s1-of", { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.3 }, 0.2);
+      countTo("#s1-count", 1, 47, 0.3, 1.2, "", "power4.out");
+      tl.fromTo(["#st1", "#st2", "#st3", "#st4", "#st5"], { x: 90, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.26, stagger: 0.13, ease: "power3.out" }, 0.34);
+      tl.fromTo("#s1-head", { y: 44, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.5, ease: "power3.out" }, 1.52);
+      scene("#s1", 0, 2.7, 0);
+
+      /* ═══ S2 · Turn ═══ */
+      tl.fromTo("#s2-mark", { scale: 0.68, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.56, ease: "back.out(1.7)" }, 2.58);
+      tl.fromTo("#s2-word", { y: 36, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.5, ease: "power3.out" }, 2.8);
+      tl.fromTo("#s2-sub", { y: 24, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.5, ease: "power3.out" }, 2.98);
+      scene("#s2", 2.5, 2.9);
+
+      /* ═══ S3 · Divider ═══ */
+      tl.fromTo("#s3-eye", { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.32 }, 5.4);
+      tl.fromTo("#s3-head", { y: 40, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.48, ease: "power3.out" }, 5.5);
+      scene("#s3", 5.3, 1.9);
+
+      /* ═══ S4 · Companies ═══ */
+      header("#s4", 7.1);
+      tl.fromTo(["#co1", "#co2", "#co3", "#co4", "#co5", "#co6"], { y: 34, scale: 0.9, autoAlpha: 0 }, { y: 0, scale: 1, autoAlpha: 1, duration: 0.42, stagger: 0.09, ease: "back.out(1.5)" }, 7.4);
+      scene("#s4", 7.1, 3.2);
+
+      /* ═══ S5 · WABA connect ═══ */
+      header("#s5", 10.2);
+      tl.fromTo("#s5-card", { y: 40, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, ease: "power3.out" }, 10.42);
+      tl.fromTo("#s5-phone", { y: 20, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.38 }, 10.66);
+      tl.to("#s5-wait", { autoAlpha: 0, scale: 0.9, duration: 0.24 }, 11.7);
+      tl.fromTo("#s5-ok", { scale: 0.82, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.4, ease: "back.out(2.2)" }, 11.82);
+      scene("#s5", 10.2, 3.2);
+
+      /* ═══ S6 · Plans and quota ═══ */
+      header("#s6", 13.3);
+      tl.fromTo(["#pl1", "#pl2", "#pl3"], { y: 32, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.38, stagger: 0.1, ease: "power3.out" }, 13.5);
+      tl.to("#pl2", { scale: 1.06, backgroundColor: "rgba(0,130,54,0.3)", borderColor: "rgba(167,243,208,0.55)", duration: 0.3, ease: "back.out(2)" }, 14.16);
+      tl.fromTo("#s6-quota", { y: 30, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.36 }, 14.5);
+      tl.fromTo("#s6-fill", { scaleX: 0 }, { scaleX: 0.67, duration: 1.05, ease: "power2.out" }, 14.75);
+      countTo("#s6-num", 0, 6720, 14.75, 1.05, " / 10,000");
+      scene("#s6", 13.3, 3.3);
+
+      /* ═══ S7 · Monitoring ═══ */
+      header("#s7", 16.5);
+      tl.fromTo("#s7-card", { y: 40, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, ease: "power3.out" }, 16.7);
+      tl.fromTo("#s7-stream .logline", { x: -30, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.3, stagger: 0.12 }, 16.95);
+      tl.fromTo("#s7-stream", { y: 0 }, { y: -110, duration: 1.9, ease: "none" }, 17.5);
+      scene("#s7", 16.5, 3.4);
+
+      /* ═══ S8 · Divider ═══ */
+      tl.fromTo("#s8-eye", { y: 18, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.32 }, 19.9);
+      tl.fromTo("#s8-head", { y: 40, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.48, ease: "power3.out" }, 20.0);
+      scene("#s8", 19.8, 1.9);
+
+      /* ═══ S9 · Campaigns ═══ */
+      header("#s9", 21.6);
+      tl.fromTo("#s9-card", { y: 40, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, ease: "power3.out" }, 21.8);
+      tl.fromTo(".aud", { y: 18, scale: 0.9, autoAlpha: 0 }, { y: 0, scale: 1, autoAlpha: 1, duration: 0.3, stagger: 0.09, ease: "back.out(2)" }, 22.05);
+      tl.fromTo("#s9-fill", { scaleX: 0 }, { scaleX: 1, duration: 1.5, ease: "power1.inOut" }, 22.4);
+      countTo("#s9-num", 0, 4982, 22.4, 1.5, " sent", "power1.inOut");
+      scene("#s9", 21.6, 3.3);
+
+      /* ═══ S10 · Live inbox ═══ */
+      header("#s10", 24.8);
+      tl.fromTo("#bb1", { x: -40, y: 20, autoAlpha: 0 }, { x: 0, y: 0, autoAlpha: 1, duration: 0.34, ease: "back.out(1.6)" }, 25.1);
+      tl.fromTo("#bb2", { x: 40, y: 20, autoAlpha: 0 }, { x: 0, y: 0, autoAlpha: 1, duration: 0.34, ease: "back.out(1.6)" }, 25.44);
+      tl.fromTo("#bb3", { x: -40, y: 20, autoAlpha: 0 }, { x: 0, y: 0, autoAlpha: 1, duration: 0.34, ease: "back.out(1.6)" }, 25.78);
+      tl.fromTo("#bb4", { x: 40, y: 20, autoAlpha: 0 }, { x: 0, y: 0, autoAlpha: 1, duration: 0.34, ease: "back.out(1.6)" }, 26.12);
+      tl.fromTo("#s10-win", { y: 26, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.36 }, 26.3);
+      tl.fromTo("#s10-hand", { rotation: 0 }, { rotation: 288, duration: 1.4, ease: "power1.inOut" }, 26.45);
+      scene("#s10", 24.8, 3.3);
+
+      /* ═══ S11 · Templates ═══ */
+      header("#s11", 28.0);
+      tl.fromTo("#s11-card", { y: 40, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, ease: "power3.out" }, 28.2);
+      tl.to("#s11-pending", { autoAlpha: 0, scale: 0.9, duration: 0.22 }, 29.3);
+      tl.fromTo("#s11-approved", { scale: 0.82, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.4, ease: "back.out(2.2)" }, 29.42);
+      scene("#s11", 28.0, 3.1);
+
+      /* ═══ S12 · Contacts and lists ═══ */
+      header("#s12", 31.0);
+      tl.fromTo("#s12-card", { y: 40, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, ease: "power3.out" }, 31.2);
+      tl.fromTo("#xl1", { x: -40, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.36, ease: "power3.out" }, 31.45);
+      tl.fromTo(".lst", { y: 26, scale: 0.88, autoAlpha: 0 }, { y: 0, scale: 1, autoAlpha: 1, duration: 0.34, stagger: 0.11, ease: "back.out(2)" }, 31.8);
+      scene("#s12", 31.0, 3.1);
+
+      /* ═══ S13 · Analytics ═══ */
+      header("#s13", 34.0);
+      tl.fromTo("#s13-card", { y: 40, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.44, ease: "power3.out" }, 34.2);
+      tl.fromTo(["#ba1", "#ba2", "#ba3", "#ba4", "#ba5", "#ba6", "#ba7", "#ba8"], { scaleY: 0 }, { scaleY: 1, duration: 0.6, stagger: 0.07, ease: "power3.out" }, 34.5);
+      countTo("#k1", 0, 4982, 34.5, 1.1);
+      countTo("#k2", 0, 4790, 34.6, 1.1);
+      countTo("#k3", 0, 3118, 34.7, 1.1);
+      scene("#s13", 34.0, 3.2);
+
+      /* ═══ S14 · Permissions — each chip flips solid as it is granted ═══ */
+      header("#s14", 37.1);
+      const perms = ["#p1", "#p2", "#p3", "#p4", "#p5", "#p6", "#p7"];
+      tl.fromTo(perms, { y: 26, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.3, stagger: 0.07, ease: "power3.out" }, 37.35);
+      perms.forEach((p, i) => {
+        const at = 38.2 + i * 0.16;
+        tl.to(p, { backgroundColor: "#008236", borderColor: "#008236", color: "#ffffff", duration: 0.22, ease: "power2.out" }, at);
+        tl.fromTo(p, { scale: 1 }, { scale: 1.09, duration: 0.11, yoyo: true, repeat: 1, ease: "power2.inOut" }, at);
+      });
+      scene("#s14", 37.1, 3.6);
+
+      /* ═══ S15 · Close ═══ */
+      tl.fromTo("#s15", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.26, ease: "power1.out" }, 40.6);
+      tl.fromTo(["#cl1", "#cl2", "#cl3"], { x: -34, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.4, stagger: 0.16, ease: "power3.out" }, 40.8);
+      tl.fromTo("#s15-mark", { scale: 0.8, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.5, ease: "back.out(1.6)" }, 41.5);
+      tl.fromTo("#s15-word", { y: 30, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.46, ease: "power3.out" }, 41.72);
+      tl.fromTo("#s15-cta", { y: 24, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.46, ease: "power3.out" }, 41.92);
+      tl.fromTo("#s15-url", { y: 20, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.46, ease: "power3.out" }, 42.12);
+
+      /* ═══ Music bed — fade up under the hook, fade out under the end card ═══ */
+      tl.fromTo("#bgm", { volume: 0 }, { volume: 1, duration: 0.5, ease: "power1.out" }, 0);
+      tl.to("#bgm", { volume: 0, duration: 1.2, ease: "power1.in" }, 43.8);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
