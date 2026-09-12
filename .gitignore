@@ -52,6 +52,8 @@ Thumbs.db
 # Screen recordings, render output and frame grabs — heavy binaries that bloat the repo.
 *.mp4
 *.png
+*.mp3
+*.m4a
 # ...but the web app's own image assets are real source, not capture output. Scoped to *.png
 # on purpose: a bare `!wa_web/app/**` would sit after the env/log rules above and re-include
 # anything they ignore under that path.
