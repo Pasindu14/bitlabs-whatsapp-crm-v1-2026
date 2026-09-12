@@ -29,7 +29,7 @@ export default defineConfig({
         storageState: 'e2e/.auth/superadmin.json',
       },
       dependencies: ['setup'],
-      testIgnore: '**/contacts/**',
+      testIgnore: ['**/contacts/**', '**/capture/**'],
     },
     {
       name: 'chromium:companyadmin',
@@ -39,6 +39,17 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       testMatch: '**/contacts/**',
+    },
+    // Marketing screenshot capture. Logs in itself (no shared storageState) and is read-only —
+    // start the dev server with CAPTURE_READONLY=1 first. See e2e/capture/marketing-shots.spec.ts.
+    {
+      name: 'capture',
+      testMatch: '**/capture/*.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        deviceScaleFactor: 2,
+      },
     },
   ],
 })

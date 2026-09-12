@@ -106,6 +106,26 @@ const client = axios.create({
   }),
 });
 
+// Read-only guard for marketing screenshot capture.
+// Set CAPTURE_READONLY=1 when running the dev server for `npm run test:capture` so a stray
+// click can never write to a live tenant (send a WhatsApp message, launch a campaign, submit a
+// template to Meta). Every server action reaches the API through this client, so refusing
+// non-GET here is the single choke point. Inert unless the flag is explicitly set.
+const CAPTURE_READONLY = process.env.CAPTURE_READONLY === "1";
+
+client.interceptors.request.use((config) => {
+  if (!CAPTURE_READONLY) return config;
+
+  const method = (config.method ?? "get").toUpperCase();
+  if (method === "GET" || method === "HEAD") return config;
+
+  throw new ApiError(
+    403,
+    "CAPTURE_READONLY",
+    `Blocked ${method} ${config.url} — the server is running in CAPTURE_READONLY mode.`
+  );
+});
+
 // Attach Bearer token from Next-Auth session on every request
 client.interceptors.request.use(async (config) => {
   const session = await auth();
