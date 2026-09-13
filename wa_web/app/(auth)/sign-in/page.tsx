@@ -1,5 +1,6 @@
 import { LoginForm } from "@/features/auth/components/forms/login-form"
 import { MessageCircle, Users, BarChart3, Zap } from "lucide-react"
+import { BrandMark } from "@/components/brand-mark"
 
 export default function LoginPage() {
   return (
@@ -30,11 +31,8 @@ export default function LoginPage() {
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center gap-10 text-center text-white max-w-sm">
 
-          {/* Icon */}
-          <div className="flex h-20 w-20 items-center justify-center rounded-3xl shadow-2xl"
-            style={{ background: "#25D366" }}>
-            <MessageCircle className="h-10 w-10 text-white fill-white" />
-          </div>
+          {/* Icon — the shared brand mark, same drawing as the favicon and sidebar. */}
+          <BrandMark onDark className="h-20 w-20 drop-shadow-2xl" />
 
           <div className="space-y-3">
             <h1 className="text-3xl font-bold tracking-tight">WhatsApp CRM</h1>
@@ -75,10 +73,7 @@ export default function LoginPage() {
 
           {/* Mobile-only icon */}
           <div className="flex justify-center lg:hidden">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg"
-              style={{ background: "#25D366" }}>
-              <MessageCircle className="h-7 w-7 text-white fill-white" />
-            </div>
+            <BrandMark className="h-14 w-14 drop-shadow-lg" />
           </div>
 
           {/* Heading */}
