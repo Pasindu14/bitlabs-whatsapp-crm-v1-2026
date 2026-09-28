@@ -7,8 +7,11 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Download,
   Info,
+  RotateCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -34,11 +37,22 @@ import {
   useCampaignStats,
   useCampaignAudienceHealth,
   useCampaignRecipients,
+  useResendQuotaBlocked,
 } from "@/features/campaigns/hooks/use-campaigns";
-import type { CampaignStatus } from "@/features/campaigns/types";
+import type {
+  CampaignRecipient,
+  CampaignStatus,
+} from "@/features/campaigns/types";
 import { STAT_META } from "@/features/campaigns/lib/stat-meta";
+import { getCampaignRecipientsAction } from "@/features/campaigns/actions/campaign-actions";
+import { exportToExcel } from "@/components/data-table/utils/export-utils";
 
 const PAGE_SIZE = 50;
+// Quota-held rows are stored as Skipped + QUOTA_EXCEEDED; the API exposes them as this virtual status.
+const QUOTA_FILTER = "QuotaExceeded";
+const QUOTA_LABEL = "Quota reached";
+// The API clamps recipients pageSize to 200 — the export pages through at that max.
+const EXPORT_PAGE_SIZE = 200;
 
 const CAMPAIGN_STATUS_VARIANT: Record<
   CampaignStatus,
@@ -65,6 +79,7 @@ const ERROR_LABELS: Record<string, string> = {
   JOB_ERROR: "Internal error",
   CAMPAIGN_FAILED: "Campaign failed",
   HEADER_MEDIA_MISSING: "Template media missing",
+  QUOTA_EXCEEDED: "Not sent — message quota reached",
   // Meta Cloud API codes
   "131049": "Not delivered — WhatsApp frequency cap",
   "130472": "Not delivered — recipient in Meta experiment",
@@ -146,6 +161,12 @@ const ERROR_DETAILS: Record<string, ErrorDetail> = {
     action:
       "No action needed — the contact is marked so future campaigns skip it.",
   },
+  QUOTA_EXCEEDED: {
+    meaning:
+      "Your plan ran out of messages while this campaign was sending, so this contact was not messaged. Nothing was sent to them and you were not charged.",
+    action:
+      'Add credits or upgrade your plan, then click "Resend quota-blocked" on this campaign. Only these held-back contacts are sent — nobody who already received it gets it twice.',
+  },
   HEADER_MEDIA_MISSING: {
     meaning:
       "The template's header image/video/document couldn't be attached at send time, so the message failed.",
@@ -199,6 +220,9 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
     undefined,
   );
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState<string | null>(null);
+  const { mutate: resendQuotaBlocked, isPending: resending } =
+    useResendQuotaBlocked();
 
   const { data: campaign } = useCampaign(campaignId);
   const { data: stats } = useCampaignStats(campaignId);
@@ -221,6 +245,81 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
 
   const totalPages = recipients?.pagination.totalPages ?? 1;
+  const failedCount = stats?.failed ?? 0;
+  const quotaCount = stats?.quotaExceeded ?? 0;
+  const noQuotaLeft = health?.quotaRemaining === 0;
+  const canResend = quotaCount > 0 && campaign?.status === "Completed";
+
+  // Pull every recipient in a bucket (not just the visible page) and download them as .xlsx, with the
+  // same human-readable reason + guidance the table's info popover shows.
+  async function exportRecipients(filter: "Failed" | typeof QUOTA_FILTER) {
+    const noun = filter === "Failed" ? "failed" : "quota-blocked";
+    const TOAST_ID = `export-${noun}-recipients`;
+    setExporting(filter);
+    toast.loading("Preparing export...", { id: TOAST_ID });
+    try {
+      const all: CampaignRecipient[] = [];
+      for (let p = 1, pages = 1; p <= pages; p++) {
+        const res = await getCampaignRecipientsAction(
+          campaignId,
+          p,
+          EXPORT_PAGE_SIZE,
+          filter,
+        );
+        if (!res.success) throw new Error(res.error);
+        all.push(...res.data.items);
+        pages = res.data.pagination.totalPages;
+      }
+      if (all.length === 0) {
+        toast.error(`No ${noun} recipients to export.`, { id: TOAST_ID });
+        return;
+      }
+
+      const slug =
+        (campaign?.name ?? "campaign")
+          .replace(/[^a-z0-9]+/gi, "-")
+          .replace(/^-+|-+$/g, "") || "campaign";
+      const ok = await exportToExcel(
+        all.map((r) => ({
+          name: r.contactName,
+          phone: r.contactPhone,
+          reason: errorLabel(r.errorCode),
+          whatToDo: errorDetail(r.errorCode).action,
+          code: r.errorCode ?? "",
+          added: new Date(r.createdAt).toLocaleString(),
+        })),
+        `${slug}-${noun}-recipients`,
+        {
+          name: "Contact",
+          phone: "Phone",
+          reason: "Reason",
+          whatToDo: "What to do",
+          code: "Error code",
+          added: "Added",
+        },
+        [
+          { wch: 24 },
+          { wch: 18 },
+          { wch: 42 },
+          { wch: 70 },
+          { wch: 14 },
+          { wch: 22 },
+        ],
+      );
+      if (!ok) throw new Error("Could not create the Excel file.");
+      toast.success(
+        `Exported ${all.length.toLocaleString()} ${noun} recipients.`,
+        { id: TOAST_ID },
+      );
+    } catch (e) {
+      toast.error("Export failed", {
+        id: TOAST_ID,
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setExporting(null);
+    }
+  }
   const rows = recipients?.items ?? [];
 
   return (
@@ -317,7 +416,14 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           </div>
           <Progress value={percent} />
 
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+          <div
+            className={cn(
+              "mt-5 grid grid-cols-2 gap-3",
+              quotaCount > 0
+                ? "sm:grid-cols-5 lg:grid-cols-9"
+                : "sm:grid-cols-4 lg:grid-cols-8",
+            )}
+          >
             {(
               [
                 ["all", "Total", stats.totalRecipients],
@@ -328,6 +434,14 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                 ["Read", "Read", stats.read],
                 ["Failed", "Failed", stats.failed],
                 ["Skipped", "Skipped", stats.skipped],
+                // Only once the quota has actually cut a campaign short — keeps the usual row at 8.
+                ...(quotaCount > 0
+                  ? ([[QUOTA_FILTER, QUOTA_LABEL, quotaCount]] as [
+                      string,
+                      string,
+                      number,
+                    ][])
+                  : []),
               ] as [string, string, number][]
             ).map(([value, label, count]) => {
               const meta = STAT_META[label];
@@ -341,11 +455,13 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                   aria-pressed={active}
                   className={cn(
                     "rounded-lg border p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50",
-                    active && "border-primary bg-primary/5 ring-1 ring-primary"
+                    active && "border-primary bg-primary/5 ring-1 ring-primary",
                   )}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{label}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {label}
+                    </span>
                     <span className={cn("rounded-md p-1", meta.pill)}>
                       <Icon className="size-3.5" />
                     </span>
@@ -362,18 +478,78 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
 
       {/* Recipient list */}
       <div className="flex flex-col gap-4">
-        {statusFilter && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>
-              Filtered by <span className="font-medium text-foreground">{statusFilter}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => changeFilter("all")}
-              className="text-primary hover:underline"
-            >
-              Clear
-            </button>
+        {(statusFilter || failedCount > 0 || quotaCount > 0) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+            {statusFilter ? (
+              <div className="flex items-center gap-2">
+                <span>
+                  Filtered by{" "}
+                  <span className="font-medium text-foreground">
+                    {statusFilter === QUOTA_FILTER ? QUOTA_LABEL : statusFilter}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => changeFilter("all")}
+                  className="text-primary hover:underline"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <span />
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {failedCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportRecipients("Failed")}
+                  disabled={exporting !== null}
+                >
+                  {exporting === "Failed" ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  Export failed ({failedCount.toLocaleString()})
+                </Button>
+              )}
+              {quotaCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportRecipients(QUOTA_FILTER)}
+                  disabled={exporting !== null}
+                >
+                  {exporting === QUOTA_FILTER ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  Export quota-blocked ({quotaCount.toLocaleString()})
+                </Button>
+              )}
+              {canResend && (
+                <Button
+                  size="sm"
+                  onClick={() => resendQuotaBlocked(campaignId)}
+                  disabled={resending || noQuotaLeft}
+                  title={
+                    noQuotaLeft
+                      ? "No message quota left — add credits or upgrade your plan first."
+                      : undefined
+                  }
+                >
+                  {resending ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <RotateCw className="h-4 w-4" />
+                  )}
+                  Resend quota-blocked ({quotaCount.toLocaleString()})
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -402,93 +578,103 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                     className="h-24 text-center text-muted-foreground"
                   >
                     No recipients
-                    {statusFilter ? ` with status “${statusFilter}”` : ""}.
+                    {statusFilter
+                      ? ` with status “${statusFilter === QUOTA_FILTER ? QUOTA_LABEL : statusFilter}”`
+                      : ""}
+                    .
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">
-                      {r.contactName}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {r.contactPhone}
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        type="button"
-                        onClick={() => changeFilter(r.status)}
-                        className={cn(
-                          "inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80",
-                          STAT_META[r.status]?.pill ??
-                            "bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300"
-                        )}
-                      >
-                        {r.status}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {r.errorCode ? (
-                        // An actual delivery/send failure — show the real reason plus a plain-language
-                        // explanation the user can read, instead of a bare code.
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-destructive">
-                            {errorLabel(r.errorCode)}
-                          </span>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button
-                                type="button"
-                                className="text-muted-foreground/70 transition-colors hover:text-foreground"
-                                aria-label="Why did this fail?"
+                rows.map((r) => {
+                  // Quota-held rows are Skipped in storage; show them as their own resendable bucket.
+                  const quotaHeld = r.errorCode === "QUOTA_EXCEEDED";
+                  const statusLabel = quotaHeld ? QUOTA_LABEL : r.status;
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">
+                        {r.contactName}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {r.contactPhone}
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            changeFilter(quotaHeld ? QUOTA_FILTER : r.status)
+                          }
+                          className={cn(
+                            "inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80",
+                            STAT_META[statusLabel]?.pill ??
+                              "bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300",
+                          )}
+                        >
+                          {statusLabel}
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {r.errorCode ? (
+                          // An actual delivery/send failure — show the real reason plus a plain-language
+                          // explanation the user can read, instead of a bare code.
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-destructive">
+                              {errorLabel(r.errorCode)}
+                            </span>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="text-muted-foreground/70 transition-colors hover:text-foreground"
+                                  aria-label="Why did this fail?"
+                                >
+                                  <Info className="size-3.5" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                align="start"
+                                className="w-80 gap-3"
                               >
-                                <Info className="size-3.5" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              align="start"
-                              className="w-80 gap-3"
-                            >
-                              <PopoverHeader>
-                                <PopoverTitle>
-                                  {errorLabel(r.errorCode)}
-                                </PopoverTitle>
-                              </PopoverHeader>
-                              <div className="space-y-3">
-                                <div className="space-y-1">
-                                  <p className="text-xs font-medium text-foreground">
-                                    Why this happened
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {errorDetail(r.errorCode).meaning}
-                                  </p>
+                                <PopoverHeader>
+                                  <PopoverTitle>
+                                    {errorLabel(r.errorCode)}
+                                  </PopoverTitle>
+                                </PopoverHeader>
+                                <div className="space-y-3">
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-medium text-foreground">
+                                      Why this happened
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {errorDetail(r.errorCode).meaning}
+                                    </p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-medium text-foreground">
+                                      What to do
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {errorDetail(r.errorCode).action}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div className="space-y-1">
-                                  <p className="text-xs font-medium text-foreground">
-                                    What to do
-                                  </p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {errorDetail(r.errorCode).action}
-                                  </p>
-                                </div>
-                              </div>
-                              <p className="text-[11px] text-muted-foreground/60">
-                                {/^\d+$/.test(r.errorCode)
-                                  ? `WhatsApp error code ${r.errorCode}`
-                                  : `Code: ${r.errorCode}`}
-                              </p>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {dateTimeFmt.format(new Date(r.createdAt))}
-                    </TableCell>
-                  </TableRow>
-                ))
+                                <p className="text-[11px] text-muted-foreground/60">
+                                  {/^\d+$/.test(r.errorCode)
+                                    ? `WhatsApp error code ${r.errorCode}`
+                                    : `Code: ${r.errorCode}`}
+                                </p>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {dateTimeFmt.format(new Date(r.createdAt))}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

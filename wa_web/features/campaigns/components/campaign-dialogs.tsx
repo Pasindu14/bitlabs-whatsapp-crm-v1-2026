@@ -37,6 +37,7 @@ import {
   useCancelCampaign,
   useLaunchCampaign,
   useCampaignStats,
+  useCampaignAudienceHealth,
 } from "@/features/campaigns/hooks/use-campaigns";
 import { CampaignForm } from "./campaign-form";
 import type {
@@ -184,7 +185,17 @@ function CancelCampaignDialog() {
 function LaunchCampaignDialog() {
   const { isOpen, selectedId, close } = useLaunchCampaignDialog();
   const { data: campaign } = useCampaign(isOpen ? selectedId : null);
+  const { data: health } = useCampaignAudienceHealth(isOpen ? selectedId : null);
   const { mutate: launch, isPending } = useLaunchCampaign();
+
+  // Partial-send preview: with less quota than sendable contacts the campaign sends what fits and holds the
+  // rest as "Quota reached" (resendable after a top-up). Recurring runs fire later, when quota may differ.
+  const quota = health?.quotaRemaining ?? null;
+  const recurring = campaign?.scheduleType === "Recurring";
+  const noQuota = !recurring && quota !== null && quota <= 0;
+  const partial =
+    !recurring && !noQuota && quota !== null && health !== undefined && quota < health.sendable;
+  const held = partial ? health!.sendable - quota! : 0;
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && close()}>
@@ -197,17 +208,38 @@ function LaunchCampaignDialog() {
             to the selected contacts.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {noQuota && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+            <p className="font-medium text-destructive">No message quota left</p>
+            <p className="mt-1 text-muted-foreground">
+              Add credits or upgrade your plan before launching this campaign.
+            </p>
+          </div>
+        )}
+        {partial && (
+          <div className="rounded-lg border border-orange-500/40 bg-orange-500/5 p-3 text-sm">
+            <p className="font-medium text-orange-700 dark:text-orange-400">
+              Only {quota!.toLocaleString()} of {health!.sendable.toLocaleString()} messages will be sent
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              Your plan has {quota!.toLocaleString()} messages left. The other {held.toLocaleString()} contacts
+              will be held as <span className="font-medium text-foreground">Quota reached</span> — add credits,
+              then use <span className="font-medium text-foreground">Resend quota-blocked</span> on the
+              campaign page to send them.
+            </p>
+          </div>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            disabled={isPending}
+            disabled={isPending || noQuota}
             onClick={(e) => {
               e.preventDefault();
               if (selectedId) launch(selectedId, { onSuccess: () => close() });
             }}
           >
             {isPending && <Spinner className="mr-2" />}
-            Launch
+            {partial ? `Launch (send ${quota!.toLocaleString()})` : "Launch"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -278,6 +310,9 @@ function RecipientsDialog() {
                   ["Read", stats.read],
                   ["Failed", stats.failed],
                   ["Skipped", stats.skipped],
+                  ...(stats.quotaExceeded > 0
+                    ? ([["Quota reached", stats.quotaExceeded]] as [string, number][])
+                    : []),
                   ["Delivery rate", `${stats.deliveryRate}%`],
                   ["Read rate", `${stats.readRate}%`],
                 ] as [string, number | string][]

@@ -87,9 +87,9 @@ public class QuotaWarningCheckerJob(
                 : $"in {(int)Math.Ceiling(hoursUntil / 24)} day(s)";
 
             var title = $"Campaign \"{campaign.Name}\" sends {daysLabel} — quota insufficient";
-            var body  = $"Needs {recipients:N0} messages but only {remaining:N0} remain. " +
-                        $"Upgrade your plan or reduce recipients before " +
-                        $"{campaign.ScheduledAt:d MMM HH:mm} UTC.";
+            var body  = $"Needs {recipients:N0} messages but only {Math.Max(0, remaining):N0} remain — only that many " +
+                        "will be sent; the rest will be held as quota-blocked (resend them after a top-up). " +
+                        $"Add credits or upgrade before {campaign.ScheduledAt:d MMM HH:mm} UTC to send them all.";
 
             await notifier.CreateAsync(campaign.CompanyId, campaign.Id, null, type, title, body, ct);
 

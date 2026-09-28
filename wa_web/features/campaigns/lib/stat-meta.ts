@@ -3,6 +3,7 @@ import {
   CheckCheck,
   Clock,
   Eye,
+  Gauge,
   Inbox,
   Send,
   SkipForward,
@@ -53,6 +54,12 @@ export const STAT_META: Record<
   Skipped: {
     icon: SkipForward,
     pill: "bg-slate-500/10 text-slate-500 dark:bg-slate-400/10 dark:text-slate-400",
+  },
+  // Held back because the message quota ran out — resendable after a top-up, so amber (not red).
+  "Quota reached": {
+    icon: Gauge,
+    pill: "bg-orange-500/10 text-orange-600 dark:bg-orange-400/10 dark:text-orange-400",
+    value: "text-orange-600 dark:text-orange-400",
   },
   "Delivery rate": {
     icon: CheckCheck,

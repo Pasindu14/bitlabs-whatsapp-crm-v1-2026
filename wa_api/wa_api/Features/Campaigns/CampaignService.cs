@@ -71,11 +71,8 @@ public class CampaignService(
         await ValidateTargetsAsync(request.TemplateId, request.ContactListIds, request.ContactIds, ct);
         ValidateSchedule(request.ScheduleType, request.ScheduledAt, request.RecurrenceCron);
 
-        if (request.ScheduleType != ScheduleType.Recurring)
-        {
-            var recipientCount = await EstimateRecipientCountAsync(request.ContactListIds, request.ContactIds, ct);
-            await subscriptionGate.EnsureCanSendBatchAsync(recipientCount, ct);
-        }
+        // No quota check on a Draft: nothing is sent yet. Launch requires ≥1 message of balance
+        // ([RequireActiveSubscription]); a partial balance sends what fits and holds the rest as QUOTA_EXCEEDED.
 
         var campaign = new Campaign
         {
@@ -177,12 +174,9 @@ public class CampaignService(
             throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",
                 $"Sends are only permitted between {SendWindow.WindowText}. Schedule this campaign for a time inside that window.");
 
-        // Quota pre-check: skip for Recurring campaigns (fire at future times when quota may have reset).
-        if (campaign.ScheduleType != ScheduleType.Recurring)
-        {
-            var recipientCount = await EstimateRecipientCountAsync(id, ct);
-            await subscriptionGate.EnsureCanSendBatchAsync(recipientCount, ct);
-        }
+        // Quota: no all-or-nothing pre-check. [RequireActiveSubscription] already refuses an exhausted balance
+        // (QUOTA_EXCEEDED); with a partial balance the batch job sends as many as the meter allows and holds
+        // the remainder as Skipped/QUOTA_EXCEEDED for a later "resend quota-blocked".
 
         // Compliance audit: launching with the consent gate overridden is a deliberate, risky act.
         // Record it so there's a trail of who sent to non-opted-in contacts and when.
@@ -265,16 +259,71 @@ public class CampaignService(
         if (campaign.Status != CampaignStatus.Paused)
             throw new BusinessRuleException("CAMPAIGN_NOT_PAUSED", "Only Paused campaigns can be resumed.");
 
-        var queuedCount = await db.CampaignRecipients
-            .CountAsync(r => r.CampaignId == id && r.Status == RecipientStatus.Queued, ct);
-        await subscriptionGate.EnsureCanSendBatchAsync(queuedCount, ct);
-
+        // Partial quota is fine ([RequireActiveSubscription] requires ≥1): the batch sends what fits and holds
+        // the rest as QUOTA_EXCEEDED.
         var jobId = jobClient.Enqueue<CampaignBatchSendJob>(
             j => j.RunAsync(id, CancellationToken.None));
 
         campaign.Status = CampaignStatus.Running;
         campaign.HangfireJobId = jobId;
         await db.SaveChangesAsync(ct);
+
+        return await GetByIdAsync(id, ct);
+    }
+
+    public async Task<CampaignResponse> ResendQuotaBlockedAsync(Guid id, CancellationToken ct = default)
+    {
+        var campaign = await db.Campaigns.FirstOrDefaultAsync(c => c.Id == id, ct)
+            ?? throw new NotFoundException("Campaign", id);
+
+        // Only a finished run: a Running/Paused campaign still owns its queue, and a Recurring campaign
+        // re-queues its whole audience on the next firing anyway.
+        if (campaign.Status != CampaignStatus.Completed)
+            throw new BusinessRuleException("CAMPAIGN_NOT_COMPLETED",
+                "Quota-blocked recipients can only be resent once the campaign has completed.");
+
+        var held = await db.CampaignRecipients.CountAsync(r => r.CampaignId == id
+            && r.Status == RecipientStatus.Skipped
+            && r.ErrorCode == CampaignRecipient.QuotaExceededErrorCode, ct);
+        if (held == 0)
+            throw new BusinessRuleException("NO_QUOTA_BLOCKED_RECIPIENTS",
+                "This campaign has no recipients held back by the message quota.");
+
+        // Sends happen immediately, so the UAE quiet-hours window must be open (same rule as launch).
+        if (!SendWindow.IsOpen(DateTime.UtcNow))
+            throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",
+                $"Sends are only permitted between {SendWindow.WindowText}. Try again inside that window.");
+
+        // Atomically claim Completed→Running so a double-click (or two admins) can't enqueue two batches.
+        var claimed = await db.Campaigns
+            .Where(c => c.Id == id && c.Status == CampaignStatus.Completed)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, CampaignStatus.Running), ct);
+        if (claimed == 0)
+            throw new ConflictException("CAMPAIGN_ALREADY_LAUNCHING",
+                "This campaign is already being resent or is no longer completed.");
+
+        // Re-queue ONLY the quota-held rows. Sent/delivered/read, Meta failures and compliance skips are
+        // untouched, and the batch's per-run duplicate guard (same CurrentRunNumber) still blocks a re-send to
+        // anyone already messaged. If the balance runs short again the batch re-holds whatever doesn't fit.
+        await db.CampaignRecipients
+            .Where(r => r.CampaignId == id
+                        && r.Status == RecipientStatus.Skipped
+                        && r.ErrorCode == CampaignRecipient.QuotaExceededErrorCode)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status, RecipientStatus.Queued)
+                .SetProperty(r => r.ErrorCode, (string?)null)
+                .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
+
+        var jobId = jobClient.Enqueue<CampaignBatchSendJob>(
+            j => j.RunAsync(id, CancellationToken.None));
+
+        campaign.Status = CampaignStatus.Running;
+        campaign.CompletedAt = null;
+        campaign.HangfireJobId = jobId;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Campaign {CampaignId}: re-queued {Held} quota-blocked recipients (job {JobId}).", id, held, jobId);
 
         return await GetByIdAsync(id, ct);
     }
@@ -325,13 +374,18 @@ public class CampaignService(
                 Delivered = g.Count(r => r.Status == RecipientStatus.Delivered),
                 Read = g.Count(r => r.Status == RecipientStatus.Read),
                 Failed = g.Count(r => r.Status == RecipientStatus.Failed),
-                Skipped = g.Count(r => r.Status == RecipientStatus.Skipped),
+                // Quota-held rows are Skipped in storage but reported as their own bucket (exclusive of
+                // Skipped) so the operator can see — and resend — exactly what the quota cut off.
+                Skipped = g.Count(r => r.Status == RecipientStatus.Skipped
+                                       && r.ErrorCode != CampaignRecipient.QuotaExceededErrorCode),
+                QuotaExceeded = g.Count(r => r.Status == RecipientStatus.Skipped
+                                             && r.ErrorCode == CampaignRecipient.QuotaExceededErrorCode),
                 SentWithoutConsent = g.Count(r => r.SentWithoutConsent),
             })
             .FirstOrDefaultAsync(ct);
 
         if (counts is null)
-            return new CampaignStatsResponse(id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0m, 0m);
+            return new CampaignStatsResponse(id, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0m, 0m);
 
         var delivered = counts.Delivered + counts.Read;
         var deliveryRate = counts.Total > 0 ? Math.Round((decimal)delivered / counts.Total * 100, 1) : 0m;
@@ -339,7 +393,7 @@ public class CampaignService(
 
         return new CampaignStatsResponse(
             id, counts.Total, counts.Queued, counts.Accepted, counts.Sent,
-            counts.Delivered, counts.Read, counts.Failed, counts.Skipped,
+            counts.Delivered, counts.Read, counts.Failed, counts.Skipped, counts.QuotaExceeded,
             counts.SentWithoutConsent, deliveryRate, readRate);
     }
 
@@ -356,10 +410,19 @@ public class CampaignService(
             .Include(r => r.Contact)
             .Where(r => r.CampaignId == id);
 
-        if (!string.IsNullOrWhiteSpace(statusFilter) &&
+        // "QuotaExceeded" is a virtual status (Skipped + QUOTA_EXCEEDED) matching the stats bucket; plain
+        // "Skipped" excludes those rows so the two filters partition exactly like the stat cards.
+        if (string.Equals(statusFilter, "QuotaExceeded", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(r => r.Status == RecipientStatus.Skipped
+                                     && r.ErrorCode == CampaignRecipient.QuotaExceededErrorCode);
+        }
+        else if (!string.IsNullOrWhiteSpace(statusFilter) &&
             Enum.TryParse<RecipientStatus>(statusFilter, true, out var parsedStatus))
         {
             query = query.Where(r => r.Status == parsedStatus);
+            if (parsedStatus == RecipientStatus.Skipped)
+                query = query.Where(r => r.ErrorCode != CampaignRecipient.QuotaExceededErrorCode);
         }
 
         var total = await query.CountAsync(ct);
@@ -506,40 +569,10 @@ public class CampaignService(
             if (!f.HasOptedIn) noConsentOverridden++; // sending without recorded consent (override on)
         }
 
+        var quotaRemaining = await subscriptionGate.GetRemainingQuotaAsync(ct);
+
         return new CampaignAudienceHealthResponse(
-            flags.Count, sendable, noConsent, optedOut, invalid, noConsentOverridden, ov);
-    }
-
-    private async Task<int> EstimateRecipientCountAsync(Guid campaignId, CancellationToken ct)
-    {
-        var listIds = await db.CampaignContactLists
-            .Where(x => x.CampaignId == campaignId)
-            .Select(x => x.ContactListId)
-            .ToListAsync(ct);
-
-        var individualContactIds = await db.CampaignContacts
-            .Where(x => x.CampaignId == campaignId)
-            .Select(x => x.ContactId)
-            .ToListAsync(ct);
-
-        return await EstimateRecipientCountAsync(listIds, individualContactIds, ct);
-    }
-
-    private async Task<int> EstimateRecipientCountAsync(
-        List<Guid>? contactListIds, List<Guid>? contactIds, CancellationToken ct)
-    {
-        var contactIdsFromLists = contactListIds is { Count: > 0 }
-            ? await db.ContactListMembers
-                .Where(m => contactListIds.Contains(m.ContactListId) && m.IsActive)
-                .Select(m => m.ContactId)
-                .Distinct()
-                .ToListAsync(ct)
-            : new List<Guid>();
-
-        return contactIdsFromLists
-            .Concat(contactIds ?? Enumerable.Empty<Guid>())
-            .Distinct()
-            .Count();
+            flags.Count, sendable, noConsent, optedOut, invalid, noConsentOverridden, ov, quotaRemaining);
     }
 
     private static void ValidateSchedule(ScheduleType type, DateTime? scheduledAt, string? cron)

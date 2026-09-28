@@ -33,6 +33,13 @@ public enum RecipientStatus
 /// </summary>
 public class CampaignRecipient : BaseEntity, ITenantEntity
 {
+    /// <summary>
+    /// ErrorCode on a <see cref="RecipientStatus.Skipped"/> row the campaign never attempted because the
+    /// company's message quota ran out mid-send. Never sent, never charged; re-queued (and only these rows)
+    /// by the "resend quota-blocked" action once the balance is topped up.
+    /// </summary>
+    public const string QuotaExceededErrorCode = "QUOTA_EXCEEDED";
+
     public Guid CompanyId { get; set; }
     public Guid CampaignId { get; set; }
     public Guid ContactId { get; set; }

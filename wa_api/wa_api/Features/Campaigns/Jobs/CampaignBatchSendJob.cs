@@ -371,32 +371,33 @@ public class CampaignBatchSendJob(
 
             // Reserve quota atomically BEFORE sending (C1 reserve-then-send): the meter enforces a hard ceiling,
             // so concurrent batches near the cap can't overshoot the plan. Null ⇒ ceiling reached (M21 ensured
-            // an active in-period sub at batch start): release this recipient's claim and pause the campaign.
+            // an active in-period sub at batch start): the campaign has sent all its balance allows.
             var reservedSubId = await meter.TryReserveAsync(campaign.CompanyId, 1, ct);
             if (reservedSubId is null)
             {
-                // Release the claim with an atomic UPDATE (a tracked Sending→Queued is a no-op vs the loaded
-                // snapshot), then pause so a resume re-sends this recipient once quota is available.
-                await db.CampaignRecipients.IgnoreQueryFilters()
-                    .Where(r => r.Id == recipient.Id)
-                    .ExecuteUpdateAsync(s => s
-                        .SetProperty(r => r.Status, RecipientStatus.Queued)
-                        .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
-                recipient.Status = RecipientStatus.Queued;
-                campaign.Status = CampaignStatus.Paused;
+                // Partial send: rather than pausing with the rest stuck Queued, hold every unsent recipient —
+                // this claimed one plus all still Queued — as Skipped/QUOTA_EXCEEDED, then let the campaign
+                // finish normally below. They were never sent or charged; the "resend quota-blocked" action
+                // re-queues exactly these rows after a top-up. Persist this batch's earlier progress FIRST so
+                // the bulk UPDATE only catches rows that are genuinely still unsent.
                 await db.SaveChangesAsync(ct);
+                var held = await db.CampaignRecipients.IgnoreQueryFilters()
+                    .Where(r => r.CampaignId == campaignId
+                                && (r.Status == RecipientStatus.Queued || r.Id == recipient.Id))
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(r => r.Status, RecipientStatus.Skipped)
+                        .SetProperty(r => r.ErrorCode, CampaignRecipient.QuotaExceededErrorCode)
+                        .SetProperty(r => r.UpdatedAt, DateTime.UtcNow), ct);
+                // ExecuteUpdate bypassed the change tracker — sync the claimed entity so the save below
+                // can't write its stale Sending back. (Unprocessed batch rows are unmodified → not saved.)
+                recipient.Status = RecipientStatus.Skipped;
+                recipient.ErrorCode = CampaignRecipient.QuotaExceededErrorCode;
 
-                await notifier.CreateAsync(
-                    campaign.CompanyId, campaignId, null,
-                    NotificationType.CampaignThrottled,
-                    "Campaign paused — message quota reached",
-                    $"\"{campaign.Name}\" reached your plan's message quota and was paused. " +
-                    "Add credits or upgrade your plan, then resume the campaign.",
-                    ct);
                 logger.LogWarning(
-                    "CampaignBatchSendJob: campaign {Id} paused — company {CompanyId} quota ceiling reached.",
-                    campaignId, campaign.CompanyId);
-                return;
+                    "CampaignBatchSendJob: campaign {Id} — company {CompanyId} quota ceiling reached; " +
+                    "{Held} recipients held as QUOTA_EXCEEDED.",
+                    campaignId, campaign.CompanyId, held);
+                break;
             }
 
             var sendSucceeded = false;
@@ -697,7 +698,10 @@ public class CampaignBatchSendJob(
                                     || r.Status == RecipientStatus.Delivered
                                     || r.Status == RecipientStatus.Read),
                 Failed = g.Count(r => r.Status == RecipientStatus.Failed),
-                Skipped = g.Count(r => r.Status == RecipientStatus.Skipped),
+                Skipped = g.Count(r => r.Status == RecipientStatus.Skipped
+                                       && r.ErrorCode != CampaignRecipient.QuotaExceededErrorCode),
+                QuotaHeld = g.Count(r => r.Status == RecipientStatus.Skipped
+                                         && r.ErrorCode == CampaignRecipient.QuotaExceededErrorCode),
                 Total = g.Count(),
             })
             .FirstOrDefaultAsync(ct);
@@ -705,17 +709,22 @@ public class CampaignBatchSendJob(
         var sent = counts?.Sent ?? 0;
         var failed = counts?.Failed ?? 0;
         var skipped = counts?.Skipped ?? 0;
+        var quotaHeld = counts?.QuotaHeld ?? 0;
         var total = counts?.Total ?? 0;
 
         var body = $"\"{campaign.Name}\" finished: {sent} sent"
                  + (failed > 0 ? $", {failed} failed" : string.Empty)
                  + (skipped > 0 ? $", {skipped} skipped" : string.Empty)
-                 + $" of {total} recipients.";
+                 + $" of {total} recipients."
+                 + (quotaHeld > 0
+                     ? $" {quotaHeld} were not sent because your message quota ran out — add credits, " +
+                       "then use \"Resend quota-blocked\" on the campaign."
+                     : string.Empty);
 
         await notifier.CreateAsync(
             campaign.CompanyId, campaign.Id, null,
             Notifications.Entities.NotificationType.CampaignCompleted,
-            "Campaign completed",
+            quotaHeld > 0 ? "Campaign partially sent — message quota reached" : "Campaign completed",
             body, ct);
     }
 

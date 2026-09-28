@@ -47,7 +47,10 @@ export interface CampaignStats {
   delivered: number;
   read: number;
   failed: number;
+  /** Skipped by a send-time gate (no consent / opted out / not on WhatsApp). Excludes quotaExceeded. */
   skipped: number;
+  /** Never sent because the message quota ran out mid-campaign — resendable after a top-up. */
+  quotaExceeded: number;
   /** Messages sent to contacts without recorded opt-in (consent override). Audit metric. */
   sentWithoutConsent: number;
   deliveryRate: number;
@@ -64,6 +67,8 @@ export interface CampaignAudienceHealth {
   invalid: number;
   noConsentOverridden: number;
   consentOverride: boolean;
+  /** Messages left in the current period; null = unlimited (platform admin). Below `sendable` ⇒ partial send. */
+  quotaRemaining: number | null;
 }
 
 export interface CampaignRecipient {

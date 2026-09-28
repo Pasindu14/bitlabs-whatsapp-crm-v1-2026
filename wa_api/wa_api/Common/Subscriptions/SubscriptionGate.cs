@@ -57,13 +57,13 @@ public class SubscriptionGate(AppDbContext db, ITenantContext tenant) : ISubscri
         return sub;
     }
 
-    public async Task EnsureCanSendBatchAsync(int count, CancellationToken ct = default)
+    public async Task<int?> GetRemainingQuotaAsync(CancellationToken ct = default)
     {
         if (tenant.IsSuperAdmin)
-            return;
+            return null;
 
         if (tenant.CompanyId is null)
-            throw new AuthorizationException("subscription");
+            return 0;
 
         var sub = await db.Subscriptions.AsNoTracking()
             .Include(s => s.Plan)
@@ -71,17 +71,9 @@ public class SubscriptionGate(AppDbContext db, ITenantContext tenant) : ISubscri
             .OrderByDescending(s => s.CreatedAt)
             .FirstOrDefaultAsync(ct);
 
-        if (sub is null)
-            throw new BusinessRuleException("SUBSCRIPTION_INACTIVE",
-                "Your company has no active subscription. Contact your platform administrator.");
+        if (sub is null || sub.CurrentPeriodEnd < DateTime.UtcNow)
+            return 0;
 
-        if (sub.CurrentPeriodEnd < DateTime.UtcNow)
-            throw new BusinessRuleException("SUBSCRIPTION_INACTIVE",
-                "Your subscription period has ended. Contact your platform administrator.");
-
-        var remaining = sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits - sub.MessagesUsedThisPeriod;
-        if (remaining < count)
-            throw new BusinessRuleException("INSUFFICIENT_QUOTA",
-                $"Insufficient message quota. This campaign requires {count} messages but only {Math.Max(0, remaining)} remain in your current period.");
+        return Math.Max(0, sub.Plan.MonthlyMessageQuota + sub.ExtraMessageCredits - sub.MessagesUsedThisPeriod);
     }
 }

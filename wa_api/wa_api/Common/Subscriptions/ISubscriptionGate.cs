@@ -25,9 +25,11 @@ public interface ISubscriptionGate
     Task EnsureActiveAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Throws when the remaining quota in the current period is less than <paramref name="count"/>.
-    /// Use before launching or resuming a campaign to verify the full batch fits in the quota.
-    /// SuperAdmin (platform plane) bypasses the check.
+    /// Messages left in the caller company's current period (plan quota + extra credits − used), floored at 0.
+    /// Never throws: returns 0 when there is no active, in-period subscription, and null for SuperAdmin
+    /// (platform plane — no plan quota). Informational only (e.g. the campaign launch preview): a campaign may
+    /// launch on a partial balance — it sends what fits and holds the rest as QUOTA_EXCEEDED — because the
+    /// per-send <see cref="ISubscriptionMeter"/> reservation is what actually caps the send.
     /// </summary>
-    Task EnsureCanSendBatchAsync(int count, CancellationToken ct = default);
+    Task<int?> GetRemainingQuotaAsync(CancellationToken ct = default);
 }

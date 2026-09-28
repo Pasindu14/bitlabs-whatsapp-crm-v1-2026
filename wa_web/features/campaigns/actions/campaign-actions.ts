@@ -56,6 +56,11 @@ export const resumeCampaignAction = createAction(
   async (id: string) => CampaignService.resume(id)
 );
 
+export const resendQuotaBlockedAction = createAction(
+  { name: "resendQuotaBlockedAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async (id: string) => CampaignService.resendQuotaBlocked(id)
+);
+
 export const cancelCampaignAction = createAction(
   { name: "cancelCampaignAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
   async (id: string) => CampaignService.cancel(id)

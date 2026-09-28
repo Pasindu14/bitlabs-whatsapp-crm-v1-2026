@@ -120,6 +120,18 @@ export const CampaignService = {
     );
   },
 
+  async resendQuotaBlocked(id: string): Promise<Campaign> {
+    return executeService(
+      { context: "CampaignService", method: "resendQuotaBlocked" },
+      async () => {
+        const res = await client.post<ApiSuccessBody<Campaign>>(
+          `/api/v1/campaigns/${id}/resend-quota-blocked`
+        );
+        return res.data.data;
+      }
+    );
+  },
+
   async cancel(id: string): Promise<Campaign> {
     return executeService(
       { context: "CampaignService", method: "cancel" },

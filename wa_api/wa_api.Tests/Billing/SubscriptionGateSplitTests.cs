@@ -124,6 +124,38 @@ public class SubscriptionGateSplitTests
         await gate.EnsureCanSendAsync(); // neither throws — 50 credits remain
     }
 
+    [Fact] // Partial-send launch preview: remaining = quota + credits − used, never negative.
+    public async Task RemainingQuota_IsQuotaPlusCreditsMinusUsed()
+    {
+        var (db, gate) = await SeedAsync(quota: 600, used: 282);
+        await using var _ = db;
+        Assert.Equal(318, await gate.GetRemainingQuotaAsync());
+    }
+
+    [Fact] // Over-consumed (e.g. credits removed) floors at 0 rather than going negative.
+    public async Task RemainingQuota_FloorsAtZero()
+    {
+        var (db, gate) = await SeedAsync(quota: 100, used: 150);
+        await using var _ = db;
+        Assert.Equal(0, await gate.GetRemainingQuotaAsync());
+    }
+
+    [Fact] // Informational read: an ended period reports 0 instead of throwing (audience health must still load).
+    public async Task RemainingQuota_ExpiredPeriod_IsZero_AndDoesNotThrow()
+    {
+        var (db, gate) = await SeedAsync(quota: 100, used: 0, periodEnd: DateTime.UtcNow.AddDays(-1));
+        await using var _ = db;
+        Assert.Equal(0, await gate.GetRemainingQuotaAsync());
+    }
+
+    [Fact] // SuperAdmin has no plan quota — null means unlimited.
+    public async Task RemainingQuota_SuperAdmin_IsNull()
+    {
+        var tenant = new Tenant(companyId: null, isSuperAdmin: true);
+        await using var db = NewDb(tenant);
+        Assert.Null(await new SubscriptionGate(db, tenant).GetRemainingQuotaAsync());
+    }
+
     [Fact] // SuperAdmin isn't a tenant and bypasses both checks, including the new one.
     public async Task SuperAdmin_BypassesBoth()
     {

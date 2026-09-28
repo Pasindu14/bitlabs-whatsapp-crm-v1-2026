@@ -39,7 +39,11 @@ public record CampaignStatsResponse(
     int Delivered,
     int Read,
     int Failed,
+    /// <summary>Skipped by a send-time gate (no consent / opted out / not on WhatsApp). Excludes QuotaExceeded.</summary>
     int Skipped,
+    /// <summary>Never sent because the message quota ran out mid-campaign (Skipped + QUOTA_EXCEEDED);
+    /// re-queued by POST /campaigns/{id}/resend-quota-blocked.</summary>
+    int QuotaExceeded,
     /// <summary>Messages sent to contacts without recorded opt-in (consent override). Audit metric.</summary>
     int SentWithoutConsent,
     decimal DeliveryRate,
@@ -77,5 +81,8 @@ public record CampaignAudienceHealthResponse(
     /// <summary>Subset of Sendable that has no recorded consent but will send because the override is on.</summary>
     int NoConsentOverridden,
     /// <summary>Whether the campaign's consent override is enabled.</summary>
-    bool ConsentOverride
+    bool ConsentOverride,
+    /// <summary>Messages left in the company's current period; null = unlimited (platform admin). When less
+    /// than Sendable, a launch sends this many and holds the rest as QUOTA_EXCEEDED.</summary>
+    int? QuotaRemaining
 );

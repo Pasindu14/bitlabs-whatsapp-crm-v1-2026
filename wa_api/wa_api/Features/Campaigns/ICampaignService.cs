@@ -21,6 +21,9 @@ public interface ICampaignService
 
     Task<CampaignResponse> ResumeAsync(Guid id, CancellationToken ct = default);
 
+    /// <summary>Re-queue only the recipients a completed campaign held back as QUOTA_EXCEEDED and send them.</summary>
+    Task<CampaignResponse> ResendQuotaBlockedAsync(Guid id, CancellationToken ct = default);
+
     Task<CampaignResponse> CancelAsync(Guid id, CancellationToken ct = default);
 
     Task<CampaignStatsResponse> GetStatsAsync(Guid id, CancellationToken ct = default);

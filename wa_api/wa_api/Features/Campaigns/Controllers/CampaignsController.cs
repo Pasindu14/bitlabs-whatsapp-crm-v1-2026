@@ -87,6 +87,16 @@ public class CampaignsController(ICampaignService service) : ControllerBase
         return Ok(ResponseHelper.Ok(result, CorrelationId));
     }
 
+    /// <summary>POST /api/v1/campaigns/{id}/resend-quota-blocked — re-send only the recipients a completed
+    /// campaign held back because the message quota ran out (Skipped + QUOTA_EXCEEDED).</summary>
+    [HttpPost("{id:guid}/resend-quota-blocked")]
+    [RequireActiveSubscription]
+    public async Task<IActionResult> ResendQuotaBlocked(Guid id, CancellationToken ct)
+    {
+        var result = await service.ResendQuotaBlockedAsync(id, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
     /// <summary>POST /api/v1/campaigns/{id}/cancel — cancel and flip remaining Queued recipients to Skipped.</summary>
     [HttpPost("{id:guid}/cancel")]
     public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)

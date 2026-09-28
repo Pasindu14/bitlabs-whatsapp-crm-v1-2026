@@ -20,6 +20,7 @@ import {
   launchCampaignAction,
   pauseCampaignAction,
   resumeCampaignAction,
+  resendQuotaBlockedAction,
   cancelCampaignAction,
   getCampaignStatsAction,
   getCampaignAudienceHealthAction,
@@ -259,6 +260,24 @@ export function useResumeCampaign() {
       toast.success("Campaign resumed");
     },
     onError: (error: ActionFailure) => handleErrorToast(error, "Campaign", "resume"),
+  });
+}
+
+/** Re-send only the recipients a completed campaign held back because the message quota ran out. */
+export function useResendQuotaBlocked() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await resendQuotaBlockedAction(id);
+      if (!res.success) throw res;
+      return res.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.campaigns.all });
+      toast.success("Resending quota-blocked recipients");
+    },
+    onError: (error: ActionFailure) => handleErrorToast(error, "Campaign", "resend"),
   });
 }
 
