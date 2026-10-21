@@ -21,12 +21,14 @@ import { useActiveWabaConnections } from "@/features/messages/hooks/use-messages
 import {
   builderSchema,
   buildTemplatePayload,
+  initialCarouselState,
   placeholderIndices,
   type BuilderFormValues,
 } from "@/features/templates/schema/template-schema";
 import { HEADER_TYPES, type TemplatePayload } from "@/features/templates/types";
 import { MediaUpload } from "./media-upload";
 import { ButtonsEditor } from "./buttons-editor";
+import { CardButtonsLayoutEditor, CarouselCardsEditor } from "./carousel-editor";
 import { TemplatePreview } from "./template-preview";
 
 const LANGUAGES = [
@@ -104,6 +106,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
   const values = useWatch({ control, defaultValue: defaultValues }) as BuilderFormValues;
   const body = values.body;
   const headerType = values.headerType;
+  const isCarousel = values.mode === "carousel";
 
   // Keep the body-example inputs in sync with the number of {{n}} placeholders in the body.
   useEffect(() => {
@@ -151,6 +154,18 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
       shouldValidate: false,
       shouldDirty: true,
     });
+  };
+
+  // First switch to Carousel seeds two blank cards; the standard-mode fields are kept so switching back loses nothing.
+  const changeMode = (mode: BuilderFormValues["mode"]) => {
+    if (mode === getValues("mode")) return;
+    setValue("mode", mode, { shouldDirty: true });
+    if (mode === "carousel" && getValues("cards").length === 0) {
+      const seed = initialCarouselState();
+      setValue("cardMediaType", seed.cardMediaType, { shouldDirty: true });
+      setValue("cardButtonTypes", seed.cardButtonTypes, { shouldDirty: true });
+      setValue("cards", seed.cards, { shouldDirty: true });
+    }
   };
 
   const submit = handleSubmit((v) => onSave(buildTemplatePayload(v)));
@@ -203,6 +218,32 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label>Template type</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    { mode: "standard", title: "Standard", hint: "Header, body, footer and buttons" },
+                    { mode: "carousel", title: "Carousel", hint: "Body + 2–10 swipeable media cards" },
+                  ] as const
+                ).map((o) => (
+                  <button
+                    key={o.mode}
+                    type="button"
+                    disabled={isSaving}
+                    aria-pressed={values.mode === o.mode}
+                    onClick={() => changeMode(o.mode)}
+                    className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
+                      values.mode === o.mode ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                    }`}
+                  >
+                    <p className="text-sm font-medium">{o.title}</p>
+                    <p className="text-xs text-muted-foreground">{o.hint}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Template name</Label>
@@ -238,61 +279,67 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
             </div>
           </SectionCard>
 
-          <SectionCard title="Header" hint="Optional. A title or media shown above the message." step={2}>
-            <Controller
-              control={control}
-              name="headerType"
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {HEADER_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {HEADER_LABELS[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {!isCarousel && (
+            <SectionCard title="Header" hint="Optional. A title or media shown above the message." step={2}>
+              <Controller
+                control={control}
+                name="headerType"
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HEADER_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {HEADER_LABELS[t]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+
+              {headerType === "text" && (
+                <div className="space-y-2">
+                  <Input placeholder="e.g. Order {{1}} confirmed" disabled={isSaving} {...register("headerText")} />
+                  {errors.headerText && <p className="text-xs text-destructive">{errors.headerText.message}</p>}
+                  {/\{\{\d+\}\}/.test(values.headerText) && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Example for {"{{1}}"}</Label>
+                      <Input placeholder="Sample value" disabled={isSaving} {...register("headerTextExample")} />
+                      {errors.headerTextExample && (
+                        <p className="text-xs text-destructive">{errors.headerTextExample.message}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
-            />
 
-            {headerType === "text" && (
-              <div className="space-y-2">
-                <Input placeholder="e.g. Order {{1}} confirmed" disabled={isSaving} {...register("headerText")} />
-                {errors.headerText && <p className="text-xs text-destructive">{errors.headerText.message}</p>}
-                {/\{\{\d+\}\}/.test(values.headerText) && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Example for {"{{1}}"}</Label>
-                    <Input placeholder="Sample value" disabled={isSaving} {...register("headerTextExample")} />
-                    {errors.headerTextExample && (
-                      <p className="text-xs text-destructive">{errors.headerTextExample.message}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+              {(headerType === "image" || headerType === "document") && (
+                <div className="space-y-1">
+                  <MediaUpload
+                    mediaType={headerType}
+                    value={values.headerMediaHandle}
+                    onChange={(h, previewId) => {
+                      setValue("headerMediaHandle", h, { shouldValidate: true, shouldDirty: true });
+                      setValue("headerMediaPreviewId", previewId, { shouldDirty: true });
+                    }}
+                    disabled={isSaving}
+                  />
+                  {errors.headerMediaHandle && (
+                    <p className="text-xs text-destructive">{errors.headerMediaHandle.message}</p>
+                  )}
+                </div>
+              )}
+            </SectionCard>
+          )}
 
-            {(headerType === "image" || headerType === "document") && (
-              <div className="space-y-1">
-                <MediaUpload
-                  mediaType={headerType}
-                  value={values.headerMediaHandle}
-                  onChange={(h, previewId) => {
-                    setValue("headerMediaHandle", h, { shouldValidate: true, shouldDirty: true });
-                    setValue("headerMediaPreviewId", previewId, { shouldDirty: true });
-                  }}
-                  disabled={isSaving}
-                />
-                {errors.headerMediaHandle && (
-                  <p className="text-xs text-destructive">{errors.headerMediaHandle.message}</p>
-                )}
-              </div>
-            )}
-          </SectionCard>
-
-          <SectionCard title="Body" hint="The main message. Use variables for personalization." step={3}>
+          <SectionCard
+            title="Body"
+            hint={isCarousel ? "The message shown above the cards. Use variables for personalization." : "The main message. Use variables for personalization."}
+            step={isCarousel ? 2 : 3}
+          >
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="body">Message text</Label>
@@ -325,28 +372,41 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
             )}
           </SectionCard>
 
-          <SectionCard title="Footer" hint="Optional. Small grey text below the message." step={4}>
-            <div className="flex items-center gap-2">
-              <Controller
-                control={control}
-                name="footerEnabled"
-                render={({ field }) => (
-                  <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} />
+          {isCarousel ? (
+            <>
+              <SectionCard title="Cards" hint="2–10 swipeable cards, each with media, optional text and buttons." step={3}>
+                <CarouselCardsEditor form={form} disabled={isSaving} />
+              </SectionCard>
+              <SectionCard title="Card buttons" hint="The same 1–2 buttons appear on every card." step={4}>
+                <CardButtonsLayoutEditor form={form} disabled={isSaving} />
+              </SectionCard>
+            </>
+          ) : (
+            <>
+              <SectionCard title="Footer" hint="Optional. Small grey text below the message." step={4}>
+                <div className="flex items-center gap-2">
+                  <Controller
+                    control={control}
+                    name="footerEnabled"
+                    render={({ field }) => (
+                      <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} />
+                    )}
+                  />
+                  <span className="text-sm">Add a footer</span>
+                </div>
+                {values.footerEnabled && (
+                  <div className="space-y-1">
+                    <Input placeholder="e.g. Reply STOP to opt out" disabled={isSaving} {...register("footer")} />
+                    {errors.footer && <p className="text-xs text-destructive">{errors.footer.message}</p>}
+                  </div>
                 )}
-              />
-              <span className="text-sm">Add a footer</span>
-            </div>
-            {values.footerEnabled && (
-              <div className="space-y-1">
-                <Input placeholder="e.g. Reply STOP to opt out" disabled={isSaving} {...register("footer")} />
-                {errors.footer && <p className="text-xs text-destructive">{errors.footer.message}</p>}
-              </div>
-            )}
-          </SectionCard>
+              </SectionCard>
 
-          <SectionCard title="Buttons" hint="Optional. Up to 10 call-to-action or quick-reply buttons." step={5}>
-            <ButtonsEditor form={form} disabled={isSaving} />
-          </SectionCard>
+              <SectionCard title="Buttons" hint="Optional. Up to 10 call-to-action or quick-reply buttons." step={5}>
+                <ButtonsEditor form={form} disabled={isSaving} />
+              </SectionCard>
+            </>
+          )}
 
           <div className="flex items-center justify-between rounded-xl border bg-muted/40 px-5 py-3">
             <p className="text-xs text-muted-foreground">

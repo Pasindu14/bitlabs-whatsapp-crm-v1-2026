@@ -8,11 +8,14 @@ import { Spinner } from "@/components/ui/spinner";
 
 const ACCEPT: Record<string, string> = {
   image: "image/jpeg,image/png",
+  video: "video/mp4",
   document: "application/pdf",
 };
 
 interface MediaUploadProps {
-  mediaType: "image" | "document";
+  mediaType: "image" | "video" | "document";
+  /** What the sample is for, used in the hint text. */
+  purpose?: "header" | "card";
   /** Current handle ("" when none). */
   value: string;
   /** Reports both the Meta handle and the id of our persisted copy (for the preview); both "" when cleared. */
@@ -20,7 +23,7 @@ interface MediaUploadProps {
   disabled?: boolean;
 }
 
-export function MediaUpload({ mediaType, value, onChange, disabled }: MediaUploadProps) {
+export function MediaUpload({ mediaType, purpose = "header", value, onChange, disabled }: MediaUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -85,7 +88,7 @@ export function MediaUpload({ mediaType, value, onChange, disabled }: MediaUploa
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Meta needs a sample {mediaType} to approve the header. (Requires Meta app credentials configured on the server.)
+        Meta needs a sample {mediaType} to approve the {purpose}. (Requires Meta app credentials configured on the server.)
       </p>
     </div>
   );

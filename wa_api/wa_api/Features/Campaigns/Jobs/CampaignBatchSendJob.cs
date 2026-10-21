@@ -256,6 +256,15 @@ public class CampaignBatchSendJob(
             }
         }
 
+        // ── Carousel: upload every card's media ONCE per batch and build the (recipient-independent) carousel
+        // component. Card text and buttons are static, so the same object is reused for every send. A null
+        // component with carouselRequired means a card's media couldn't be resolved → fail locally, like a header.
+        var carouselCards = campaign.Template.Components?.Carousel?.Cards;
+        var carouselRequired = carouselCards is { Count: > 0 };
+        object? carouselComponent = carouselRequired
+            ? await BuildCarouselComponentAsync(db, waba.PhoneNumberId, waba.EncryptedAccessToken, carouselCards!, campaignId, ct)
+            : null;
+
         // Snapshot the cumulative sent count so we can detect crossing a burst-pause boundary during this
         // batch (see the chain point below). Uses SentCount so the check is batch-size independent.
         var sentCountAtBatchStart = campaign.SentCount;
@@ -321,7 +330,7 @@ public class CampaignBatchSendJob(
             // fail at Meta with HTTP 400. Fail this recipient locally BEFORE acquiring a permit (M20): the tier
             // permit counts against the number's scarce daily unique-recipient cap, so consuming one for a send
             // that cannot happen would burn that allowance for nothing.
-            if (headerMediaRequired && headerMedia is null)
+            if ((headerMediaRequired && headerMedia is null) || (carouselRequired && carouselComponent is null))
             {
                 recipient.Status = RecipientStatus.Failed;
                 recipient.ErrorCode = "HEADER_MEDIA_MISSING";
@@ -408,7 +417,7 @@ public class CampaignBatchSendJob(
                     waba.PhoneNumberId, waba.EncryptedAccessToken,
                     recipient.Contact.Phone,
                     campaign.Template.Name, campaign.Template.Language,
-                    resolvedVars, headerMedia, ct);
+                    resolvedVars, headerMedia, carouselComponent, ct);
 
                 if (externalId is not null)
                 {
@@ -881,6 +890,57 @@ public class CampaignBatchSendJob(
         }
     }
 
+    /// <summary>
+    /// Builds the <c>carousel</c> send component: one entry per card with its <c>card_index</c>, a media header
+    /// (a fresh media id uploaded from the card's stored sample — template upload handles aren't valid for sends)
+    /// and a button parameter per quick-reply. The payload mirrors the button text, which the inbound handler's
+    /// opt-out detection already reads. Returns null (logged) if any card's media can't be resolved so the
+    /// caller fails the affected recipients locally instead of sending a half-formed carousel.
+    /// </summary>
+    private async Task<object?> BuildCarouselComponentAsync(
+        AppDbContext db, string phoneNumberId, string accessToken, List<TemplateCarouselCard> cards, Guid campaignId, CancellationToken ct)
+    {
+        var sendCards = new List<object>();
+        for (var i = 0; i < cards.Count; i++)
+        {
+            var card = cards[i];
+            var header = card.Header;
+            var sample = header?.MediaPreviewId is { } sampleId
+                ? await db.TemplateMediaSamples.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == sampleId, ct)
+                : null;
+            if (header is null || sample is null)
+            {
+                logger.LogError("Campaign {Id}: carousel card {Index} has no stored media sample — cannot send.", campaignId, i);
+                return null;
+            }
+
+            var mediaId = await UploadHeaderMediaAsync(phoneNumberId, accessToken, sample, ct);
+            if (mediaId is null)
+                return null;
+
+            object mediaParam = header.Type == "video"
+                ? new { type = "video", video = new { id = mediaId } }
+                : new { type = "image", image = new { id = mediaId } };
+
+            var cardComponents = new List<object> { new { type = "header", parameters = new[] { mediaParam } } };
+            for (var j = 0; j < card.Buttons.Count; j++)
+            {
+                if (card.Buttons[j].Type != "quick_reply") continue;
+                cardComponents.Add(new
+                {
+                    type = "button",
+                    sub_type = "quick_reply",
+                    index = j,
+                    parameters = new[] { new { type = "payload", payload = card.Buttons[j].Text } },
+                });
+            }
+
+            sendCards.Add(new { card_index = i, components = cardComponents });
+        }
+
+        return new { type = "carousel", cards = sendCards };
+    }
+
     /// <summary>Call Meta's template message send endpoint. On a throttle response, <c>RetryAfter</c> carries
     /// Meta's requested cool-down (from the <c>Retry-After</c> header) when present, else null.</summary>
     private async Task<(string? ExternalId, string? ErrorCode, TimeSpan? RetryAfter)> SendTemplateMessageAsync(
@@ -888,6 +948,7 @@ public class CampaignBatchSendJob(
         string templateName, string language,
         Dictionary<string, string> resolvedVars,
         (string Type, string MediaId)? headerMedia,
+        object? carouselComponent,
         CancellationToken ct)
     {
         var client = httpClientFactory.CreateClient("MetaGraph");
@@ -924,6 +985,8 @@ public class CampaignBatchSendJob(
         }
         if (bodyParams.Length > 0)
             componentList.Add(new { type = "body", parameters = bodyParams });
+        if (carouselComponent is not null)
+            componentList.Add(carouselComponent);
 
         object components = componentList.Count > 0 ? componentList.ToArray() : Array.Empty<object>();
 

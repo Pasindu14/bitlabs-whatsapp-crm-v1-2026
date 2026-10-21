@@ -29,7 +29,7 @@ export default defineConfig({
         storageState: 'e2e/.auth/superadmin.json',
       },
       dependencies: ['setup'],
-      testIgnore: ['**/contacts/**', '**/capture/**'],
+      testIgnore: ['**/contacts/**', '**/capture/**', '**/unit/**'],
     },
     {
       name: 'chromium:companyadmin',
@@ -39,6 +39,11 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       testMatch: '**/contacts/**',
+    },
+    // Pure unit tests (schema/payload logic) — no browser, no login, no API. Run: npx playwright test --project=unit
+    {
+      name: 'unit',
+      testMatch: '**/unit/*.spec.ts',
     },
     // Marketing screenshot capture. Logs in itself (no shared storageState) and is read-only —
     // start the dev server with CAPTURE_READONLY=1 first. See e2e/capture/marketing-shots.spec.ts.

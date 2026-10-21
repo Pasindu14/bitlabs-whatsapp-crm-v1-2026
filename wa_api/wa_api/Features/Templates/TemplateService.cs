@@ -234,7 +234,7 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
     /// name format, mandatory body, contiguous positional variables, and a sample value for every
     /// variable (body, header text, dynamic URL) + a media handle for media headers.
     /// </summary>
-    private static void Validate(string name, TemplateComponents c)
+    public static void Validate(string name, TemplateComponents c)
     {
         var fields = new Dictionary<string, string[]>();
 
@@ -300,6 +300,9 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
         if (c.Header is { Type: "image" or "video" or "document" } m && string.IsNullOrWhiteSpace(m.MediaHandle))
             fields["components.header.media"] = ["Upload a sample media file for the media header."];
 
+        if (c.Carousel is not null)
+            ValidateCarousel(c, fields);
+
         var buttons = c.Buttons ?? [];
         if (buttons.Count > 10)
             fields["components.buttons"] = ["A template can have at most 10 buttons."];
@@ -328,6 +331,101 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
 
         if (fields.Count > 0)
             throw new ValidationException(fields);
+    }
+
+    /// <summary>
+    /// Media-card carousel rules (Meta): 2–10 cards that all share one media type and one button layout, 1–2
+    /// buttons per card (quick_reply / url / phone_number), optional card text (≤160, no variables, all-or-none),
+    /// and nothing at the top level except the body — no header, footer or buttons.
+    /// </summary>
+    private static void ValidateCarousel(TemplateComponents c, Dictionary<string, string[]> fields)
+    {
+        const string root = "components.carousel";
+        var cards = c.Carousel!.Cards ?? [];
+
+        if (c.Header is { } topHeader && topHeader.Type is not ("none" or null))
+            fields["components.header"] = ["A carousel template can't have a header — the media lives on the cards."];
+        if (c.Footer is { } topFooter && !string.IsNullOrWhiteSpace(topFooter.Text))
+            fields["components.footer"] = ["A carousel template can't have a footer."];
+        if ((c.Buttons ?? []).Count > 0)
+            fields["components.buttons"] = ["A carousel template can't have buttons outside the cards."];
+
+        if (cards.Count is < 2 or > 10)
+        {
+            fields[$"{root}.cards"] = ["A carousel needs between 2 and 10 cards."];
+            return;
+        }
+
+        var firstType = cards[0].Header?.Type;
+        if (firstType is not ("image" or "video"))
+            fields[$"{root}.cards[0].header.type"] = ["Card media must be an image or a video."];
+
+        var anyText = cards.Any(card => !string.IsNullOrWhiteSpace(card.Body?.Text));
+        var layout = cards[0].Buttons ?? [];
+
+        for (var i = 0; i < cards.Count; i++)
+        {
+            var card = cards[i];
+            var at = $"{root}.cards[{i}]";
+
+            if (card.Header is not { Type: "image" or "video" } header)
+                fields[$"{at}.header.type"] = ["Card media must be an image or a video."];
+            else
+            {
+                if (header.Type != firstType)
+                    fields[$"{at}.header.type"] = ["Every card must use the same media type (all images or all videos)."];
+                if (string.IsNullOrWhiteSpace(header.MediaHandle) || header.MediaPreviewId is null)
+                    fields[$"{at}.header.media"] = ["Upload a media file for this card."];
+            }
+
+            var text = card.Body?.Text?.Trim() ?? string.Empty;
+            if (anyText && text.Length == 0)
+                fields[$"{at}.body.text"] = ["Add text to every card, or remove it from all of them."];
+            else if (text.Length > 160)
+                fields[$"{at}.body.text"] = ["Card text can be at most 160 characters."];
+            else if (PlaceholderRegex().IsMatch(text))
+                fields[$"{at}.body.text"] = ["Card text can't contain variables."];
+
+            var buttons = card.Buttons ?? [];
+            if (buttons.Count is < 1 or > 2)
+            {
+                fields[$"{at}.buttons"] = ["Each card needs 1 or 2 buttons."];
+                continue;
+            }
+            if (buttons.Count != layout.Count
+                || !buttons.Select(b => b.Type).SequenceEqual(layout.Select(b => b.Type)))
+                fields[$"{at}.buttons"] = ["Every card must have the same buttons in the same order."];
+
+            for (var j = 0; j < buttons.Count; j++)
+            {
+                var b = buttons[j];
+                var bat = $"{at}.buttons[{j}]";
+                if (b.Type is not ("quick_reply" or "url" or "phone_number"))
+                {
+                    fields[$"{bat}.type"] = ["Card buttons can be quick reply, URL or phone number."];
+                    continue;
+                }
+                if (string.IsNullOrWhiteSpace(b.Text))
+                    fields[$"{bat}.text"] = ["Button text is required."];
+                else if (b.Text.Trim().Length > 25)
+                    fields[$"{bat}.text"] = ["Button text can be at most 25 characters."];
+
+                if (b.Type == "url")
+                {
+                    if (string.IsNullOrWhiteSpace(b.Url))
+                        fields[$"{bat}.url"] = ["A URL button needs a URL."];
+                    else if (PlaceholderRegex().IsMatch(b.Url))
+                        fields[$"{bat}.url"] = ["Card URLs can't contain variables."];
+                }
+                else if (b.Type == "phone_number")
+                {
+                    if (string.IsNullOrWhiteSpace(b.PhoneNumber))
+                        fields[$"{bat}.phoneNumber"] = ["A call button needs a phone number."];
+                    else if (!E164Regex().IsMatch(NormalizePhone(b.PhoneNumber)))
+                        fields[$"{bat}.phoneNumber"] = ["Use international format, e.g. +14155552671 — country code, no spaces."];
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -369,6 +467,22 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
         foreach (var b in c.Buttons ?? [])
             if (b.Type == "phone_number" && !string.IsNullOrWhiteSpace(b.PhoneNumber))
                 b.PhoneNumber = NormalizePhone(b.PhoneNumber);
+
+        if (c.Carousel is { } carousel)
+        {
+            foreach (var card in carousel.Cards ?? [])
+            {
+                card.Body ??= new TemplateBody();
+                card.Body.Text = card.Body.Text?.Trim() ?? string.Empty;
+                card.Body.Examples = [];
+                foreach (var b in card.Buttons ?? [])
+                {
+                    b.Text = b.Text?.Trim() ?? string.Empty;
+                    if (b.Type == "phone_number" && !string.IsNullOrWhiteSpace(b.PhoneNumber))
+                        b.PhoneNumber = NormalizePhone(b.PhoneNumber);
+                }
+            }
+        }
         return c;
     }
 
@@ -384,6 +498,10 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
     private static void EnsureOptOutButton(Template t)
     {
         if (t.Category != TemplateCategory.Marketing) return;
+
+        // A carousel can't carry top-level buttons, and cards are capped at 2 (shared) buttons — there is
+        // no slot for an auto "Stop". Contacts can still opt out by replying STOP (inbound keyword handling).
+        if (t.Components.Carousel is not null) return;
 
         var buttons = t.Components.Buttons;
 

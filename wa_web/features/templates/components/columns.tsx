@@ -1,7 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { FileText, MoreHorizontal, RefreshCw } from "lucide-react";
+import { FileText, GalleryHorizontal, MoreHorizontal, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -49,7 +49,15 @@ export function getTemplateColumns(actions: TemplateColumnActions): ColumnDef<Te
             </div>
             <div className="min-w-0">
               <div className="truncate font-medium">{t.name}</div>
-              <div className="truncate text-xs text-muted-foreground uppercase">{t.language}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-xs text-muted-foreground uppercase">{t.language}</span>
+                {t.isCarousel && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400">
+                    <GalleryHorizontal className="h-3 w-3" />
+                    Carousel
+                  </span>
+                )}
+              </div>
             </div>
           </button>
         );

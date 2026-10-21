@@ -19,6 +19,26 @@ public static partial class TemplateMapper
         var c = t.Components;
         var components = new List<object>();
 
+        // A carousel template is only BODY + CAROUSEL — Meta rejects a top-level header, footer or buttons.
+        if (c.Carousel is { Cards.Count: > 0 })
+        {
+            var carouselBody = new Dictionary<string, object?> { ["type"] = "BODY", ["text"] = c.Body.Text };
+            if (c.Body.Examples is { Count: > 0 } carouselExamples)
+                carouselBody["example"] = new Dictionary<string, object?> { ["body_text"] = new[] { carouselExamples.ToArray() } };
+            components.Add(carouselBody);
+            components.Add(MapCarousel(c.Carousel));
+
+            return new Dictionary<string, object?>
+            {
+                ["name"] = t.Name,
+                ["language"] = t.Language,
+                ["category"] = t.Category.ToString().ToUpperInvariant(),
+                ["parameter_format"] = "POSITIONAL",
+                ["allow_category_change"] = true,
+                ["components"] = components,
+            };
+        }
+
         // ── HEADER (optional) ──────────────────────────────────────────────
         if (c.Header is { } h && h.Type is not ("none" or null))
         {
@@ -71,6 +91,43 @@ public static partial class TemplateMapper
             ["allow_category_change"] = true,                          // let Meta re-tag rather than reject
             ["components"] = components,
         };
+    }
+
+    /// <summary>
+    /// Meta's <c>CAROUSEL</c> component: a <c>cards</c> array where each card carries its own
+    /// <c>components</c> (media HEADER, optional BODY, BUTTONS). Every card must share the same shape —
+    /// <c>TemplateService.Validate</c> enforces that before we get here.
+    /// </summary>
+    private static Dictionary<string, object?> MapCarousel(TemplateCarousel carousel)
+    {
+        var cards = new List<object>();
+        foreach (var card in carousel.Cards)
+        {
+            var cardComponents = new List<object>();
+
+            var h = card.Header;
+            var header = new Dictionary<string, object?>
+            {
+                ["type"] = "HEADER",
+                ["format"] = (h?.Type ?? "image").ToUpperInvariant(),
+            };
+            if (!string.IsNullOrWhiteSpace(h?.MediaHandle))
+                header["example"] = new Dictionary<string, object?> { ["header_handle"] = new[] { h!.MediaHandle } };
+            cardComponents.Add(header);
+
+            if (!string.IsNullOrWhiteSpace(card.Body?.Text))
+                cardComponents.Add(new Dictionary<string, object?> { ["type"] = "BODY", ["text"] = card.Body.Text });
+
+            cardComponents.Add(new Dictionary<string, object?>
+            {
+                ["type"] = "BUTTONS",
+                ["buttons"] = card.Buttons.Select(MapButton).Cast<object>().ToList(),
+            });
+
+            cards.Add(new Dictionary<string, object?> { ["components"] = cardComponents });
+        }
+
+        return new Dictionary<string, object?> { ["type"] = "CAROUSEL", ["cards"] = cards };
     }
 
     private static Dictionary<string, object?> MapButton(TemplateButton b)
