@@ -10,9 +10,9 @@ export default async function LogsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6 h-full">
-      <div className="rounded-2xl border bg-muted/40 px-8 py-10">
-        <h1 className="text-3xl font-bold tracking-tight">Live Logs</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="page-header">
+        <h1>Live Logs</h1>
+        <p>
           Real-time API log stream — last 100 entries, refreshed every 2 s.
         </p>
       </div>

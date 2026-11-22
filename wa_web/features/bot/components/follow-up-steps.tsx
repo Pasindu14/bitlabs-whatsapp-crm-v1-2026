@@ -13,11 +13,21 @@ import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SectionCard } from "./section-card";
 import { useApprovedTemplates } from "@/features/templates/hooks/use-templates";
 import type { SaveBotProfileInput } from "@/features/bot/schema/bot-schema";
+
+/** A Select item cannot have an empty value, so "nothing picked" needs a stand-in. */
+const NO_TEMPLATE = "__none__";
+import { Label } from "@/components/ui/label";
 
 /** Meta only accepts free-text messages this long after the customer's last message. */
 const WINDOW_HOURS = 24;
@@ -70,7 +80,7 @@ export function FollowUpSteps({
         <div key={field.id} className="space-y-2 rounded-lg border p-3">
           <div className="flex items-end gap-3">
             <div className="w-40 space-y-1.5">
-              <label className="text-sm font-medium">Send after (hours)</label>
+              <Label className="text-sm font-medium">Send after (hours)</Label>
               <Controller
                 control={control}
                 name={`followUpSteps.${index}.delayMinutes`}
@@ -110,25 +120,29 @@ export function FollowUpSteps({
           {/* Past 24 hours the script cannot be sent, so the template is the whole message. */}
           {(steps?.[index]?.delayMinutes ?? 0) > WINDOW_HOURS * 60 && (
             <div className="space-y-1.5 rounded-md bg-muted/50 p-2.5">
-              <label className="text-xs font-medium">
+              <Label className="text-xs font-medium">
                 Template to send (required past 24 hours)
-              </label>
+              </Label>
               <Controller
                 control={control}
                 name={`followUpSteps.${index}.templateId`}
                 render={({ field: f }) => (
-                  <NativeSelect
-                    value={f.value ?? ""}
-                    onChange={(e) => f.onChange(e.target.value || null)}
-                    onBlur={f.onBlur}
+                  <Select
+                    value={f.value ?? NO_TEMPLATE}
+                    onValueChange={(v) => f.onChange(v === NO_TEMPLATE ? null : v)}
                   >
-                    <option value="">No template — this step will be skipped</option>
-                    {(templates ?? []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                    <SelectTrigger className="w-full" onBlur={f.onBlur}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_TEMPLATE}>No template — this step will be skipped</SelectItem>
+                      {(templates ?? []).map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               />
               {(templates ?? []).length === 0 ? (

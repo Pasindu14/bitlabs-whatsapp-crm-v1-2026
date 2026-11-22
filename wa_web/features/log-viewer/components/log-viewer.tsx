@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getLogsAction, type LogEntry } from "@/features/log-viewer/actions/log-actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const LEVEL_COLOR: Record<string, string> = {
   Verbose: "text-zinc-500",
@@ -83,39 +85,45 @@ export function LogViewer() {
     <div className="flex flex-col gap-3 h-full">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <input
+        <Input
           type="text"
           placeholder="Filter logs…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="h-8 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring w-64"
+          className="w-64"
         />
-        <button
+        <Button
+          type="button"
+          variant="outline"
           onClick={() => setPaused((p) => !p)}
-          className={`h-8 rounded-md px-3 text-xs font-medium border transition-colors ${
+          className={
             paused
-              ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
-              : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-          }`}
+              ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/15 hover:text-yellow-600"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-600"
+          }
         >
           {paused ? "▶ Resume" : "⏸ Pause"}
-        </button>
-        <button
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
           onClick={() => setAutoScroll((a) => !a)}
-          className={`h-8 rounded-md px-3 text-xs font-medium border transition-colors ${
+          className={
             autoScroll
-              ? "bg-primary/10 border-primary/30 text-primary"
-              : "bg-muted border-border text-muted-foreground"
-          }`}
+              ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+              : "text-muted-foreground"
+          }
         >
           ↓ Auto-scroll {autoScroll ? "on" : "off"}
-        </button>
-        <button
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="text-muted-foreground"
           onClick={() => { setEntries([]); sinceRef.current = null; }}
-          className="h-8 rounded-md px-3 text-xs font-medium border border-border text-muted-foreground hover:text-foreground transition-colors"
         >
           Clear
-        </button>
+        </Button>
         <span className="text-xs text-muted-foreground ml-auto">
           {visible.length} {visible.length === 1 ? "entry" : "entries"}
           {paused && " · paused"}

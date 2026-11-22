@@ -253,10 +253,10 @@ function LinkEditor({ link, onDone }: { link?: BotLink; onDone: () => void }) {
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Label className="flex items-center gap-2 text-sm text-muted-foreground font-normal leading-normal">
           <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />
           In use
-        </label>
+        </Label>
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onDone}>
             <X className="mr-1 size-4" />

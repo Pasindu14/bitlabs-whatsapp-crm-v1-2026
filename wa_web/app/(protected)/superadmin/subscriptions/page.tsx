@@ -15,9 +15,9 @@ export default async function SubscriptionsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div className="rounded-2xl border bg-muted/40 px-8 py-10">
-        <h1 className="text-3xl font-bold tracking-tight">Subscriptions</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="page-header">
+        <h1>Subscriptions</h1>
+        <p>
           Assign companies to plans and track their monthly message usage.
         </p>
       </div>

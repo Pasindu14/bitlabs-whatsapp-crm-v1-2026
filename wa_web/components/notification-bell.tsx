@@ -19,10 +19,12 @@ function typeIcon(type: NotificationType) {
 
 function NotificationItem({ notification, onRead }: { notification: Notification; onRead: (id: string) => void }) {
   return (
-    <button
+    <Button
+      type="button"
+      variant="ghost"
       onClick={() => { if (!notification.isRead) onRead(notification.id); }}
       className={cn(
-        "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
+        "flex h-auto w-full items-start justify-start gap-3 rounded-none px-4 py-3 text-left text-sm font-normal whitespace-normal hover:bg-muted/50 active:translate-y-0",
         !notification.isRead && "bg-muted/30"
       )}
     >
@@ -39,7 +41,7 @@ function NotificationItem({ notification, onRead }: { notification: Notification
       {!notification.isRead && (
         <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
       )}
-    </button>
+    </Button>
   );
 }
 

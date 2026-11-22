@@ -5,6 +5,7 @@ import { Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Input } from "@/components/ui/input";
 
 const ACCEPT: Record<string, string> = {
   image: "image/jpeg,image/png",
@@ -49,7 +50,7 @@ export function MediaUpload({ mediaType, purpose = "header", value, onChange, di
 
   return (
     <div className="space-y-2">
-      <input
+      <Input
         ref={inputRef}
         type="file"
         accept={ACCEPT[mediaType]}
@@ -73,17 +74,19 @@ export function MediaUpload({ mediaType, purpose = "header", value, onChange, di
         {value && (
           <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
             {fileName ?? "Sample attached"}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               onClick={() => {
                 onChange("", "");
                 setFileName(null);
               }}
-              className="text-muted-foreground hover:text-foreground"
+              className="size-5 text-muted-foreground"
               aria-label="Remove sample"
             >
               <X className="h-3 w-3" />
-            </button>
+            </Button>
           </span>
         )}
       </div>

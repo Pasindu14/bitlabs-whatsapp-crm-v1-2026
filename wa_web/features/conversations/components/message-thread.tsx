@@ -24,6 +24,7 @@ import { useBotAccess } from "@/features/bot/hooks/use-bot-access";
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
 import { initials, formatDayDivider, sameDay, displayPhone } from "./format";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export function MessageThread() {
   const selected = useConversationStore((s) => s.selected);
@@ -265,23 +266,26 @@ function TakeOverDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-2">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={String(choice)}
+          onValueChange={(v) => v && setChoice(Number(v))}
+          className="grid w-full grid-cols-2 gap-2"
+        >
           {/* "Until I hand it back" is no use when the point is choosing a time to hand it back. */}
           {(handBack ? TAKEOVER_OPTIONS.slice(0, -1) : TAKEOVER_OPTIONS).map((option, index) => (
-            <button
+            <ToggleGroupItem
               key={option.label}
-              type="button"
-              onClick={() => setChoice(index)}
-              className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                choice === index
-                  ? "border-primary bg-primary/10 font-medium"
-                  : "hover:bg-muted"
-              } ${option.minutes === undefined ? "col-span-2" : ""}`}
+              value={String(index)}
+              className={`h-auto w-full rounded-lg px-3 py-2 font-normal data-[state=on]:border-primary data-[state=on]:bg-primary/10 data-[state=on]:font-medium ${
+                option.minutes === undefined ? "col-span-2" : ""
+              }`}
             >
               {option.label}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

@@ -13,6 +13,7 @@ import {
   money,
   numFmt,
 } from "@/features/admin-reports/components/shared";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 export function PackagesReport() {
   const [from, setFrom] = useState(isoDaysAgo(30));
@@ -65,46 +66,46 @@ export function PackagesReport() {
       ) : (
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Plan</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Price</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Packages</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Revenue</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-1/3">Share</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="w-full text-sm">
+              <TableHeader>
+                <TableRow className="border-b bg-muted/40">
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Plan</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Price</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Packages</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Revenue</TableHead>
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground w-1/3">Share</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {byPlan.map((r) => (
-                  <tr key={r.planId} className="border-b last:border-0 hover:bg-muted/20">
-                    <td className="px-4 py-3 font-medium">{r.planName}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                  <TableRow key={r.planId} className="border-b last:border-0 hover:bg-muted/20">
+                    <TableCell className="px-4 py-3 font-medium">{r.planName}</TableCell>
+                    <TableCell className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                       {money(r.price)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{numFmt.format(r.count)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-primary">
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-right tabular-nums">{numFmt.format(r.count)}</TableCell>
+                    <TableCell className="px-4 py-3 text-right tabular-nums text-primary">
                       {money(r.revenue)}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
                       <div className="h-2 rounded-full bg-muted">
                         <div
                           className="h-2 rounded-full bg-primary"
                           style={{ width: `${(r.revenue / maxRevenue) * 100}%` }}
                         />
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {byPlan.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                  <TableRow>
+                    <TableCell colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                       No packages purchased in this range.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}

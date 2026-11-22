@@ -14,6 +14,7 @@ import {
   isoToday,
   numFmt,
 } from "@/features/admin-reports/components/shared";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 /** A company costing us more than this share of what it pays is flagged. */
 const COST_SHARE_ALERT = 0.5;
@@ -119,22 +120,22 @@ export function UsageReport() {
       ) : (
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40">
-                  <th className="w-8 px-2 py-3" />
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sent</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Failed</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">AI cost</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Meta cost</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Total</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Per msg</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Plan (pro-rated)</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Margin</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="w-full text-sm">
+              <TableHeader>
+                <TableRow className="border-b bg-muted/40">
+                  <TableHead className="w-8 px-2 py-3" />
+                  <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Company</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Sent</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Failed</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">AI cost</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Meta cost</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Total</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Per msg</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Plan (pro-rated)</TableHead>
+                  <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Margin</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {companies.map((c) => (
                   <UsageRow
                     key={c.companyId}
@@ -144,14 +145,14 @@ export function UsageReport() {
                   />
                 ))}
                 {companies.length === 0 && (
-                  <tr>
-                    <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
+                  <TableRow>
+                    <TableCell colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                       No messages or AI usage in this range.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
       )}
@@ -184,14 +185,14 @@ function UsageRow({ row, expanded, onToggle }: { row: CompanyUsageRow; expanded:
 
   return (
     <Fragment>
-      <tr
+      <TableRow
         className={cn("border-b last:border-0 hover:bg-muted/20 cursor-pointer", over && "bg-destructive/5")}
         onClick={onToggle}
       >
-        <td className="px-2 py-3 text-muted-foreground">
+        <TableCell className="px-2 py-3 text-muted-foreground">
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </td>
-        <td className="px-4 py-3 font-medium">
+        </TableCell>
+        <TableCell className="px-4 py-3 font-medium">
           <span className="inline-flex items-center gap-1.5">
             {row.companyName}
             {underReported && (
@@ -201,16 +202,16 @@ function UsageRow({ row, expanded, onToggle }: { row: CompanyUsageRow; expanded:
               />
             )}
           </span>
-        </td>
-        <td className="px-4 py-3 text-right tabular-nums">{numFmt.format(row.sent)}</td>
-        <td className="px-4 py-3 text-right tabular-nums text-destructive">{numFmt.format(row.failed)}</td>
-        <td className="px-4 py-3 text-right tabular-nums">{usdFmt.format(cost?.aiCostUsd ?? 0)}</td>
-        <td className="px-4 py-3 text-right tabular-nums">{usdFmt.format(cost?.metaCostUsd ?? 0)}</td>
-        <td className="px-4 py-3 text-right tabular-nums font-medium">{aed(cost?.totalCostAed)}</td>
-        <td className="px-4 py-3 text-right tabular-nums">
+        </TableCell>
+        <TableCell className="px-4 py-3 text-right tabular-nums">{numFmt.format(row.sent)}</TableCell>
+        <TableCell className="px-4 py-3 text-right tabular-nums text-destructive">{numFmt.format(row.failed)}</TableCell>
+        <TableCell className="px-4 py-3 text-right tabular-nums">{usdFmt.format(cost?.aiCostUsd ?? 0)}</TableCell>
+        <TableCell className="px-4 py-3 text-right tabular-nums">{usdFmt.format(cost?.metaCostUsd ?? 0)}</TableCell>
+        <TableCell className="px-4 py-3 text-right tabular-nums font-medium">{aed(cost?.totalCostAed)}</TableCell>
+        <TableCell className="px-4 py-3 text-right tabular-nums">
           {cost?.costPerMessageAed == null ? "—" : aedPerMsgFmt.format(cost.costPerMessageAed)}
-        </td>
-        <td className="px-4 py-3 text-right tabular-nums">
+        </TableCell>
+        <TableCell className="px-4 py-3 text-right tabular-nums">
           {cost?.planName ? (
             <span className="flex flex-col items-end">
               <span>{aed(cost.planPriceForRangeAed)}</span>
@@ -219,8 +220,8 @@ function UsageRow({ row, expanded, onToggle }: { row: CompanyUsageRow; expanded:
           ) : (
             <span className="text-muted-foreground">No plan</span>
           )}
-        </td>
-        <td
+        </TableCell>
+        <TableCell
           className={cn(
             "px-4 py-3 text-right tabular-nums font-medium",
             cost?.marginAed != null && cost.marginAed < 0 && "text-destructive",
@@ -233,15 +234,15 @@ function UsageRow({ row, expanded, onToggle }: { row: CompanyUsageRow; expanded:
               cost {pctFmt.format(cost.costShareOfPlan)} of plan
             </span>
           )}
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
       {expanded && (
-        <tr className="border-b bg-muted/10">
-          <td />
-          <td colSpan={9} className="px-4 py-4">
+        <TableRow className="border-b bg-muted/10">
+          <TableCell />
+          <TableCell colSpan={9} className="px-4 py-4">
             <CostBreakdown row={row} />
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </Fragment>
   );

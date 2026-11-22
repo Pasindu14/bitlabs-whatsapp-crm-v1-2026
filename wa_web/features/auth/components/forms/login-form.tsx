@@ -60,7 +60,7 @@ export function LoginForm({
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
-          className="h-10 focus-visible:ring-[#25D366]"
+          className="h-9"
         />
       </div>
 
@@ -75,26 +75,30 @@ export function LoginForm({
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            className="h-10 pr-10 focus-visible:ring-[#25D366]"
+            className="h-9 pr-10"
           />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            tabIndex={-1}
-          >
-            {showPassword
-              ? <EyeOff className="h-4 w-4" />
-              : <Eye className="h-4 w-4" />}
-          </button>
+          <span className="absolute right-1.5 top-1/2 -translate-y-1/2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setShowPassword((v) => !v)}
+              className="text-muted-foreground"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              tabIndex={-1}
+            >
+              {showPassword
+                ? <EyeOff className="h-4 w-4" />
+                : <Eye className="h-4 w-4" />}
+            </Button>
+          </span>
         </div>
       </div>
 
       <Button
         type="submit"
         disabled={loading}
-        className="h-10 font-semibold text-white"
-        style={{ background: loading ? "#059669" : "#25D366" }}
+        className="h-9"
       >
         {loading
           ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Signing in…</>

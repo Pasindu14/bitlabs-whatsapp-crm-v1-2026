@@ -14,6 +14,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { useImportContactsDialog } from "@/features/contact-lists/store/contact-list-store";
 import { useContactList, useImportContacts } from "@/features/contact-lists/hooks/use-contact-lists";
 import type { ImportContactsResult } from "@/features/contact-lists/types";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -101,18 +103,18 @@ export function ImportContactsDialog() {
           </div>
         ) : (
           <div className="space-y-4">
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-center hover:bg-muted/40">
+            <Label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-8 text-center hover:bg-muted/40 font-normal leading-normal">
               <FileSpreadsheet className="h-6 w-6 text-muted-foreground" />
               <span className="text-sm">
                 {file ? file.name : "Click to choose an .xlsx file"}
               </span>
-              <input
+              <Input
                 type="file"
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="hidden"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
-            </label>
+            </Label>
             <Button className="w-full" disabled={!file || importMut.isPending} onClick={onSubmit}>
               {importMut.isPending ? (
                 <>

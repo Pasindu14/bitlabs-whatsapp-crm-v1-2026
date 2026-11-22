@@ -23,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { queryKeys } from "@/lib/hooks/query-keys";
 import { getContactsAction } from "@/features/contacts/actions/contact-actions";
 import { useBookDialog } from "@/features/calendar/store/calendar-store";
@@ -33,6 +32,7 @@ import {
   useCreateAppointment,
 } from "@/features/calendar/hooks/use-calendar";
 import { dateInZone, timeInZone, todayInZone } from "@/features/calendar/components/zone";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**
  * Books a slot on the shared calendar.
@@ -179,23 +179,23 @@ function BookDialog({
                 <Spinner className="size-4" /> Checking availability…
               </div>
             ) : availability && availability.slots.length > 0 ? (
-              <div className="grid max-h-48 grid-cols-3 gap-2 overflow-y-auto rounded-md border p-2 sm:grid-cols-4">
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={slotUtc ?? ""}
+                onValueChange={(v) => v && setSlotUtc(v)}
+                className="grid max-h-48 w-full grid-cols-3 gap-2 overflow-y-auto rounded-md border p-2 sm:grid-cols-4"
+              >
                 {availability.slots.map((s) => (
-                  <button
+                  <ToggleGroupItem
                     key={s.startUtc}
-                    type="button"
-                    onClick={() => setSlotUtc(s.startUtc)}
-                    className={cn(
-                      "rounded-md border px-2 py-1.5 text-sm transition",
-                      slotUtc === s.startUtc
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "hover:bg-muted"
-                    )}
+                    value={s.startUtc}
+                    className="h-8 w-full px-2 font-normal data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                   >
                     {timeInZone(s.startUtc, timeZoneId)}
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
             ) : (
               <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
                 Nothing free on this day. Try another date, or check your opening hours and blackouts.
@@ -233,15 +233,16 @@ function BookDialog({
               <div className="max-h-36 space-y-1 overflow-y-auto rounded-md border p-1">
                 {contacts && contacts.length > 0 ? (
                   contacts.map((c) => (
-                    <button
+                    <Button
                       key={c.id}
                       type="button"
+                      variant="ghost"
                       onClick={() => setContactId(c.id)}
-                      className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+                      className="h-auto w-full justify-between px-2 py-1.5 text-left text-sm font-normal"
                     >
                       <span>{c.name}</span>
                       <span className="text-xs text-muted-foreground">{c.phone}</span>
-                    </button>
+                    </Button>
                   ))
                 ) : (
                   <p className="px-2 py-1.5 text-sm text-muted-foreground">No contacts found.</p>

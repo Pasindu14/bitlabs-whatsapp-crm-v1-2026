@@ -223,9 +223,9 @@ export function CampaignForm({
                 <p className="p-3 text-sm text-muted-foreground">No contact lists found.</p>
               )}
               {listsData?.map((list) => (
-                <label
+                <Label
                   key={list.id}
-                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/40"
+                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/40 font-normal leading-normal"
                 >
                   <Checkbox
                     checked={selectedListIds.includes(list.id)}
@@ -240,7 +240,7 @@ export function CampaignForm({
                   <Badge variant="secondary" className="shrink-0 text-xs">
                     {list.contactCount}
                   </Badge>
-                </label>
+                </Label>
               ))}
             </div>
             {selectedListIds.length > 0 && (
@@ -268,9 +268,9 @@ export function CampaignForm({
                 <p className="p-3 text-sm text-muted-foreground">No contacts found.</p>
               )}
               {contactsData?.map((contact) => (
-                <label
+                <Label
                   key={contact.id}
-                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/40"
+                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/40 font-normal leading-normal"
                 >
                   <Checkbox
                     checked={selectedContactIds.includes(contact.id)}
@@ -280,7 +280,7 @@ export function CampaignForm({
                     <div className="text-sm font-medium truncate">{contact.name}</div>
                     <div className="text-xs text-muted-foreground">{contact.phone}</div>
                   </div>
-                </label>
+                </Label>
               ))}
             </div>
             {selectedContactIds.length > 0 && (
@@ -301,7 +301,7 @@ export function CampaignForm({
         control={control}
         name="overrideConsentGate"
         render={({ field }) => (
-          <label className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 cursor-pointer">
+          <Label className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 cursor-pointer font-normal leading-normal">
             <Checkbox
               className="mt-0.5"
               checked={field.value ?? false}
@@ -317,7 +317,7 @@ export function CampaignForm({
                 banned. Opted-out contacts are still never messaged.
               </p>
             </div>
-          </label>
+          </Label>
         )}
       />
 

@@ -23,8 +23,8 @@ import {
 } from "@/features/calendar/hooks/use-calendar";
 import { useAvailability } from "@/features/calendar/hooks/use-calendar";
 import type { Appointment } from "@/features/calendar/types";
-import { cn } from "@/lib/utils";
 import { dateInZone, dateTimeInZone, timeInZone } from "@/features/calendar/components/zone";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   Pending: "outline",
@@ -186,23 +186,23 @@ function DetailsDialog({
                     <Spinner className="size-4" /> Checking availability…
                   </div>
                 ) : availability && availability.slots.length > 0 ? (
-                  <div className="grid max-h-40 grid-cols-3 gap-2 overflow-y-auto rounded-md border p-2 sm:grid-cols-4">
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    value={newSlotUtc ?? ""}
+                    onValueChange={(v) => v && setNewSlotUtc(v)}
+                    className="grid max-h-40 w-full grid-cols-3 gap-2 overflow-y-auto rounded-md border p-2 sm:grid-cols-4"
+                  >
                     {availability.slots.map((s) => (
-                      <button
+                      <ToggleGroupItem
                         key={s.startUtc}
-                        type="button"
-                        onClick={() => setNewSlotUtc(s.startUtc)}
-                        className={cn(
-                          "rounded-md border px-2 py-1.5 text-sm transition",
-                          newSlotUtc === s.startUtc
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "hover:bg-muted"
-                        )}
+                        value={s.startUtc}
+                        className="h-8 w-full px-2 font-normal data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                       >
                         {timeInZone(s.startUtc, timeZoneId)}
-                      </button>
+                      </ToggleGroupItem>
                     ))}
-                  </div>
+                  </ToggleGroup>
                 ) : (
                   <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
                     Nothing free on this day.

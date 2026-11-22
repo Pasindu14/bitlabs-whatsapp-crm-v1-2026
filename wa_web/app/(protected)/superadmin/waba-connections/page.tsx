@@ -16,9 +16,9 @@ export default async function WabaConnectionsPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       {/* Header card — mirrors the Company Management screen style */}
-      <div className="rounded-2xl border bg-muted/40 px-8 py-10">
-        <h1 className="text-3xl font-bold tracking-tight">WABA Connections</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="page-header">
+        <h1>WABA Connections</h1>
+        <p>
           Connect and manage WhatsApp Business phone numbers for tenant companies.
         </p>
       </div>

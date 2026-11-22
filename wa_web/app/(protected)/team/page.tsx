@@ -16,9 +16,9 @@ export default async function TeamPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       {/* Header card — mirrors the SuperAdmin Users screen style */}
-      <div className="rounded-2xl border bg-muted/40 px-8 py-10">
-        <h1 className="text-3xl font-bold tracking-tight">Team</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="page-header">
+        <h1>Team</h1>
+        <p>
           Create and manage Company Admin and Agent users for your company.
         </p>
       </div>

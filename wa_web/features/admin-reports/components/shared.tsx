@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export const numFmt = new Intl.NumberFormat("en-US");
 export const dateFmt = new Intl.DateTimeFormat(undefined, {
@@ -46,7 +47,7 @@ export function DateRangeFilter({ from, to, onFrom, onTo, onPreset }: DateRangeF
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">From</label>
+        <Label className="text-xs font-medium text-muted-foreground">From</Label>
         <Input
           type="date"
           value={from}
@@ -56,7 +57,7 @@ export function DateRangeFilter({ from, to, onFrom, onTo, onPreset }: DateRangeF
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">To</label>
+        <Label className="text-xs font-medium text-muted-foreground">To</Label>
         <Input
           type="date"
           value={to}

@@ -90,7 +90,7 @@ export function ContactForm({
         control={control}
         name="hasOptedIn"
         render={({ field }) => (
-          <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+          <Label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer font-normal leading-normal">
             <Checkbox
               className="mt-0.5"
               checked={field.value ?? false}
@@ -103,7 +103,7 @@ export function ContactForm({
                 Recorded as a manual opt-in.
               </p>
             </div>
-          </label>
+          </Label>
         )}
       />
 
@@ -114,8 +114,8 @@ export function ContactForm({
           control={control}
           name="isOptedOut"
           render={({ field }) => (
-            <label
-              className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer ${
+            <Label
+              className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer font-normal leading-normal ${
                 field.value ? "border-destructive/50 bg-destructive/5" : ""
               }`}
             >
@@ -134,7 +134,7 @@ export function ContactForm({
                     : ""}
                 </p>
               </div>
-            </label>
+            </Label>
           )}
         />
       )}

@@ -46,6 +46,7 @@ import type {
 import { STAT_META } from "@/features/campaigns/lib/stat-meta";
 import { getCampaignRecipientsAction } from "@/features/campaigns/actions/campaign-actions";
 import { exportToExcel } from "@/components/data-table/utils/export-utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const PAGE_SIZE = 50;
 // Quota-held rows are stored as Skipped + QUOTA_EXCEEDED; the API exposes them as this virtual status.
@@ -416,9 +417,13 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           </div>
           <Progress value={percent} />
 
-          <div
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            value={statusFilter ?? "all"}
+            onValueChange={(v) => v && changeFilter(v)}
             className={cn(
-              "mt-5 grid grid-cols-2 gap-3",
+              "mt-5 grid w-full grid-cols-2 items-stretch gap-3",
               quotaCount > 0
                 ? "sm:grid-cols-5 lg:grid-cols-9"
                 : "sm:grid-cols-4 lg:grid-cols-8",
@@ -448,13 +453,11 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               const Icon = meta.icon;
               const active = (statusFilter ?? "all") === value;
               return (
-                <button
+                <ToggleGroupItem
                   key={value}
-                  type="button"
-                  onClick={() => changeFilter(value)}
-                  aria-pressed={active}
+                  value={value}
                   className={cn(
-                    "rounded-lg border p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50",
+                    "block h-auto w-full min-w-0 rounded-lg p-3 text-left font-normal whitespace-normal hover:border-primary/50 hover:bg-accent/50",
                     active && "border-primary bg-primary/5 ring-1 ring-primary",
                   )}
                 >
@@ -469,10 +472,10 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                   <div className={cn("mt-1 text-xl font-bold", meta.value)}>
                     {count.toLocaleString()}
                   </div>
-                </button>
+                </ToggleGroupItem>
               );
             })}
-          </div>
+          </ToggleGroup>
         </div>
       )}
 
@@ -488,13 +491,14 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                     {statusFilter === QUOTA_FILTER ? QUOTA_LABEL : statusFilter}
                   </span>
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant="link"
                   onClick={() => changeFilter("all")}
-                  className="text-primary hover:underline"
+                  className="h-auto p-0 text-sm"
                 >
                   Clear
-                </button>
+                </Button>
               </div>
             ) : (
               <span />
@@ -598,19 +602,21 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                         {r.contactPhone}
                       </TableCell>
                       <TableCell>
-                        <button
+                        <Button
                           type="button"
+                          variant="link"
+                          size="xs"
                           onClick={() =>
                             changeFilter(quotaHeld ? QUOTA_FILTER : r.status)
                           }
                           className={cn(
-                            "inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80",
+                            "h-auto rounded-md px-2 py-0.5 hover:no-underline hover:opacity-80",
                             STAT_META[statusLabel]?.pill ??
                               "bg-slate-500/10 text-slate-600 dark:bg-slate-400/10 dark:text-slate-300",
                           )}
                         >
                           {statusLabel}
-                        </button>
+                        </Button>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {r.errorCode ? (
@@ -622,13 +628,15 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                             </span>
                             <Popover>
                               <PopoverTrigger asChild>
-                                <button
+                                <Button
                                   type="button"
-                                  className="text-muted-foreground/70 transition-colors hover:text-foreground"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  className="size-5 text-muted-foreground/70"
                                   aria-label="Why did this fail?"
                                 >
                                   <Info className="size-3.5" />
-                                </button>
+                                </Button>
                               </PopoverTrigger>
                               <PopoverContent
                                 align="start"

@@ -7,6 +7,7 @@ import type { Conversation } from "@/features/conversations/types";
 import { useConversationStore } from "@/features/conversations/store/conversation-store";
 import { useMarkConversationRead } from "@/features/conversations/hooks/use-conversations";
 import { initials, formatListTime } from "./format";
+import { Button } from "@/components/ui/button";
 
 export function ConversationListItem({
   conversation,
@@ -29,11 +30,12 @@ export function ConversationListItem({
 
   return (
     <li>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={onClick}
         className={cn(
-          "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60",
+          "flex h-auto w-full items-center justify-start gap-3 rounded-none px-4 py-3 text-left text-sm font-normal whitespace-normal hover:bg-muted/60 active:translate-y-0",
           active && "bg-muted",
         )}
       >
@@ -68,7 +70,7 @@ export function ConversationListItem({
             )}
           </div>
         </div>
-      </button>
+      </Button>
     </li>
   );
 }

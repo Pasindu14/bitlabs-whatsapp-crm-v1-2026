@@ -5,11 +5,20 @@ import { Controller, type Control, type FieldErrors, type UseFormRegister } from
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SectionCard } from "./section-card";
 import { useApprovedTemplates } from "@/features/templates/hooks/use-templates";
 import type { SaveBotProfileInput } from "@/features/bot/schema/bot-schema";
+
+/** A Select item cannot have an empty value, so "nothing picked" needs a stand-in. */
+const NO_TEMPLATE = "__none__";
 
 /** Customer name, customer number, one-line summary — what the alert template must take. */
 const ALERT_VARIABLES = 3;
@@ -90,18 +99,22 @@ export function HandoffAlerts({
           control={control}
           name="handoffAlertTemplateId"
           render={({ field }) => (
-            <NativeSelect
-              value={field.value ?? ""}
-              onChange={(e) => field.onChange(e.target.value || null)}
-              onBlur={field.onBlur}
+            <Select
+              value={field.value ?? NO_TEMPLATE}
+              onValueChange={(v) => field.onChange(v === NO_TEMPLATE ? null : v)}
             >
-              <option value="">No WhatsApp alert — in-app notification only</option>
-              {usable.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </NativeSelect>
+              <SelectTrigger className="w-full" onBlur={field.onBlur}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_TEMPLATE}>No WhatsApp alert — in-app notification only</SelectItem>
+                {usable.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         />
         {usable.length === 0 ? (

@@ -39,10 +39,11 @@ export function getTemplateColumns(actions: TemplateColumnActions): ColumnDef<Te
       cell: ({ row }) => {
         const t = row.original;
         return (
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => onOpen(t.id)}
-            className="flex items-center gap-3 text-left"
+            className="flex h-auto items-center justify-start gap-3 p-0 text-left text-sm font-normal whitespace-normal hover:bg-transparent active:translate-y-0"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <FileText className="h-4 w-4" />
@@ -59,7 +60,7 @@ export function getTemplateColumns(actions: TemplateColumnActions): ColumnDef<Te
                 )}
               </div>
             </div>
-          </button>
+          </Button>
         );
       },
       size: 300,

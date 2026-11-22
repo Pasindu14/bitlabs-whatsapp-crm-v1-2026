@@ -16,9 +16,9 @@ export default async function TemplatesPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
-      <div className="rounded-2xl border bg-muted/40 px-8 py-10">
-        <h1 className="text-3xl font-bold tracking-tight">Message Templates</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="page-header">
+        <h1>Message Templates</h1>
+        <p>
           Build WhatsApp marketing templates, submit them to Meta, and track approval status.
         </p>
         <div className="mt-4">

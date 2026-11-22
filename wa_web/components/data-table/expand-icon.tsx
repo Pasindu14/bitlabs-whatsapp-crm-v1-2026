@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 // ** import types
 import type { Row } from "@tanstack/react-table";
 
@@ -31,15 +33,11 @@ export function ExpandIcon<TData>({
   }
 
   return (
-    <button
+    <Button
       onClick={row.getToggleExpandedHandler()}
-      className={cn(
-        "inline-flex items-center justify-center",
-        "h-6 w-6 cursor-pointer transition-all",
-        "hover:bg-muted rounded-sm",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        className
-      )}
+      variant="ghost"
+      size="icon-xs"
+      className={cn("rounded-sm", className)}
       aria-label={row.getIsExpanded() ? "Collapse row" : "Expand row"}
       aria-expanded={row.getIsExpanded()}
       type="button"
@@ -50,6 +48,6 @@ export function ExpandIcon<TData>({
           row.getIsExpanded() && "rotate-90"
         )}
       />
-    </button>
+    </Button>
   );
 }

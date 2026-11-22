@@ -16,9 +16,9 @@ export default async function PlansPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       {/* Header card — mirrors the Company Management screen style */}
-      <div className="rounded-2xl border bg-muted/40 px-8 py-10">
-        <h1 className="text-3xl font-bold tracking-tight">Plans</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="page-header">
+        <h1>Plans</h1>
+        <p>
           Define the subscription tiers companies can be placed on — quota, price, and features.
         </p>
       </div>

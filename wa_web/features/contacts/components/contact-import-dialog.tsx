@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useImportContactsDialog } from "@/features/contacts/store/contact-store";
 import { useImportContacts } from "@/features/contacts/hooks/use-contacts";
 import type { ImportContactRow, ImportContactsResult } from "@/features/contacts/types";
+import { Label } from "@/components/ui/label";
 
 /** Parses pasted lines into rows. Each line is "phone" or "phone, Name" (comma or tab separated). */
 function parseRows(text: string): ImportContactRow[] {
@@ -120,7 +121,7 @@ export function ContactImportDialog() {
               className="font-mono text-sm"
             />
 
-            <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+            <Label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer font-normal leading-normal">
               <Checkbox
                 className="mt-0.5"
                 checked={markOptedIn}
@@ -133,7 +134,7 @@ export function ContactImportDialog() {
                   contacts without opt-in unless the consent override is on.
                 </p>
               </div>
-            </label>
+            </Label>
 
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">

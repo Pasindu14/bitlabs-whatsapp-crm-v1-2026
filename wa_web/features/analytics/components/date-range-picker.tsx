@@ -1,5 +1,8 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 interface Props {
   from: string;
   to: string;
@@ -9,21 +12,27 @@ interface Props {
 export function AnalyticsDateRangePicker({ from, to, onChange }: Props) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <label className="text-muted-foreground">From</label>
-      <input
+      <Label htmlFor="analytics-from" className="font-normal text-muted-foreground">
+        From
+      </Label>
+      <Input
+        id="analytics-from"
         type="date"
         value={from}
         max={to}
         onChange={(e) => onChange({ from: e.target.value, to })}
-        className="rounded-md border bg-background px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+        className="w-[150px]"
       />
-      <label className="text-muted-foreground">To</label>
-      <input
+      <Label htmlFor="analytics-to" className="font-normal text-muted-foreground">
+        To
+      </Label>
+      <Input
+        id="analytics-to"
         type="date"
         value={to}
         min={from}
         onChange={(e) => onChange({ from, to: e.target.value })}
-        className="rounded-md border bg-background px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+        className="w-[150px]"
       />
     </div>
   );

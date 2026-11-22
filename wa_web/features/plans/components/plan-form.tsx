@@ -125,10 +125,10 @@ export function PlanForm({
             return (
               <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
                 {PERMISSIONS.map((perm) => (
-                  <label
+                  <Label
                     key={perm.key}
                     htmlFor={`flag-${perm.key}`}
-                    className="flex items-center gap-2 text-sm"
+                    className="flex items-center gap-2 text-sm font-normal leading-normal"
                   >
                     <Checkbox
                       id={`flag-${perm.key}`}
@@ -136,7 +136,7 @@ export function PlanForm({
                       onCheckedChange={(c) => toggle(perm.key, c === true)}
                     />
                     {perm.label}
-                  </label>
+                  </Label>
                 ))}
               </div>
             );
@@ -153,7 +153,7 @@ export function PlanForm({
         control={control}
         name="isOnline"
         render={({ field }) => (
-          <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+          <Label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer font-normal leading-normal">
             <Checkbox
               className="mt-0.5"
               checked={field.value ?? false}
@@ -166,7 +166,7 @@ export function PlanForm({
                 flow once online payments are configured.
               </p>
             </div>
-          </label>
+          </Label>
         )}
       />
 

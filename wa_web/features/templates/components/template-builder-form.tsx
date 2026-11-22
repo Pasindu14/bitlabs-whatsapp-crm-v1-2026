@@ -30,6 +30,7 @@ import { MediaUpload } from "./media-upload";
 import { ButtonsEditor } from "./buttons-editor";
 import { CardButtonsLayoutEditor, CarouselCardsEditor } from "./carousel-editor";
 import { TemplatePreview } from "./template-preview";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const LANGUAGES = [
   { code: "en_US", label: "English (US)" },
@@ -220,28 +221,30 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
 
             <div className="space-y-2">
               <Label>Template type</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={values.mode}
+                disabled={isSaving}
+                onValueChange={(v) => v && changeMode(v as BuilderFormValues["mode"])}
+                className="grid w-full items-stretch gap-2 sm:grid-cols-2"
+              >
                 {(
                   [
                     { mode: "standard", title: "Standard", hint: "Header, body, footer and buttons" },
                     { mode: "carousel", title: "Carousel", hint: "Body + 2–10 swipeable media cards" },
                   ] as const
                 ).map((o) => (
-                  <button
+                  <ToggleGroupItem
                     key={o.mode}
-                    type="button"
-                    disabled={isSaving}
-                    aria-pressed={values.mode === o.mode}
-                    onClick={() => changeMode(o.mode)}
-                    className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
-                      values.mode === o.mode ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                    }`}
+                    value={o.mode}
+                    className="block h-auto w-full rounded-lg p-3 text-left font-normal whitespace-normal data-[state=on]:border-primary data-[state=on]:bg-primary/5"
                   >
                     <p className="text-sm font-medium">{o.title}</p>
                     <p className="text-xs text-muted-foreground">{o.hint}</p>
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

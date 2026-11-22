@@ -177,7 +177,7 @@ export function RuleForm({
         control={control}
         name="isEnabled"
         render={({ field }) => (
-          <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer">
+          <Label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer font-normal leading-normal">
             <Checkbox
               className="mt-0.5"
               checked={field.value ?? false}
@@ -189,7 +189,7 @@ export function RuleForm({
                 Disabled rules are skipped by the bot but kept for later.
               </p>
             </div>
-          </label>
+          </Label>
         )}
       />
 

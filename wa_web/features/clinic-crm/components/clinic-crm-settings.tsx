@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -32,6 +38,9 @@ import {
   useTestClinicCrm,
 } from "@/features/clinic-crm/hooks/use-clinic-crm";
 import type { ClinicCrmSettings } from "@/features/clinic-crm/types";
+
+/** A Select item cannot have an empty value, so "nothing picked" needs a stand-in. */
+const NO_TREATMENT = "__none__";
 
 /**
  * The link to the clinic's own CRM (plan 014). While it is on, the clinic's CRM is the calendar that
@@ -311,32 +320,36 @@ function TreatmentMatchingCard({ settings }: { settings: ClinicCrmSettings }) {
                 {treatments.isLoading ? (
                   <Skeleton className="h-9 w-64" />
                 ) : (
-                  <NativeSelect
-                    className="w-full sm:w-64"
-                    value={draft[service.appointmentTypeId]?.toString() ?? ""}
+                  <Select
+                    value={draft[service.appointmentTypeId]?.toString() ?? NO_TREATMENT}
                     disabled={!treatments.data}
-                    onChange={(e) =>
+                    onValueChange={(v) =>
                       setDraft((d) => ({
                         ...d,
-                        [service.appointmentTypeId]: e.target.value ? Number(e.target.value) : null,
+                        [service.appointmentTypeId]: v === NO_TREATMENT ? null : Number(v),
                       }))
                     }
                   >
-                    <option value="">No treatment</option>
-                    {(treatments.data ?? []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                    {/* A saved match the clinic has since removed stays visible, so it can be changed. */}
-                    {draft[service.appointmentTypeId] != null &&
-                    treatments.data &&
-                    !treatments.data.some((t) => t.id === draft[service.appointmentTypeId]) ? (
-                      <option value={draft[service.appointmentTypeId]!}>
-                        Treatment #{draft[service.appointmentTypeId]} (no longer at the clinic)
-                      </option>
-                    ) : null}
-                  </NativeSelect>
+                    <SelectTrigger className="w-full sm:w-64">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_TREATMENT}>No treatment</SelectItem>
+                      {(treatments.data ?? []).map((t) => (
+                        <SelectItem key={t.id} value={t.id.toString()}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                      {/* A saved match the clinic has since removed stays visible, so it can be changed. */}
+                      {draft[service.appointmentTypeId] != null &&
+                      treatments.data &&
+                      !treatments.data.some((t) => t.id === draft[service.appointmentTypeId]) ? (
+                        <SelectItem value={draft[service.appointmentTypeId]!.toString()}>
+                          Treatment #{draft[service.appointmentTypeId]} (no longer at the clinic)
+                        </SelectItem>
+                      ) : null}
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
             ))}

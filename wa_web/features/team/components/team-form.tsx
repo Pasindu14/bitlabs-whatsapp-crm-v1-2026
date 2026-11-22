@@ -153,10 +153,10 @@ export function TeamForm({
               return (
                 <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
                   {PERMISSIONS.map((p) => (
-                    <label
+                    <Label
                       key={p.key}
                       htmlFor={`perm-${p.key}`}
-                      className="flex items-center gap-2 text-sm font-normal"
+                      className="flex items-center gap-2 text-sm font-normal leading-normal"
                     >
                       <Checkbox
                         id={`perm-${p.key}`}
@@ -164,7 +164,7 @@ export function TeamForm({
                         onCheckedChange={(c) => toggle(p.key, c === true)}
                       />
                       {p.label}
-                    </label>
+                    </Label>
                   ))}
                 </div>
               );

@@ -11,6 +11,7 @@ import {
   timeInZone,
   todayInZone,
 } from "@/features/calendar/components/zone";
+import { Button } from "@/components/ui/button";
 
 /** Pixels per hour. Sets the whole grid's vertical scale. */
 const HOUR_PX = 56;
@@ -198,13 +199,14 @@ export function WeekGrid({
                     (minutesBetween(a.startUtc, a.endUtc) / 60) * HOUR_PX
                   );
                   return (
-                    <button
+                    <Button
                       key={a.id}
                       type="button"
+                      variant="link"
                       onClick={() => onSelectAppointment(a.id)}
                       style={{ top, height }}
                       className={cn(
-                        "absolute inset-x-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        "absolute inset-x-1 block h-auto overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight font-normal whitespace-normal text-foreground transition hover:no-underline hover:brightness-95 active:translate-y-0",
                         STATUS_STYLES[a.status] ?? STATUS_STYLES.Confirmed
                       )}
                     >
@@ -213,7 +215,7 @@ export function WeekGrid({
                       {height > 44 && (
                         <div className="truncate opacity-70">{a.appointmentTypeName}</div>
                       )}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

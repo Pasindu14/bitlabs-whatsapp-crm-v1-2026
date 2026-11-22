@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCompanyHealth } from "@/features/monitoring/hooks/use-monitoring";
 import type { CompanyHealth } from "@/features/monitoring/types";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 const numFmt = new Intl.NumberFormat("en-US");
 const dateFmt = new Intl.DateTimeFormat(undefined, {
@@ -116,28 +117,28 @@ export function CompanyHealthTable() {
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/40">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Health</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Quality</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sent (30d)</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Failed</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Fail Rate</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Active Campaigns</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Last Activity</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="w-full text-sm">
+            <TableHeader>
+              <TableRow className="border-b bg-muted/40">
+                <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Company</TableHead>
+                <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Health</TableHead>
+                <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Quality</TableHead>
+                <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Sent (30d)</TableHead>
+                <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Failed</TableHead>
+                <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Fail Rate</TableHead>
+                <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Active Campaigns</TableHead>
+                <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Last Activity</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {sorted.map((company) => (
-                <tr
+                <TableRow
                   key={company.id}
                   className={`border-b last:border-0 transition-colors hover:bg-muted/20 ${
                     !company.isActive ? "opacity-50" : ""
                   }`}
                 >
-                  <td className="px-4 py-3">
+                  <TableCell className="px-4 py-3">
                     <div className="flex flex-col">
                       <span className="font-medium">{company.name}</span>
                       {!company.isActive && (
@@ -146,49 +147,49 @@ export function CompanyHealthTable() {
                         </Badge>
                       )}
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     <HealthBadge company={company} />
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     <QualityBadge rating={company.qualityRating} />
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right tabular-nums">
                     {numFmt.format(company.totalSent30d)}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-destructive">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right tabular-nums text-destructive">
                     {numFmt.format(company.failed30d)}
-                  </td>
-                  <td className={`px-4 py-3 text-right tabular-nums font-medium ${
+                  </TableCell>
+                  <TableCell className={`px-4 py-3 text-right tabular-nums font-medium ${
                     company.isFlagged ? "text-amber-600" : "text-muted-foreground"
                   }`}>
                     {company.totalSent30d > 0
                       ? `${(company.failureRate * 100).toFixed(1)}%`
                       : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-right tabular-nums">
                     {company.activeCampaigns > 0 ? (
                       <Badge variant="secondary">{company.activeCampaigns}</Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-muted-foreground">
                     {company.lastMessageAt
                       ? dateFmt.format(new Date(company.lastMessageAt))
                       : "Never"}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
               {sorted.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                     No companies found.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     </div>

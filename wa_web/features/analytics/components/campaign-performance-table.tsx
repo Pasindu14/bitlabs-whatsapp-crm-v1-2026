@@ -11,6 +11,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { CampaignPerformance } from "@/features/analytics/types";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   data?: CampaignPerformance;
@@ -51,13 +53,15 @@ function MetricHeader({ label, align }: { label: string; align: "left" | "right"
       {label}
       <Popover>
         <PopoverTrigger asChild>
-          <button
+          <Button
             type="button"
-            className="text-muted-foreground/70 transition-colors hover:text-foreground"
+            variant="ghost"
+            size="icon-xs"
+            className="size-5 text-muted-foreground/70"
             aria-label={`What is ${label}?`}
           >
             <Info className="size-3.5" />
-          </button>
+          </Button>
         </PopoverTrigger>
         <PopoverContent align={align === "right" ? "end" : "start"} className="w-72 gap-2">
           <PopoverHeader>
@@ -94,52 +98,52 @@ export function CampaignPerformanceTable({ data, isLoading }: Props) {
   return (
     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40">
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Campaign</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Launched</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Recipients</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+        <Table className="w-full text-sm">
+          <TableHeader>
+            <TableRow className="border-b bg-muted/40">
+              <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Campaign</TableHead>
+              <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Status</TableHead>
+              <TableHead className="px-4 py-3 text-left font-medium text-muted-foreground">Launched</TableHead>
+              <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">Recipients</TableHead>
+              <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">
                 <MetricHeader label="Delivered %" align="right" />
-              </th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+              </TableHead>
+              <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">
                 <MetricHeader label="Read %" align="right" />
-              </th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">
+              </TableHead>
+              <TableHead className="px-4 py-3 text-right font-medium text-muted-foreground">
                 <MetricHeader label="Failed %" align="right" />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                <td className="px-4 py-3 font-medium max-w-[200px] truncate">{row.name}</td>
-                <td className="px-4 py-3">
+              <TableRow key={row.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                <TableCell className="px-4 py-3 font-medium max-w-[200px] truncate">{row.name}</TableCell>
+                <TableCell className="px-4 py-3">
                   <Badge variant={STATUS_VARIANT[row.status] ?? "secondary"}>
                     {row.status}
                   </Badge>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground tabular-nums">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground tabular-nums">
                   {row.launchedAt ? dateFmt.format(new Date(row.launchedAt)) : "—"}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-right tabular-nums">
                   {numFmt.format(row.totalRecipients)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-primary">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-right tabular-nums text-primary">
                   {pct(row.delivered + row.read, row.totalRecipients)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-blue-600">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-right tabular-nums text-blue-600">
                   {pct(row.read, row.totalRecipients)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-destructive">
+                </TableCell>
+                <TableCell className="px-4 py-3 text-right tabular-nums text-destructive">
                   {pct(row.failed, row.totalRecipients)}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
