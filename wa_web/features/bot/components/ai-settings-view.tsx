@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useForm, useWatch, Controller, type FieldErrors, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Bot, Sparkles } from "lucide-react";
+import { Bot, ScrollText, Sparkles, Store } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,13 +53,18 @@ export function AiSettingsView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="min-w-0 space-y-4">
       {/* Keyed on the saved timestamp so a successful save remounts the form with the new values
           rather than needing an effect to sync them — the same trick the calendar settings use. */}
       <ProfileForm key={profile.updatedAt ?? "new"} profile={profile} />
       <FaqSection />
       <LinkSection />
-      <AiPreviewPanel canPreview={profile.exists} />
+      </div>
+      {/* Beside the settings on wide screens, so a change can be tried without scrolling away. */}
+      <div className="xl:sticky xl:top-4">
+        <AiPreviewPanel canPreview={profile.exists} />
+      </div>
     </div>
   );
 }
@@ -134,14 +139,11 @@ function ProfileForm({
   );
 
   return (
-    <form onSubmit={handleSubmit((data) => save.mutate(data), onInvalid)} className="space-y-6">
+    <form onSubmit={handleSubmit((data) => save.mutate(data), onInvalid)} className="space-y-4">
       <SectionCard
-        title={
-          <span className="flex items-center gap-2">
-            <Sparkles className="size-4" />
-            AI assistant
-          </span>
-        }
+        title="AI assistant"
+        icon={Sparkles}
+        tone="green"
         description={
           <>
             Replies to anything your keyword rules don&apos;t cover, in the customer&apos;s own
@@ -177,6 +179,8 @@ function ProfileForm({
 
       <SectionCard
         title="About the business"
+        icon={Store}
+        tone="blue"
         description={
           <>
             Everything here is quoted to customers word for word, so write it the way you&apos;d
@@ -236,6 +240,8 @@ function ProfileForm({
 
       <SectionCard
         title="Rules"
+        icon={ScrollText}
+        tone="amber"
         description={
           <>
             It already writes short, warm WhatsApp messages. Your answers below are its script —

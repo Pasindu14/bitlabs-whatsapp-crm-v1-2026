@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { PageHero } from "@/components/page-hero";
+import { getCompanyHealthAction } from "@/features/monitoring/actions/monitoring-actions";
 import { CompanyHealthTable } from "@/features/monitoring/components/company-health-table";
 
 export default async function MonitoringPage() {
@@ -8,14 +10,21 @@ export default async function MonitoringPage() {
     redirect("/unauthorized");
   }
 
+  const res = await getCompanyHealthAction();
+  const list = res.success ? res.data.companies : null;
+  const sent = list ? list.reduce((t, c) => t + c.totalSent30d, 0) : null;
+
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <div className="page-header">
-        <h1>Platform Monitoring</h1>
-        <p>
-          Cross-tenant health overview — message volumes, failure rates, and active campaigns per company (last 30 days). Companies with a failure rate above 10% are flagged.
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
+      <PageHero
+        title="Platform monitoring"
+        description="How every company's messaging went over the last 30 days. A company is flagged when more than 1 in 10 of its messages fail."
+        facts={[
+          { label: "Messages sent", value: sent },
+          { label: "Companies sending campaigns now", value: list ? list.filter((c) => c.activeCampaigns > 0).length : null, tone: "blue" },
+          { label: "Flagged", value: list ? list.filter((c) => c.isFlagged).length : null, tone: "red" },
+        ]}
+      />
 
       <CompanyHealthTable />
     </div>

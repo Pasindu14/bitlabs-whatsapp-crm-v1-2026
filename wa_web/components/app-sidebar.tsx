@@ -1,14 +1,29 @@
 "use client";
 import {
+  Activity,
   BarChart3,
+  Bot,
   Building2,
+  CalendarDays,
+  Contact,
+  CreditCard,
+  FileClock,
+  FileText,
+  Inbox,
+  Layers,
   LayoutDashboard,
-  MessageCircle,
+  ListChecks,
+  Megaphone,
+  Package,
+  PieChart,
+  Plug,
+  Smartphone,
+  UserCog,
   Users,
   type LucideIcon,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { NavMain } from "@/components/nav-main";
+import { NavMain, type NavSection } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { CompanyLogo } from "@/components/company-logo";
 import { useBotAccess } from "@/features/bot/hooks/use-bot-access";
@@ -20,91 +35,70 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-type NavSubItem = {
+type NavItem = {
   title: string;
   url: string;
+  icon: LucideIcon;
   roles?: string[];
   /** Only shown when the company's plan includes this feature (plan 005). */
   feature?: "chatbot" | "calendar";
 };
 
-type NavGroup = {
-  title: string;
-  url: string;
-  icon: LucideIcon;
-  isActive?: boolean;
-  roles?: string[];
-  items: NavSubItem[];
-};
+type NavGroup = { label: string; roles: string[]; items: NavItem[] };
 
 // Roles mirror wa_api UserRole: SuperAdmin | CompanyAdmin | Agent.
 const navConfig: NavGroup[] = [
-  {
-    title: "Overview",
-    url: "#",
-    icon: LayoutDashboard,
-    isActive: true,
-    roles: ["CompanyAdmin", "Agent"],
-    items: [
-      { title: "Dashboard", url: "/dashboard" },
-    ],
-  },
   // ── Platform administration (SuperAdmin only) ──────────────────
   {
-    title: "Platform",
-    url: "#",
-    icon: Building2,
-    isActive: true,
+    label: "Platform",
     roles: ["SuperAdmin"],
     items: [
-      { title: "Companies", url: "/superadmin/companies" },
-      { title: "WABA Connections", url: "/superadmin/waba-connections" },
-      { title: "Plans", url: "/superadmin/plans" },
-      { title: "Packages", url: "/superadmin/packages" },
-      { title: "Subscriptions", url: "/superadmin/subscriptions" },
-      { title: "Users", url: "/superadmin/users" },
-      { title: "Monitoring", url: "/superadmin/monitoring" },
-      { title: "Reports", url: "/superadmin/reports" },
-      { title: "Logs", url: "/superadmin/server-logs" },
+      { title: "Companies", url: "/superadmin/companies", icon: Building2 },
+      { title: "WhatsApp numbers", url: "/superadmin/waba-connections", icon: Smartphone },
+      { title: "Plans", url: "/superadmin/plans", icon: Layers },
+      { title: "Packages", url: "/superadmin/packages", icon: Package },
+      { title: "Subscriptions", url: "/superadmin/subscriptions", icon: CreditCard },
+      { title: "Users", url: "/superadmin/users", icon: UserCog },
+    ],
+  },
+  {
+    label: "Health",
+    roles: ["SuperAdmin"],
+    items: [
+      { title: "Monitoring", url: "/superadmin/monitoring", icon: Activity },
+      { title: "Reports", url: "/superadmin/reports", icon: PieChart },
+      { title: "Logs", url: "/superadmin/server-logs", icon: FileClock },
     ],
   },
   // ── Company workspace (CompanyAdmin / Agent) ───────────────────
   {
-    title: "Messaging",
-    url: "#",
-    icon: MessageCircle,
-    isActive: false,
+    label: "Workspace",
     roles: ["CompanyAdmin", "Agent"],
     items: [
-      { title: "Inbox", url: "/inbox" },
-      { title: "Campaigns", url: "/campaigns" },
-      { title: "Chatbot", url: "/bot", roles: ["CompanyAdmin"], feature: "chatbot" },
-      { title: "Calendar", url: "/calendar", roles: ["CompanyAdmin"], feature: "calendar" },
-      { title: "Templates", url: "/templates" },
-      { title: "Contacts", url: "/contacts" },
-      { title: "Contact Lists", url: "/contact-lists" },
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Inbox", url: "/inbox", icon: Inbox },
+      { title: "Campaigns", url: "/campaigns", icon: Megaphone },
+      { title: "Chatbot", url: "/bot", icon: Bot, roles: ["CompanyAdmin"], feature: "chatbot" },
+      { title: "Calendar", url: "/calendar", icon: CalendarDays, roles: ["CompanyAdmin"], feature: "calendar" },
     ],
   },
   {
-    title: "Analytics",
-    url: "#",
-    icon: BarChart3,
-    isActive: false,
-    roles: ["CompanyAdmin"],
+    label: "Audience and content",
+    roles: ["CompanyAdmin", "Agent"],
     items: [
-      { title: "Reports", url: "/analytics" },
+      { title: "Contacts", url: "/contacts", icon: Contact },
+      { title: "Contact lists", url: "/contact-lists", icon: ListChecks },
+      { title: "Templates", url: "/templates", icon: FileText },
     ],
   },
   {
-    title: "Company Settings",
-    url: "#",
-    icon: Users,
-    isActive: false,
+    label: "Company",
     roles: ["CompanyAdmin"],
     items: [
-      { title: "Team", url: "/team" },
-      { title: "Connections", url: "/connections" },
-      { title: "Subscription", url: "/my-subscription" },
+      { title: "Reports", url: "/analytics", icon: BarChart3 },
+      { title: "Team", url: "/team", icon: Users },
+      { title: "Connections", url: "/connections", icon: Plug },
+      { title: "Subscription", url: "/my-subscription", icon: CreditCard },
     ],
   },
 ];
@@ -114,19 +108,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const userRole = session?.user?.role ?? "";
   const botAccess = useBotAccess();
 
-  const filteredNav = navConfig
-    .filter((group) => !group.roles || group.roles.includes(userRole))
+  const sections: NavSection[] = navConfig
+    .filter((group) => group.roles.includes(userRole))
     .map((group) => ({
-      title: group.title,
-      url: group.url,
-      icon: group.icon,
-      isActive: group.isActive,
+      label: group.label,
       items: group.items.filter(
         (item) =>
           (!item.roles || item.roles.includes(userRole)) &&
           (!item.feature || botAccess[item.feature]),
       ),
-    }));
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -134,7 +126,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <CompanyLogo />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={filteredNav} />
+        <NavMain sections={sections} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

@@ -1393,7 +1393,7 @@ export function DataTable<TData extends ExportableData, TValue>({
 
       <div
         ref={tableContainerRef}
-        className="overflow-y-auto rounded-md border table-container"
+        className="overflow-y-auto rounded-xl border bg-card table-container shadow-[0_10px_30px_-24px_rgb(16_60_36/0.45)]"
         aria-label="Data table"
         onKeyDown={
           tableConfig.enableKeyboardNavigation ? handleKeyDown : undefined
@@ -1407,7 +1407,7 @@ export function DataTable<TData extends ExportableData, TValue>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <TableHead
-                    className="px-2 py-2 relative text-left group/th bg-muted [&:not(:last-child)]:border-r"
+                    className="relative h-10 bg-[#f1f7f3] px-2 py-2 text-left text-[12.5px] font-medium text-[#3d5246] group/th dark:bg-muted dark:text-muted-foreground [&:not(:last-child)]:border-r [&:not(:last-child)]:border-r-[#e3ece6] dark:[&:not(:last-child)]:border-r-border"
                     key={header.id}
                     colSpan={header.colSpan}
                     scope="col"

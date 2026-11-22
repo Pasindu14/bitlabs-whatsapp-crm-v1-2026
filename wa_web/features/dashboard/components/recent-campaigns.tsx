@@ -22,7 +22,7 @@ export function RecentCampaigns({ rows }: { rows: CampaignPerformanceRow[] | nul
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>Recent campaigns</CardTitle>
+        <CardTitle className="text-[15px]">Recent campaigns</CardTitle>
         <CardDescription>How your latest sends are landing.</CardDescription>
         <CardAction>
           <Button asChild variant="ghost" size="sm">
@@ -36,7 +36,7 @@ export function RecentCampaigns({ rows }: { rows: CampaignPerformanceRow[] | nul
         {rows === null ? (
           <Empty text="Campaigns could not be loaded." />
         ) : rows.length === 0 ? (
-          <Empty text="No campaigns in the last 90 days." />
+          <Empty text="No campaigns in the last 90 days. Send a template to a contact list to reach many customers at once." cta />
         ) : (
           rows.map((r) => {
             const delivered = pct(r.delivered, r.sent);
@@ -69,11 +69,18 @@ export function RecentCampaigns({ rows }: { rows: CampaignPerformanceRow[] | nul
   );
 }
 
-function Empty({ text }: { text: string }) {
+function Empty({ text, cta = false }: { text: string; cta?: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
-      <Megaphone className="size-5" />
-      {text}
+    <div className="flex flex-col items-center gap-3 py-8 text-center text-muted-foreground">
+      <span className="flex size-10 items-center justify-center rounded-full bg-[#fbe7d3] text-[#9a4f0f]">
+        <Megaphone className="size-[18px]" />
+      </span>
+      <p className="max-w-[18rem] text-[13px]">{text}</p>
+      {cta && (
+        <Button asChild size="sm" variant="outline" className="rounded-full">
+          <Link href="/campaigns">Create a campaign</Link>
+        </Button>
+      )}
     </div>
   );
 }

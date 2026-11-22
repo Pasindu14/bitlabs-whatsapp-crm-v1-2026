@@ -1,7 +1,9 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Bot, MessageCircle, User } from "lucide-react";
+import { ArrowLeft, Bot, Clock, User } from "lucide-react";
+import { DoubleTick } from "@/components/brand-mark";
+import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,7 +25,7 @@ import type { ConversationBotState } from "@/features/conversations/types";
 import { useBotAccess } from "@/features/bot/hooks/use-bot-access";
 import { MessageBubble } from "./message-bubble";
 import { MessageComposer } from "./message-composer";
-import { initials, formatDayDivider, sameDay, displayPhone } from "./format";
+import { initials, formatDayDivider, sameDay, displayPhone, avatarTone, windowLeft } from "./format";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export function MessageThread() {
@@ -41,23 +43,27 @@ export function MessageThread() {
 
   if (!selected) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-muted/20 px-6 text-center">
-        <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
-          <MessageCircle className="size-7 text-primary" />
+      <div className="flex h-full flex-col items-center justify-center gap-4 bg-[#eef4ef] px-6 text-center dark:bg-muted/20">
+        <span className="flex size-16 items-center justify-center rounded-2xl bg-card text-primary shadow-[0_12px_30px_-14px_rgb(16_60_36/0.35)]">
+          <DoubleTick className="w-8" />
+        </span>
+        <div className="space-y-1.5">
+          <p className="text-lg font-medium tracking-tight">Pick a chat to start replying</p>
+          <p className="max-w-xs text-sm text-muted-foreground">
+            Unread chats are marked in green. Your replies go out from your WhatsApp business number.
+          </p>
         </div>
-        <p className="text-sm font-medium">Select a conversation</p>
-        <p className="max-w-xs text-xs text-muted-foreground">
-          Choose a conversation from the list to view the thread and reply.
-        </p>
       </div>
     );
   }
 
   const windowOpen = selected.windowExpiresAt ? new Date(selected.windowExpiresAt) > new Date() : false;
+  const left = windowLeft(selected.windowExpiresAt);
+  const name = selected.contactName || displayPhone(selected.contactPhone);
 
   return (
-    <div className="flex h-full flex-col bg-muted/20">
-      <div className="flex shrink-0 items-center gap-3 border-b bg-card px-3 py-2.5 sm:px-4">
+    <div className="flex h-full flex-col bg-[#eef4ef] dark:bg-muted/20">
+      <div className="flex h-16 shrink-0 items-center gap-3 border-b bg-card px-3 sm:px-5">
         <Button
           variant="ghost"
           size="icon"
@@ -67,62 +73,75 @@ export function MessageThread() {
         >
           <ArrowLeft className="size-5" />
         </Button>
-        <Avatar className="size-9">
-          <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-            {initials(selected.contactName)}
-          </AvatarFallback>
+        <Avatar className="size-10">
+          <AvatarFallback className={cn("text-sm font-medium", avatarTone(name))}>{initials(name)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{selected.contactName}</p>
+          <p className="truncate text-[15px] font-medium">{name}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {displayPhone(selected.contactPhone)} · via {selected.displayPhoneNumber}
+            {displayPhone(selected.contactPhone)}, via {selected.displayPhoneNumber}
           </p>
         </div>
 
         {botTyping ? <BotWorkingBadge /> : null}
+
+        <span
+          title="WhatsApp lets you reply freely for 24 hours after the customer's last message."
+          className={cn(
+            "hidden shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:flex",
+            left ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+          )}
+        >
+          <Clock className="size-3.5" />
+          {left ? `Reply window: ${left}` : "Reply window closed"}
+        </span>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1 px-3 sm:px-4">
-        {isLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Spinner className="size-5 text-muted-foreground" />
-          </div>
-        ) : !messages || messages.length === 0 ? (
-          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-            No messages yet.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5 py-4">
-            {messages.map((m, i) => {
-              const showDivider = i === 0 || !sameDay(messages[i - 1].createdAt, m.createdAt);
-              return (
-                <Fragment key={m.id}>
-                  {showDivider && (
-                    <div className="my-2 flex justify-center">
-                      <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                        {formatDayDivider(m.createdAt)}
-                      </span>
-                    </div>
-                  )}
-                  <MessageBubble message={m} conversationId={selected.id} />
-                </Fragment>
-              );
-            })}
-            <div ref={bottomRef} />
-          </div>
-        )}
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="mx-auto w-full max-w-3xl px-3 sm:px-6">
+          {isLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Spinner className="size-5 text-muted-foreground" />
+            </div>
+          ) : !messages || messages.length === 0 ? (
+            <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+              No messages in this chat yet.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5 py-5">
+              {messages.map((m, i) => {
+                const showDivider = i === 0 || !sameDay(messages[i - 1].createdAt, m.createdAt);
+                return (
+                  <Fragment key={m.id}>
+                    {showDivider && (
+                      <div className="my-3 flex justify-center">
+                        <span className="rounded-full bg-card/90 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-[0_1px_0_rgb(0_0_0/0.05)]">
+                          {formatDayDivider(m.createdAt)}
+                        </span>
+                      </div>
+                    )}
+                    <MessageBubble message={m} conversationId={selected.id} />
+                  </Fragment>
+                );
+              })}
+              <div ref={bottomRef} />
+            </div>
+          )}
+        </div>
       </ScrollArea>
 
-      {botAccess.chatbot && botAccess.platformEnabled ? (
-        <BotStateBanner
-          conversationId={selected.id}
-          botState={selected.botState}
-          botResumesAt={selected.botResumesAt}
-          botPausedByAgent={selected.botPausedByAgent}
-        />
-      ) : null}
+      <div className="mx-auto w-full max-w-3xl shrink-0 space-y-2 px-3 pb-3 sm:px-6 sm:pb-4">
+        {botAccess.chatbot && botAccess.platformEnabled ? (
+          <BotStateBanner
+            conversationId={selected.id}
+            botState={selected.botState}
+            botResumesAt={selected.botResumesAt}
+            botPausedByAgent={selected.botPausedByAgent}
+          />
+        ) : null}
 
-      <MessageComposer conversationId={selected.id} windowOpen={windowOpen} />
+        <MessageComposer conversationId={selected.id} windowOpen={windowOpen} contactName={name} />
+      </div>
     </div>
   );
 }
@@ -166,21 +185,30 @@ function BotStateBanner({
   const handedOver = paused && !botPausedByAgent;
 
   return (
-    <div className="flex items-center justify-between gap-3 border-t bg-muted/40 px-4 py-2 text-xs">
-      <span className="flex items-center gap-2 text-muted-foreground">
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs",
+        paused ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200/70 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/20" : "bg-card text-foreground ring-1 ring-black/5",
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span
+          className={cn(
+            "flex size-6 shrink-0 items-center justify-center rounded-full",
+            paused ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20" : "bg-primary/10 text-primary",
+          )}
+        >
+          {paused ? <User className="size-3.5" /> : <Bot className="size-3.5" />}
+        </span>
         {paused ? (
           <>
-            <User className="size-3.5" />
             {handedOver ? "The bot passed this chat to your team" : "You're handling this chat"}
             {botResumesAt
               ? ` — the bot takes over again ${formatResume(botResumesAt)}`
               : " — the bot stays off until you hand it back"}
           </>
         ) : (
-          <>
-            <Bot className="size-3.5" />
-            The bot is handling this chat
-          </>
+          <>The bot is answering this chat</>
         )}
       </span>
 
@@ -198,8 +226,9 @@ function BotStateBanner({
         ) : null}
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
+          className="rounded-full bg-card"
           disabled={setBotState.isPending}
           onClick={() =>
             paused ? setBotState.mutate({ conversationId, paused: false }) : setAsking(true)

@@ -1,99 +1,55 @@
+import { CircleHelp, ShieldCheck } from "lucide-react"
 import { LoginForm } from "@/features/auth/components/forms/login-form"
-import { MessageCircle, Users, BarChart3, Zap } from "lucide-react"
+import { SignInShowcase } from "@/features/auth/components/sign-in-showcase"
 import { BrandMark } from "@/components/brand-mark"
+import { Separator } from "@/components/ui/separator"
 
 export default function LoginPage() {
   return (
-    <div className="min-h-svh grid lg:grid-cols-2">
-
-      {/* ── Left brand panel ── */}
-      <div className="relative hidden lg:flex flex-col items-center justify-center overflow-hidden p-12"
-        style={{ background: "linear-gradient(135deg, #064E3B 0%, #065F46 40%, #047857 100%)" }}>
-
-        {/* Decorative blobs */}
-        <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full opacity-20"
-          style={{ background: "#10B981" }} />
-        <div className="absolute -top-20 -right-20 h-96 w-96 rounded-full opacity-10"
-          style={{ background: "#34D399" }} />
-        <div className="absolute bottom-1/4 right-8 h-56 w-56 rounded-full opacity-15"
-          style={{ background: "#059669" }} />
-
-        {/* Floating chat bubble decorations */}
-        <div className="absolute top-16 left-12 flex flex-col gap-2 opacity-20">
-          <div className="h-3 w-24 rounded-full bg-white" />
-          <div className="h-3 w-16 rounded-full bg-white" />
-        </div>
-        <div className="absolute bottom-20 right-16 flex flex-col gap-2 opacity-20">
-          <div className="h-3 w-20 rounded-full bg-white ml-auto" />
-          <div className="h-3 w-28 rounded-full bg-white ml-auto" />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center gap-10 text-center text-white max-w-sm">
-
-          {/* Icon — the shared brand mark, same drawing as the favicon and sidebar. */}
-          <BrandMark onDark className="h-20 w-20 drop-shadow-2xl" />
-
-          <div className="space-y-3">
-            <h1 className="text-3xl font-bold tracking-tight">WhatsApp CRM</h1>
-            <p className="text-base leading-relaxed" style={{ color: "#A7F3D0" }}>
-              Multi-tenant messaging platform for bulk campaigns, live chat, and contact management — powered by Meta&apos;s official API.
-            </p>
-          </div>
-
-          <div className="w-12 h-px" style={{ background: "#34D399" }} />
-
-          {/* Feature bullets */}
-          <div className="grid grid-cols-1 gap-3 w-full text-left">
-            {[
-              { icon: Zap, text: "Bulk campaigns with throttled delivery" },
-              { icon: Users, text: "Multi-tenant company isolation" },
-              { icon: BarChart3, text: "Delivery & cost analytics" },
-              { icon: MessageCircle, text: "Live inbox with 24-hour window" },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-3">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                  style={{ background: "rgba(16,185,129,0.25)" }}>
-                  <Icon className="h-3.5 w-3.5" style={{ color: "#6EE7B7" }} />
-                </div>
-                <span className="text-sm" style={{ color: "#D1FAE5" }}>{text}</span>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-xs" style={{ color: "#6EE7B7" }}>
-            Powered by Meta WhatsApp Cloud API
-          </p>
-        </div>
+    <div className="grid min-h-svh lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+      <div className="hidden lg:block">
+        <SignInShowcase />
       </div>
 
-      {/* ── Right form panel ── */}
-      <div className="flex flex-col items-center justify-center bg-background p-8">
-        <div className="w-full max-w-sm space-y-8">
+      {/* Mint with one soft green glow from the panel side, so the two halves read as one page. */}
+      <main className="relative flex flex-col overflow-hidden bg-[#eef5f0] px-5 py-8 sm:px-10 dark:bg-background">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-40 -left-40 size-[36rem] rounded-full bg-[radial-gradient(closest-side,rgb(15_107_62/0.16),transparent)]"
+        />
 
-          {/* Mobile-only icon */}
-          <div className="flex justify-center lg:hidden">
-            <BrandMark className="h-14 w-14 drop-shadow-lg" />
-          </div>
+        {/* Mobile keeps the brand; the showcase panel is desktop-only. */}
+        <div className="relative flex items-center gap-3 lg:hidden">
+          <BrandMark className="size-9" />
+          <span className="text-[1.25rem] font-medium tracking-tight">Growchat</span>
+        </div>
 
-          {/* Heading */}
-          <div className="space-y-1.5">
-            <h2 className="text-2xl font-bold tracking-tight">Welcome back</h2>
-            <p className="text-sm text-muted-foreground">
-              Sign in to your WhatsApp CRM account
+        <div className="relative flex flex-1 items-center justify-center py-10">
+          <div className="w-full max-w-[25rem] rounded-[1.25rem] bg-card p-8 shadow-[0_1px_2px_rgb(16_60_36/0.06),0_30px_60px_-30px_rgb(16_60_36/0.35)] ring-1 ring-[rgb(16_60_36/0.06)] sm:p-10">
+            <h2 className="text-[2.125rem] leading-[1.1] font-normal tracking-[-0.03em]">Welcome back</h2>
+            <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">
+              Sign in with the email your company admin invited you with.
+            </p>
+
+            <LoginForm className="mt-8" />
+
+            <Separator className="my-7" />
+
+            <p className="flex items-start gap-2.5 text-[13px] leading-relaxed text-muted-foreground">
+              <CircleHelp className="mt-0.5 size-4 shrink-0" />
+              Can&apos;t sign in? Ask your company admin to reset your password.
             </p>
           </div>
-
-          {/* Form */}
-          <LoginForm />
-
-          {/* Footer */}
-          <p className="text-center text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} WhatsApp CRM. All rights reserved.
-          </p>
         </div>
-      </div>
 
+        <div className="relative flex flex-col items-center gap-1.5 text-center text-[12px] leading-relaxed text-muted-foreground">
+          <p className="flex items-center justify-center gap-2">
+            <ShieldCheck className="size-3.5 shrink-0 text-primary" />
+            Messages are sent through Meta&apos;s official WhatsApp Business Platform.
+          </p>
+          <p>&copy; {new Date().getFullYear()} Growchat</p>
+        </div>
+      </main>
     </div>
   )
 }

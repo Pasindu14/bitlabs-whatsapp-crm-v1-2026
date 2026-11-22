@@ -54,19 +54,31 @@ export default function ProtectedLayout({
 
   const pathSegments = pathname.split("/").filter(Boolean);
   
-  const formatSegment = (segment: string) =>
-    segment
-      .split('-')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+  // Sentence case, matching the sidebar and page titles: "my-subscription" → "My subscription".
+  // A few segments read better under their sidebar name.
+  const SEGMENT_LABELS: Record<string, string> = {
+    bot: "Chatbot",
+    analytics: "Reports",
+    superadmin: "Platform",
+    "waba-connections": "WhatsApp numbers",
+    "server-logs": "Logs",
+  };
+  const formatSegment = (segment: string) => {
+    if (SEGMENT_LABELS[segment]) return SEGMENT_LABELS[segment];
+    // Record ids (campaigns/<uuid>, templates/<uuid>) mean nothing to a person.
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)) return "Details";
+    const words = segment.split("-").join(" ");
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  };
 
   return (
     <SessionGuard>
       <TooltipProvider>
         <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarChange}>
           <AppSidebar />
-          <SidebarInset>
-            <header className="flex h-12 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-10">
+          {/* bg-* here wins over the inset's own white so the canvas colour shows; the pattern comes from .app-canvas. */}
+          <SidebarInset className="app-canvas bg-[#f4f8f5] dark:bg-background">
+            <header className="flex h-12 shrink-0 items-center gap-2 bg-background transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-10">
               <div className="flex flex-1 items-center gap-2 px-4">
                 <SidebarTrigger className="-ml-1" />
                 <Separator

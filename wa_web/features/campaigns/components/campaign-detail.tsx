@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import {
-  ArrowLeft,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -12,9 +9,7 @@ import {
   RotateCw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Popover,
@@ -41,8 +36,8 @@ import {
 } from "@/features/campaigns/hooks/use-campaigns";
 import type {
   CampaignRecipient,
-  CampaignStatus,
 } from "@/features/campaigns/types";
+import { CampaignHero } from "@/features/campaigns/components/campaign-hero";
 import { STAT_META } from "@/features/campaigns/lib/stat-meta";
 import { getCampaignRecipientsAction } from "@/features/campaigns/actions/campaign-actions";
 import { exportToExcel } from "@/components/data-table/utils/export-utils";
@@ -55,18 +50,6 @@ const QUOTA_LABEL = "Quota reached";
 // The API clamps recipients pageSize to 200 — the export pages through at that max.
 const EXPORT_PAGE_SIZE = 200;
 
-const CAMPAIGN_STATUS_VARIANT: Record<
-  CampaignStatus,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Draft: "secondary",
-  Scheduled: "outline",
-  Running: "default",
-  Paused: "secondary",
-  Completed: "default",
-  Failed: "destructive",
-  Cancelled: "secondary",
-};
 
 // Human labels for the engine's own skip/fail codes AND the Meta Cloud API policy codes we know
 // about (mirrors wa_api MetaPolicyErrorCodes). Anything unmapped falls back to the raw code.
@@ -241,9 +224,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
     setPage(1);
   }
 
-  const total = stats?.totalRecipients ?? 0;
-  const processed = stats ? total - stats.queued : 0;
-  const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
 
   const totalPages = recipients?.pagination.totalPages ?? 1;
   const failedCount = stats?.failed ?? 0;
@@ -324,159 +304,44 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const rows = recipients?.items ?? [];
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3">
-        <Link
-          href="/campaigns"
-          className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Campaigns
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">
-            {campaign?.name ?? "Campaign"}
-          </h1>
-          {campaign && (
-            <Badge variant={CAMPAIGN_STATUS_VARIANT[campaign.status]}>
-              {campaign.status}
-            </Badge>
-          )}
-        </div>
-        {campaign && (
-          <p className="text-sm text-muted-foreground">
-            Template{" "}
-            <span className="font-medium">{campaign.templateName}</span>
-          </p>
-        )}
-      </div>
+    <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
+      <CampaignHero campaign={campaign} stats={stats} health={health} isLive={isLive} />
 
-      {/* Audience health — pre-send breakdown of who will actually be messaged */}
-      {health && health.total > 0 && (
-        <div className="rounded-2xl border p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Audience health</h2>
-            <span className="text-xs text-muted-foreground">
-              {health.total.toLocaleString()} targeted
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
-              <div className="text-xs text-muted-foreground">Will send</div>
-              <div className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-500">
-                {health.sendable.toLocaleString()}
-              </div>
-            </div>
-            <div className="rounded-lg border p-3">
-              <div className="text-xs text-muted-foreground">Opted out</div>
-              <div className="mt-1 text-xl font-bold">
-                {health.optedOut.toLocaleString()}
-              </div>
-            </div>
-            <div className="rounded-lg border p-3">
-              <div className="text-xs text-muted-foreground">
-                Not on WhatsApp
-              </div>
-              <div className="mt-1 text-xl font-bold">
-                {health.invalid.toLocaleString()}
-              </div>
-            </div>
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            {health.sendable.toLocaleString()} of{" "}
-            {health.total.toLocaleString()} contacts will be messaged; the rest
-            are skipped (opted out or not reachable on WhatsApp).
-          </p>
-        </div>
-      )}
-
-      {/* Progress + stats */}
+      {/* Status filter for the recipient table, one chip per bucket. */}
       {stats && (
-        <div className="rounded-2xl border p-5">
-          <div className="mb-3 flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 font-semibold">
-              {isLive ? (
-                <>
-                  <Spinner className="size-4 text-primary" />
-                  Sending…
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="size-4 text-primary" />
-                  Completed
-                </>
-              )}
-            </span>
-            <span className="text-muted-foreground">
-              {processed.toLocaleString()} of {total.toLocaleString()}
-              <span className="ml-1.5 font-semibold text-primary">
-                {percent}%
-              </span>
-            </span>
-          </div>
-          <Progress value={percent} />
-
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            value={statusFilter ?? "all"}
-            onValueChange={(v) => v && changeFilter(v)}
-            className={cn(
-              "mt-5 grid w-full grid-cols-2 items-stretch gap-3",
-              quotaCount > 0
-                ? "sm:grid-cols-5 lg:grid-cols-9"
-                : "sm:grid-cols-4 lg:grid-cols-8",
-            )}
-          >
-            {(
-              [
-                ["all", "Total", stats.totalRecipients],
-                ["Queued", "Queued", stats.queued],
-                ["Accepted", "Accepted", stats.accepted],
-                ["Sent", "Sent", stats.sent],
-                ["Delivered", "Delivered", stats.delivered],
-                ["Read", "Read", stats.read],
-                ["Failed", "Failed", stats.failed],
-                ["Skipped", "Skipped", stats.skipped],
-                // Only once the quota has actually cut a campaign short — keeps the usual row at 8.
-                ...(quotaCount > 0
-                  ? ([[QUOTA_FILTER, QUOTA_LABEL, quotaCount]] as [
-                      string,
-                      string,
-                      number,
-                    ][])
-                  : []),
-              ] as [string, string, number][]
-            ).map(([value, label, count]) => {
-              const meta = STAT_META[label];
-              const Icon = meta.icon;
-              const active = (statusFilter ?? "all") === value;
-              return (
-                <ToggleGroupItem
-                  key={value}
-                  value={value}
-                  className={cn(
-                    "block h-auto w-full min-w-0 rounded-lg p-3 text-left font-normal whitespace-normal hover:border-primary/50 hover:bg-accent/50",
-                    active && "border-primary bg-primary/5 ring-1 ring-primary",
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">
-                      {label}
-                    </span>
-                    <span className={cn("rounded-md p-1", meta.pill)}>
-                      <Icon className="size-3.5" />
-                    </span>
-                  </div>
-                  <div className={cn("mt-1 text-xl font-bold", meta.value)}>
-                    {count.toLocaleString()}
-                  </div>
-                </ToggleGroupItem>
-              );
-            })}
-          </ToggleGroup>
-        </div>
+        <ToggleGroup
+          type="single"
+          value={statusFilter ?? "all"}
+          onValueChange={(v) => v && changeFilter(v)}
+          className="flex flex-wrap justify-start gap-1.5"
+          aria-label="Show recipients by status"
+        >
+          {(
+            [
+              ["all", "Everyone", stats.totalRecipients, "bg-foreground/40"],
+              ["Queued", "Queued", stats.queued, "bg-amber-400"],
+              ["Accepted", "Accepted", stats.accepted, "bg-slate-400"],
+              ["Sent", "Sent", stats.sent, "bg-[#8a9a90]"],
+              ["Delivered", "Delivered", stats.delivered, "bg-[#8fc9a5]"],
+              ["Read", "Read", stats.read, "bg-[#2fa8e6]"],
+              ["Failed", "Failed", stats.failed, "bg-[#e5533d]"],
+              ["Skipped", "Skipped", stats.skipped, "bg-slate-300"],
+              // Only once the quota has actually cut a campaign short.
+              ...(quotaCount > 0 ? ([[QUOTA_FILTER, QUOTA_LABEL, quotaCount, "bg-amber-500"]] as [string, string, number, string][]) : []),
+            ] as [string, string, number, string][]
+          ).map(([value, label, count, dot]) => (
+            <ToggleGroupItem
+              key={value}
+              value={value}
+              disabled={count === 0 && value !== "all"}
+              className="h-8 gap-2 rounded-full border bg-card px-3 text-[13px] font-normal data-[state=on]:border-primary data-[state=on]:bg-[#e3f1e8] data-[state=on]:font-medium data-[state=on]:text-[#0f6b3e] disabled:opacity-45 dark:data-[state=on]:bg-primary/15"
+            >
+              <span className={cn("size-2 rounded-full", dot)} />
+              {label}
+              <span className="text-muted-foreground tabular-nums">{count.toLocaleString()}</span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       )}
 
       {/* Recipient list */}
@@ -557,9 +422,9 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           </div>
         )}
 
-        <div className="rounded-2xl border">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-[0_10px_30px_-24px_rgb(16_60_36/0.45)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-[#f1f7f3] dark:bg-muted">
               <TableRow>
                 <TableHead>Contact</TableHead>
                 <TableHead>Phone</TableHead>

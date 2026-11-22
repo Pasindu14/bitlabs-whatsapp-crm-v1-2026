@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Conversation } from "@/features/conversations/types";
 import { initials, timeAgo } from "@/features/dashboard/format";
+import { avatarTone } from "@/features/conversations/components/format";
+import { cn } from "@/lib/utils";
 import { OpenConversationLink } from "@/features/dashboard/components/open-conversation-link";
 
 /** The latest chats, newest first, with unread counts. */
@@ -13,7 +15,7 @@ export function RecentConversations({ items }: { items: Conversation[] | null })
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>Recent conversations</CardTitle>
+        <CardTitle className="text-[15px]">Recent conversations</CardTitle>
         <CardDescription>Latest WhatsApp chats across your numbers.</CardDescription>
         <CardAction>
           <Button asChild variant="ghost" size="sm">
@@ -35,8 +37,8 @@ export function RecentConversations({ items }: { items: Conversation[] | null })
               conversation={c}
               className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/60"
             >
-              <Avatar className="size-8">
-                <AvatarFallback className="bg-primary/10 text-primary">
+              <Avatar className="size-9">
+                <AvatarFallback className={cn("text-[12px] font-medium", avatarTone(c.contactName || c.contactPhone))}>
                   {initials(c.contactName || c.contactPhone)}
                 </AvatarFallback>
               </Avatar>

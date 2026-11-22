@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlertCircle, RotateCcw, Send, Wrench } from "lucide-react";
+import { AlertCircle, RotateCcw, Send, Wrench, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
@@ -104,6 +104,9 @@ export function AiPreviewPanel({ canPreview }: { canPreview: boolean }) {
   return (
     <SectionCard
       title="Try it"
+      icon={FlaskConical}
+      tone="green"
+      defaultOpen
       description={
         <>
           Talk to the assistant the way a customer would. It checks your real calendar, but nothing

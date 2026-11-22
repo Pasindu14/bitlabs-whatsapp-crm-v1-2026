@@ -10,7 +10,7 @@ import {
   type UseFormRegister,
 } from "react-hook-form";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -65,6 +65,8 @@ export function FollowUpSteps({
   return (
     <SectionCard
       title="Follow-up messages"
+      icon={Repeat}
+      tone="purple"
       description={
         <>
           If a customer goes quiet, the assistant sends these in order and stops as soon as they

@@ -171,7 +171,7 @@ export function UsageReport() {
 function StatCard({ label, value, hint, alert }: { label: string; value: string; hint?: string; alert?: boolean }) {
   return (
     <div className={cn("rounded-xl border bg-card p-5 shadow-sm", alert && "border-destructive/40 bg-destructive/5")}>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[13px] font-medium text-muted-foreground">{label}</p>
       <p className={cn("mt-2 text-3xl font-bold tabular-nums", alert && "text-destructive")}>{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
@@ -255,7 +255,7 @@ function CostBreakdown({ row }: { row: CompanyUsageRow }) {
   return (
     <div className="grid gap-6 md:grid-cols-3">
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">AI calls by kind</p>
+        <p className="mb-2 text-[13px] font-medium text-muted-foreground">AI calls by kind</p>
         {cost.aiByKind.length === 0 ? (
           <p className="text-muted-foreground">No AI calls.</p>
         ) : (
@@ -273,7 +273,7 @@ function CostBreakdown({ row }: { row: CompanyUsageRow }) {
         )}
       </div>
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Prompt cache</p>
+        <p className="mb-2 text-[13px] font-medium text-muted-foreground">Prompt cache</p>
         <p className="text-2xl font-semibold tabular-nums">
           {cost.cacheHitRate == null ? "—" : pctFmt.format(cost.cacheHitRate)}
         </p>
@@ -283,7 +283,7 @@ function CostBreakdown({ row }: { row: CompanyUsageRow }) {
         </p>
       </div>
       <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Meta</p>
+        <p className="mb-2 text-[13px] font-medium text-muted-foreground">Meta</p>
         <ul className="space-y-1 tabular-nums">
           <li className="flex justify-between gap-4">
             <span>Billable messages</span>

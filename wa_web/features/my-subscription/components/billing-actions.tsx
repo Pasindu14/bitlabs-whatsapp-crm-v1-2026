@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import Script from "next/script";
-import { ExternalLink, Zap, Settings2, Loader2, CreditCard } from "lucide-react";
+import { ExternalLink, Settings2, Loader2, CreditCard } from "lucide-react";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAvailablePlans, useCreatePayHereCheckout, useRefreshAfterPayHere } from "@/features/my-subscription/hooks/use-my-subscription";
+import { useAvailablePlans, useCreatePayHereCheckout, useMySubscription, useRefreshAfterPayHere } from "@/features/my-subscription/hooks/use-my-subscription";
 import {
   createCheckoutSessionAction,
   createPortalSessionAction,
@@ -62,6 +64,7 @@ function toPayHerePayload(payload: PayHereCheckoutPayload) {
 export function BillingActionsCard() {
   const { data: plans, isLoading, isError } = useAvailablePlans();
   const { data: fxRate } = useUsdToAedRate();
+  const { data: current } = useMySubscription();
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [payHereLoadingId, setPayHereLoadingId] = useState<string | null>(null);
@@ -134,123 +137,117 @@ export function BillingActionsCard() {
   const anyLoading = loadingPlanId !== null || payHereLoadingId !== null;
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border bg-card p-6 shadow-sm">
+    <Card className="rounded-xl">
       <Script src={PAYHERE_SCRIPT_SRC} strategy="afterInteractive" onLoad={() => setPayHereReady(true)} />
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-muted-foreground" />
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Plans &amp; Billing
+      <CardHeader>
+        <CardTitle className="text-[15px]">Plans and billing</CardTitle>
+        <CardDescription>Move to a bigger plan, or top up when you&apos;re running low.</CardDescription>
+        <CardAction>
+          <Button variant="outline" size="sm" onClick={handlePortal} disabled={portalLoading} className="rounded-full">
+            {portalLoading ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Settings2 data-icon="inline-start" />}
+            Manage billing
+          </Button>
+        </CardAction>
+      </CardHeader>
+
+      <CardContent className="flex flex-col gap-4">
+        {isLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className="h-36 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : isError ? (
+          <p className="text-sm text-destructive">Plans couldn&apos;t load. Refresh the page to try again.</p>
+        ) : !plans?.length ? (
+          <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+            There are no plans to buy here yet. Ask your platform administrator to add one.
           </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handlePortal}
-          disabled={portalLoading}
-        >
-          {portalLoading ? (
-            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Settings2 className="mr-1.5 h-3.5 w-3.5" />
-          )}
-          Manage Billing
-        </Button>
-      </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {plans.map((plan) => {
+              const dirhamFirst = formatDirhamFirst(plan.price, plan.currency, fxRate?.rate);
+              const usdApprox = !dirhamFirst ? formatUsdApprox(plan.price, plan.currency, fxRate?.rate) : null;
+              const isCurrent = current?.hasSubscription && current.planName === plan.name;
+              return (
+                <div
+                  key={plan.id}
+                  className={cn(
+                    "relative flex flex-col gap-4 rounded-xl border p-5 transition-colors",
+                    isCurrent ? "border-primary/50 bg-[#f1f8f3] dark:bg-primary/10" : "bg-card hover:border-primary/30",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[16px] font-medium">{plan.name}</p>
+                      <p className="mt-0.5 text-[13px] text-muted-foreground">
+                        {numFmt.format(plan.monthlyMessageQuota)} messages a month
+                      </p>
+                    </div>
+                    {isCurrent && (
+                      <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
+                        Your plan
+                      </span>
+                    )}
+                  </div>
 
-      {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[1, 2].map((i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : isError ? (
-        <p className="text-sm text-destructive">Could not load available plans.</p>
-      ) : !plans?.length ? (
-        <p className="text-sm text-muted-foreground">
-          No self-service plans are configured yet. Contact your platform administrator.
-        </p>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {plans.map((plan) => {
-            const dirhamFirst = formatDirhamFirst(plan.price, plan.currency, fxRate?.rate);
-            const usdApprox = !dirhamFirst ? formatUsdApprox(plan.price, plan.currency, fxRate?.rate) : null;
-            return (
-            <div
-              key={plan.id}
-              className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4"
-            >
-              <div>
-                <p className="font-semibold">{plan.name}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {numFmt.format(plan.monthlyMessageQuota)} messages / month
-                </p>
-              </div>
-              <div className="flex items-end justify-between gap-2">
-                <div>
-                  {/* Dirhams lead for the UAE audience, but the USD line below is the real charge. */}
-                  <p className="text-lg font-bold">
-                    {dirhamFirst ? dirhamFirst.aed : currFmt(plan.price, plan.currency)}
-                    <span className="text-xs font-normal text-muted-foreground"> /mo</span>
-                  </p>
-                  {dirhamFirst ? (
-                    <p className="text-xs text-muted-foreground">
-                      {dirhamFirst.usd} charged in USD
+                  <div>
+                    {/* Dirhams lead for the UAE audience, but the USD line below is the real charge. */}
+                    <p className="text-[1.75rem] leading-none font-light tracking-[-0.02em] tabular-nums">
+                      {dirhamFirst ? dirhamFirst.aed : currFmt(plan.price, plan.currency)}
+                      <span className="ml-1 text-[13px] text-muted-foreground">a month</span>
                     </p>
-                  ) : (
-                    usdApprox && (
-                      <p className="text-xs text-muted-foreground">{usdApprox}</p>
-                    )
-                  )}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {plan.stripePriceId && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleStripeCheckout(plan.id)}
-                      disabled={anyLoading}
-                    >
-                      {loadingPlanId === plan.id ? (
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                      )}
-                      Subscribe
-                    </Button>
-                  )}
-                  {plan.payHereEnabled && (
-                    <Button
-                      size="sm"
-                      variant={plan.stripePriceId ? "outline" : "default"}
-                      onClick={() => handlePayHereCheckout(plan)}
-                      disabled={anyLoading}
-                    >
-                      {payHereLoadingId === plan.id ? (
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-                      )}
-                      Pay Now
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-            );
-          })}
-        </div>
-      )}
+                    {dirhamFirst ? (
+                      <p className="mt-1 text-[12px] text-muted-foreground">{dirhamFirst.usd} charged in USD</p>
+                    ) : (
+                      usdApprox && <p className="mt-1 text-[12px] text-muted-foreground">{usdApprox}</p>
+                    )}
+                  </div>
 
-      {/* Disclosure: whichever currency isn't the plan's native one is an indicative conversion,
-          not the charge — say so plainly for both directions. */}
-      {fxRate && plans?.some((p) => ["USD", "AED"].includes(p.currency?.toUpperCase())) && (
-        <p className="text-xs text-muted-foreground">
-          Prices shown in a currency other than the plan&apos;s own are indicative, converted at{" "}
-          {fxRate.rate} AED per USD. You&apos;re charged in the plan&apos;s listed currency; your bank
-          may apply its own conversion or foreign-transaction fee.
-        </p>
-      )}
-    </div>
+                  <div className="mt-auto flex flex-wrap gap-2">
+                    {plan.stripePriceId && (
+                      <Button size="sm" onClick={() => handleStripeCheckout(plan.id)} disabled={anyLoading} className="rounded-full">
+                        {loadingPlanId === plan.id ? (
+                          <Loader2 className="animate-spin" data-icon="inline-start" />
+                        ) : (
+                          <ExternalLink data-icon="inline-start" />
+                        )}
+                        Subscribe with card
+                      </Button>
+                    )}
+                    {plan.payHereEnabled && (
+                      <Button
+                        size="sm"
+                        variant={plan.stripePriceId ? "outline" : "default"}
+                        onClick={() => handlePayHereCheckout(plan)}
+                        disabled={anyLoading}
+                        className="rounded-full"
+                      >
+                        {payHereLoadingId === plan.id ? (
+                          <Loader2 className="animate-spin" data-icon="inline-start" />
+                        ) : (
+                          <CreditCard data-icon="inline-start" />
+                        )}
+                        Pay with PayHere
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Disclosure: whichever currency isn't the plan's native one is an indicative conversion,
+            not the charge — say so plainly for both directions. */}
+        {fxRate && plans?.some((p) => ["USD", "AED"].includes(p.currency?.toUpperCase())) && (
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            Prices in a second currency are a guide, converted at {fxRate.rate} AED per USD. You pay in the
+            plan&apos;s own currency, and your bank may add its own conversion fee.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

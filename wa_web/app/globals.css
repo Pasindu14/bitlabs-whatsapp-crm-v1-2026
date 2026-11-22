@@ -131,13 +131,43 @@
 
 @layer components {
   /* The title block at the top of every screen, styled once here from the theme tokens. */
+  /* Page title band: the Growchat leaf green with the brand's double tick, huge and tone-on-tone,
+     as on the sign-in page, dashboard and chatbot. One class restyles every screen's header. */
   .page-header {
-    @apply rounded-xl border bg-muted/40 px-6 py-6;
+    @apply relative overflow-hidden rounded-2xl px-6 py-6 sm:px-8;
+    background-color: #0f6b3e;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 17 12' fill='none' stroke='%230b5a33' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 6.5 4.2 10 10 2.5M8 9l1 1 6.2-8'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right -2.5rem bottom -5.5rem;
+    background-size: 21rem auto;
+    color: #f2faee;
+  }
+  .dark .page-header {
+    background-color: #0b4f2e;
   }
   .page-header h1 {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply text-[1.75rem] leading-tight font-light tracking-[-0.03em];
   }
   .page-header p {
-    @apply mt-1 text-sm text-muted-foreground;
+    @apply mt-1.5 max-w-2xl text-[14px] leading-relaxed;
+    color: #b9dcc5;
+  }
+
+  /* The page canvas behind every signed-in screen: pale mint scattered with the product's own
+     marks — chat bubbles and read ticks — drawn faint enough that white cards and tables read
+     cleanly on top. A soft wash from the top keeps the area under the header calm. */
+  .app-canvas {
+    background-color: #f4f8f5;
+    background-image:
+      linear-gradient(to bottom, #f4f8f5 0, rgb(244 248 245 / 0) 14rem),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150' fill='none' stroke='%230f6b3e' stroke-opacity='0.075' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 22h24a7 7 0 0 1 7 7v9a7 7 0 0 1-7 7H31l-7 6v-6h-4a7 7 0 0 1-7-7v-9a7 7 0 0 1 7-7z'/%3E%3Cpath d='M30 33.5h14M30 38.5h8'/%3E%3Cpath d='M103 84h18a6 6 0 0 1 6 6v7a6 6 0 0 1-6 6h-3v5l-6-5h-9a6 6 0 0 1-6-6v-7a6 6 0 0 1 6-6z'/%3E%3Cpath d='M92 30l3.5 3.8 7-9M100 32.8l1.2 1.2 7-9'/%3E%3Cpath d='M28 112l3.5 3.8 7-9M36 114.8l1.2 1.2 7-9'/%3E%3Ccircle cx='70' cy='70' r='1.5'/%3E%3Ccircle cx='132' cy='132' r='1.5'/%3E%3C/svg%3E");
+    background-size: 100% 100%, 150px 150px;
+    background-repeat: no-repeat, repeat;
+    background-attachment: local, local;
+  }
+  .dark .app-canvas {
+    background-color: var(--background);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150' fill='none' stroke='%23ffffff' stroke-opacity='0.035' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 22h24a7 7 0 0 1 7 7v9a7 7 0 0 1-7 7H31l-7 6v-6h-4a7 7 0 0 1-7-7v-9a7 7 0 0 1 7-7z'/%3E%3Cpath d='M103 84h18a6 6 0 0 1 6 6v7a6 6 0 0 1-6 6h-3v5l-6-5h-9a6 6 0 0 1-6-6v-7a6 6 0 0 1 6-6z'/%3E%3Cpath d='M92 30l3.5 3.8 7-9M100 32.8l1.2 1.2 7-9'/%3E%3Cpath d='M28 112l3.5 3.8 7-9M36 114.8l1.2 1.2 7-9'/%3E%3C/svg%3E");
+    background-size: 150px 150px;
   }
 }

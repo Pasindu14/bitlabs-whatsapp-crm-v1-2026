@@ -1,27 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDownToLine, Eraser, Pause, Play, Search } from "lucide-react";
 import { getLogsAction, type LogEntry } from "@/features/log-viewer/actions/log-actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 
-const LEVEL_COLOR: Record<string, string> = {
-  Verbose: "text-zinc-500",
-  Debug: "text-zinc-400",
-  Information: "text-emerald-400",
-  Warning: "text-yellow-400",
-  Error: "text-red-400",
-  Fatal: "text-red-500 font-bold",
+/** Chip colour and short label per Serilog level. */
+const LEVEL: Record<string, { label: string; chip: string; row?: string }> = {
+  Verbose: { label: "Trace", chip: "bg-white/5 text-[#7d8f85]" },
+  Debug: { label: "Debug", chip: "bg-white/5 text-[#9fb0a6]" },
+  Information: { label: "Info", chip: "bg-[#1fbf5c]/15 text-[#7fd6a0]" },
+  Warning: { label: "Warn", chip: "bg-amber-400/15 text-amber-300", row: "border-l-amber-400/70 bg-amber-400/[0.04]" },
+  Error: { label: "Error", chip: "bg-[#e5533d]/20 text-[#ff9f80]", row: "border-l-[#e5533d] bg-[#e5533d]/[0.06]" },
+  Fatal: { label: "Fatal", chip: "bg-[#e5533d] text-white", row: "border-l-[#e5533d] bg-[#e5533d]/[0.1]" },
 };
 
-const LEVEL_BADGE: Record<string, string> = {
-  Verbose: "VRB",
-  Debug: "DBG",
-  Information: "INF",
-  Warning: "WRN",
-  Error: "ERR",
-  Fatal: "FTL",
-};
+/**
+ * Framework chatter that buries the lines a person is looking for: EF SQL, MVC pipeline steps and
+ * result-writing notices. Hidden by default, counted, and one switch away.
+ */
+const ROUTINE = [
+  /^Executed DbCommand/,
+  /^Executing endpoint/,
+  /^Executed endpoint/,
+  /^Route matched/,
+  // ASP.NET quotes the result type: Executing "OkObjectResult", writing value of type ...
+  /^Executing "?\w*Result"?/,
+  /^Executed action/,
+  /^Executing action/,
+];
+const isRoutine = (e: LogEntry) => (e.level === "Information" || e.level === "Debug" || e.level === "Verbose") && ROUTINE.some((r) => r.test(e.message));
+
+type LevelFilter = "all" | "warnings" | "errors";
+const isWarning = (e: LogEntry) => e.level === "Warning";
+const isError = (e: LogEntry) => e.level === "Error" || e.level === "Fatal";
 
 function formatTs(ts: string) {
   const d = new Date(ts);
@@ -31,13 +48,17 @@ function formatTs(ts: string) {
 export function LogViewer() {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [filter, setFilter] = useState("");
+  const [level, setLevel] = useState<LevelFilter>("all");
+  const [hideRoutine, setHideRoutine] = useState(true);
   const [autoScroll, setAutoScroll] = useState(false);
   const [paused, setPaused] = useState(false);
   const sinceRef = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
 
-  pausedRef.current = paused;
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
 
   useEffect(() => {
     let active = true;
@@ -72,85 +93,156 @@ export function LogViewer() {
     if (autoScroll) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries, autoScroll]);
 
-  const visible = filter
-    ? entries.filter(
-        (e) =>
-          e.message.toLowerCase().includes(filter.toLowerCase()) ||
-          e.level.toLowerCase().includes(filter.toLowerCase()) ||
-          (e.exception ?? "").toLowerCase().includes(filter.toLowerCase())
-      )
-    : entries;
+  const counts = useMemo(
+    () => ({
+      warnings: entries.filter(isWarning).length,
+      errors: entries.filter(isError).length,
+      routine: entries.filter(isRoutine).length,
+    }),
+    [entries],
+  );
+
+  const visible = useMemo(() => {
+    const q = filter.toLowerCase();
+    return entries.filter((e) => {
+      if (level === "warnings" && !isWarning(e)) return false;
+      if (level === "errors" && !isError(e)) return false;
+      if (hideRoutine && isRoutine(e)) return false;
+      if (!q) return true;
+      return (
+        e.message.toLowerCase().includes(q) ||
+        e.level.toLowerCase().includes(q) ||
+        (e.exception ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [entries, filter, level, hideRoutine]);
 
   return (
-    <div className="flex flex-col gap-3 h-full">
+    <div className="flex h-full flex-col gap-3">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Input
-          type="text"
-          placeholder="Filter logs…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="w-64"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setPaused((p) => !p)}
-          className={
-            paused
-              ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/15 hover:text-yellow-600"
-              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-600"
-          }
+      <div className="flex flex-wrap items-center gap-2">
+        <InputGroup className="h-9 w-full rounded-lg bg-card sm:w-64">
+          <InputGroupAddon className="pl-3">
+            <Search className="size-4" />
+          </InputGroupAddon>
+          <InputGroupInput
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Search the logs"
+            aria-label="Search the logs"
+            className="h-full text-sm"
+          />
+        </InputGroup>
+
+        <ToggleGroup
+          type="single"
+          value={level}
+          onValueChange={(v) => v && setLevel(v as LevelFilter)}
+          className="gap-0.5 rounded-lg bg-muted p-0.5"
+          aria-label="Show log levels"
         >
-          {paused ? "▶ Resume" : "⏸ Pause"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setAutoScroll((a) => !a)}
-          className={
-            autoScroll
-              ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
-              : "text-muted-foreground"
-          }
-        >
-          ↓ Auto-scroll {autoScroll ? "on" : "off"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="text-muted-foreground"
-          onClick={() => { setEntries([]); sinceRef.current = null; }}
-        >
-          Clear
-        </Button>
-        <span className="text-xs text-muted-foreground ml-auto">
-          {visible.length} {visible.length === 1 ? "entry" : "entries"}
-          {paused && " · paused"}
-        </span>
+          <LevelTab value="all" label="All" />
+          <LevelTab value="warnings" label="Warnings" count={counts.warnings} dot="bg-amber-400" />
+          <LevelTab value="errors" label="Errors" count={counts.errors} dot="bg-[#e5533d]" />
+        </ToggleGroup>
+
+        <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
+          <Switch id="hide-routine" checked={hideRoutine} onCheckedChange={setHideRoutine} />
+          <Label htmlFor="hide-routine" className="text-[13px] font-normal">
+            Hide routine lines
+          </Label>
+        </div>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button type="button" variant="outline" size="sm" onClick={() => setPaused((p) => !p)} className="rounded-full">
+            {paused ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+            {paused ? "Resume" : "Pause"}
+          </Button>
+          <Button
+            type="button"
+            variant={autoScroll ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAutoScroll((a) => !a)}
+            aria-pressed={autoScroll}
+            className="rounded-full"
+          >
+            <ArrowDownToLine data-icon="inline-start" />
+            Follow
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setEntries([]);
+              sinceRef.current = null;
+            }}
+            className="rounded-full"
+          >
+            <Eraser data-icon="inline-start" />
+            Clear
+          </Button>
+        </div>
       </div>
 
-      {/* Terminal */}
-      <div className="flex-1 min-h-0 rounded-lg border border-border bg-zinc-950 overflow-y-auto font-mono text-xs p-4 space-y-0.5">
-        {visible.length === 0 && (
-          <div className="text-zinc-600 italic">Waiting for log entries…</div>
-        )}
-        {visible.map((e, i) => (
-          <div key={i} className="leading-5 group">
-            <span className="text-zinc-600">{formatTs(e.timestamp)} </span>
-            <span className={`${LEVEL_COLOR[e.level] ?? "text-zinc-300"} mr-1`}>
-              [{LEVEL_BADGE[e.level] ?? e.level.slice(0, 3).toUpperCase()}]
-            </span>
-            <span className="text-zinc-200">{e.message}</span>
-            {e.exception && (
-              <div className="mt-0.5 ml-12 text-red-400 whitespace-pre-wrap text-[10px] opacity-80">
-                {e.exception}
+      {/* Console */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#1d2b24] bg-[#0f1a15] shadow-[0_14px_34px_-24px_rgb(0_0_0/0.6)]">
+        <div className="flex items-center justify-between border-b border-white/5 px-4 py-2 text-[12px] text-[#9fb0a6]">
+          <span className="flex items-center gap-2">
+            <span
+              className={cn(
+                "size-2 rounded-full",
+                paused ? "bg-amber-400" : "animate-pulse bg-[#1fbf5c] motion-reduce:animate-none",
+              )}
+            />
+            {paused ? "Paused" : "Live"}
+          </span>
+          <span className="tabular-nums">
+            {visible.length} shown
+            {hideRoutine && counts.routine > 0 ? `, ${counts.routine} routine lines hidden` : ""}
+          </span>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto py-1 font-mono text-[12px] leading-5">
+          {visible.length === 0 && (
+            <p className="px-4 py-6 text-[#7d8f85]">
+              {entries.length === 0 ? "Waiting for the API to log something…" : "Nothing matches these filters."}
+            </p>
+          )}
+          {visible.map((e, i) => {
+            const meta = LEVEL[e.level] ?? { label: e.level, chip: "bg-white/5 text-[#9fb0a6]" };
+            return (
+              <div
+                key={`${e.timestamp}-${i}`}
+                className={cn("grid grid-cols-[6.5rem_3.25rem_minmax(0,1fr)] gap-3 border-l-2 border-l-transparent px-4 py-0.5", meta.row)}
+              >
+                <span className="text-[#5f7268] tabular-nums">{formatTs(e.timestamp)}</span>
+                <span className={cn("h-fit rounded px-1.5 text-center text-[10.5px] font-semibold", meta.chip)}>{meta.label}</span>
+                <span className="break-words whitespace-pre-wrap text-[#dbe7df]">
+                  {e.message}
+                  {e.exception && (
+                    <span className="mt-1 block text-[11px] whitespace-pre-wrap text-[#ff9f80]/90">{e.exception}</span>
+                  )}
+                </span>
               </div>
-            )}
-          </div>
-        ))}
-        <div ref={bottomRef} />
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
       </div>
     </div>
+  );
+}
+
+function LevelTab({ value, label, count, dot }: { value: LevelFilter; label: string; count?: number; dot?: string }) {
+  return (
+    <ToggleGroupItem
+      value={value}
+      className="h-8 gap-1.5 rounded-md border-0 px-3 text-[13px] font-normal text-muted-foreground data-[state=on]:bg-card data-[state=on]:font-medium data-[state=on]:text-foreground data-[state=on]:shadow-[0_1px_2px_rgb(0_0_0/0.08)]"
+    >
+      {dot && <span className={cn("size-1.5 rounded-full", dot)} />}
+      {label}
+      {count ? <span className="tabular-nums text-muted-foreground">{count}</span> : null}
+    </ToggleGroupItem>
   );
 }

@@ -1,0 +1,213 @@
+/*
+ * The sign-in page's one orchestrated moment: a reminder goes out, its ticks move
+ * sent -> delivered -> read, the customer answers, the chatbot confirms.
+ * Headline words light up in step with the tick states.
+ * Everything runs once on load; reduced-motion users get the finished state.
+ */
+
+.panel {
+  --field: #0f6b3e;        /* deep leaf — the panel */
+  --field-deep: #0b5a33;   /* watermark tick */
+  --on-field: #f2faee;     /* headline + brand text */
+  --on-field-soft: #b9dcc5;
+  --ink: #14201a;          /* text inside bubbles */
+  --ink-soft: #5c6d63;
+  --tick: #8a9a90;
+  --read: #2fa8e6;         /* read ticks: sky blue */
+  --bot: #0f6b3e;
+  --bubble-in: #ffffff;
+  --bubble-out: #dcf8c6;   /* WhatsApp-style outgoing lime */
+  background: var(--field);
+  color: var(--on-field);
+  overflow: hidden;
+}
+
+:global(.dark) .panel {
+  --field: #0b4f2e;
+  --field-deep: #093f25;
+  --bubble-in: #f4f8f5;
+}
+
+.watermark {
+  position: absolute;
+  left: -6%;
+  bottom: -14%;
+  width: 78%;
+  color: var(--field-deep);
+  pointer-events: none;
+}
+
+.word {
+  color: color-mix(in oklab, var(--on-field) 28%, transparent);
+  animation: lightUp 400ms ease-out forwards;
+}
+.word:nth-child(1) { animation-delay: 700ms; }
+.word:nth-child(2) { animation-delay: 1500ms; }
+.word:nth-child(3) { animation-delay: 2300ms; }
+
+@keyframes lightUp {
+  to { color: var(--on-field); }
+}
+
+.bubble {
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(6px);
+  animation: arrive 360ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.08), 0 8px 24px -12px rgb(0 0 0 / 0.35);
+}
+.bubbleOut { background: var(--bubble-out); }
+.bubbleIn { background: var(--bubble-in); }
+
+.b1 { animation-delay: 250ms; }
+.b2 { animation-delay: 2900ms; }
+.b3 { animation-delay: 3700ms; }
+
+@keyframes arrive {
+  to { opacity: 1; transform: none; }
+}
+
+/* Tick stack: three layers in one slot, revealed in turn. */
+.ticks {
+  position: relative;
+  display: inline-block;
+  width: 16px;
+  height: 11px;
+}
+.ticks > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+.tSent { color: var(--tick); animation: show 1ms 700ms forwards, hide 1ms 1500ms forwards; }
+.tDelivered { color: var(--tick); animation: show 1ms 1500ms forwards, hide 1ms 2300ms forwards; }
+.tRead { color: var(--read); animation: show 1ms 2300ms forwards, pop 320ms 2300ms ease-out; }
+
+/* The bot's reply is read as soon as it lands. */
+.b3 .tRead { animation: show 1ms 4200ms forwards, pop 320ms 4200ms ease-out; }
+
+@keyframes show { to { opacity: 1; } }
+@keyframes hide { to { opacity: 0; } }
+@keyframes pop {
+  0% { transform: scale(0.7); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* ── Chat window ── */
+.window {
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 2px 0 rgb(255 255 255 / 0.08) inset, 0 40px 80px -30px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.12);
+  transform: rotate(-1.5deg);
+}
+.windowHead { background: #ffffff; }
+.windowBody { background: #eef4ef; min-height: 17.5rem; }
+.avatar { background: #dcf1e3; color: #0f6b3e; }
+.botPill { background: #e3f5e9; color: #0f6b3e; }
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #1fbf5c;
+  box-shadow: 0 0 0 3px rgb(31 191 92 / 0.2);
+}
+.dayChip { background: rgb(255 255 255 / 0.85); color: var(--ink-soft); }
+.composer { background: #f1f4f2; color: #8a9a90; }
+.send { background: #0f6b3e; color: #ffffff; }
+
+.typing {
+  background: var(--bubble-out);
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  animation: typingShow 1ms 3200ms forwards, typingHide 1ms 3700ms forwards;
+}
+.typing > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #6f8a79;
+  animation: dot 900ms infinite ease-in-out;
+}
+.typing > span:nth-child(2) { animation-delay: 150ms; }
+.typing > span:nth-child(3) { animation-delay: 300ms; }
+
+@keyframes typingShow { to { opacity: 1; max-height: 3rem; padding-top: 0.625rem; padding-bottom: 0.625rem; } }
+@keyframes typingHide { to { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; } }
+@keyframes dot {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-3px); opacity: 1; }
+}
+
+/* ── Campaign card: the bulk send behind the chat ── */
+.campaign {
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.12);
+  transform: rotate(2deg);
+  opacity: 0;
+  animation: arrive 420ms cubic-bezier(0.2, 0.7, 0.2, 1) 80ms forwards;
+}
+
+/* Bars fill in step with the headline: Delivered with "Delivered.", Read with "Read.",
+   replies trickling in after. */
+.barDelivered,
+.barRead,
+.barReplied {
+  width: 0;
+  animation: fill 700ms cubic-bezier(0.3, 0.7, 0.2, 1) forwards;
+}
+.barDelivered { background: #8fc9a5; animation-delay: 1200ms; }
+.barRead { background: var(--read); animation-delay: 2000ms; }
+.barReplied { background: #0f6b3e; animation-delay: 2800ms; }
+
+@keyframes fill {
+  to { width: var(--w); }
+}
+
+/* ── How-it-works steps: dim until their part of the animation plays ── */
+.step {
+  opacity: 0.4;
+  animation: stepOn 400ms ease-out forwards;
+}
+.step:nth-child(1) { animation-delay: 150ms; }   /* campaign card arrives */
+.step:nth-child(2) { animation-delay: 1200ms; }  /* bars fill, ticks turn blue */
+.step:nth-child(3) { animation-delay: 2900ms; }  /* the reply comes in */
+
+.stepNum {
+  background: rgb(255 255 255 / 0.1);
+  color: var(--on-field);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.25);
+  animation: numOn 400ms ease-out forwards;
+}
+.step:nth-child(1) .stepNum { animation-delay: 150ms; }
+.step:nth-child(2) .stepNum { animation-delay: 1200ms; }
+.step:nth-child(3) .stepNum { animation-delay: 2900ms; }
+
+@keyframes stepOn { to { opacity: 1; } }
+@keyframes numOn {
+  to { background: #dcf8c6; color: #0f6b3e; box-shadow: inset 0 0 0 1px #dcf8c6; }
+}
+
+.soft { color: var(--on-field-soft); }
+.meta { color: var(--ink-soft); }
+.bot { color: var(--bot); font-weight: 500; }
+
+@media (prefers-reduced-motion: reduce) {
+  .word, .bubble, .ticks > svg, .typing, .typing > span { animation: none !important; }
+  .typing { display: none; }
+  .window { transform: none; }
+  .campaign { animation: none !important; opacity: 1; transform: none; }
+  .step, .stepNum { animation: none !important; }
+  .step { opacity: 1; }
+  .stepNum { background: #dcf8c6; color: #0f6b3e; }
+  .barDelivered, .barRead, .barReplied { animation: none !important; width: var(--w); }
+  .word { color: var(--on-field); }
+  .bubble { opacity: 1; transform: none; }
+  .tRead { opacity: 1; }
+}

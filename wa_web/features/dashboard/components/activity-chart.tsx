@@ -15,9 +15,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { DailyMessageCount } from "@/features/analytics/types";
 
 const config = {
-  sent: { label: "Sent", color: "var(--primary)" },
-  delivered: { label: "Delivered", color: "var(--chart-2)" },
-  read: { label: "Read", color: "oklch(0.62 0.17 250)" },
+  sent: { label: "Sent", color: "#0f6b3e" },
+  delivered: { label: "Delivered", color: "#8fc9a5" },
+  read: { label: "Read", color: "#2fa8e6" },
 } satisfies ChartConfig;
 
 const RANGES = [
@@ -31,19 +31,42 @@ const toDate = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00`);
 const tickFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 
 /** Messages sent / delivered / read per day, with a 7/14/30-day switch. */
-export function ActivityChart({ daily }: { daily: DailyMessageCount[] }) {
+export function ActivityChart({
+  daily,
+  range: fixedRange,
+}: {
+  daily: DailyMessageCount[];
+  /** A fixed from/to (yyyy-mm-dd). Hides the 7/14/30 switch; the caller owns the range. */
+  range?: { from: string; to: string };
+}) {
   const [range, setRange] = useState("30");
 
+  // One point per day for the whole range, zeros included, so a quiet week still draws a line
+  // instead of a lone dot.
   const data = useMemo(() => {
-    const sorted = [...daily].sort((a, b) => a.date.localeCompare(b.date));
-    return sorted.slice(-Number(range));
-  }, [daily, range]);
+    const byDay = new Map(daily.map((d) => [d.date.slice(0, 10), d]));
+    const out: DailyMessageCount[] = [];
+    const key = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const end = fixedRange ? new Date(`${fixedRange.to}T00:00:00`) : new Date();
+    const start = fixedRange
+      ? new Date(`${fixedRange.from}T00:00:00`)
+      : new Date(end.getFullYear(), end.getMonth(), end.getDate() - (Number(range) - 1));
+    // Capped at a year so a mistyped range can't build an enormous series.
+    for (let d = new Date(start), n = 0; d <= end && n < 366; d.setDate(d.getDate() + 1), n++) {
+      const k = key(d);
+      out.push(byDay.get(k) ?? { date: k, sent: 0, delivered: 0, read: 0, failed: 0 });
+    }
+    return out;
+  }, [daily, range, fixedRange]);
+  const empty = data.every((d) => d.sent === 0);
 
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>Message activity</CardTitle>
+        <CardTitle className="text-[15px]">Message activity</CardTitle>
         <CardDescription>Template and chat messages sent from your numbers.</CardDescription>
+        {!fixedRange && (
         <CardAction>
           <ToggleGroup
             type="single"
@@ -59,9 +82,10 @@ export function ActivityChart({ daily }: { daily: DailyMessageCount[] }) {
             ))}
           </ToggleGroup>
         </CardAction>
+        )}
       </CardHeader>
       <CardContent className="flex-1">
-        {data.length === 0 ? (
+        {empty ? (
           <div className="flex h-[260px] items-center justify-center rounded-md border border-dashed text-muted-foreground">
             No messages sent in this period yet.
           </div>

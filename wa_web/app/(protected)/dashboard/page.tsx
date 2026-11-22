@@ -1,16 +1,13 @@
 import Link from "next/link";
 import {
   Building2,
-  CheckCheck,
   Contact,
   CreditCard,
-  Eye,
   Inbox,
   Layers,
   ListChecks,
   Megaphone,
   Plus,
-  Send,
   Smartphone,
   Users,
 } from "lucide-react";
@@ -28,8 +25,9 @@ import { ActivityChart } from "@/features/dashboard/components/activity-chart";
 import { RecentConversations } from "@/features/dashboard/components/recent-conversations";
 import { RecentCampaigns } from "@/features/dashboard/components/recent-campaigns";
 import { QuickLinkCard } from "@/features/dashboard/components/quick-link-card";
-import { CurrentPlanCard } from "@/features/my-subscription/components/current-plan-card";
-import { change, pct } from "@/features/dashboard/format";
+import { DeliveryBand } from "@/features/dashboard/components/delivery-band";
+import { PlanPanel } from "@/features/dashboard/components/plan-panel";
+import { change } from "@/features/dashboard/format";
 
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 const daysAgo = (n: number) => {
@@ -74,8 +72,6 @@ async function CompanyAdminContent({ name }: { name: string }) {
   const sum = (rows: typeof sorted) => rows.reduce((t, r) => t + r.sent, 0);
   const sentTrend = sorted.length >= 14 ? change(sum(sorted.slice(-7)), sum(sorted.slice(-14, -7))) : null;
 
-  const deliveryRate = m ? pct(m.totalDelivered, m.totalSent) : null;
-  const readRate = m ? pct(m.totalRead, m.totalSent) : null;
   const contactsTotal = contacts.success ? contacts.data.pagination.total : null;
 
   const recentCampaigns = campaigns.success
@@ -99,39 +95,19 @@ async function CompanyAdminContent({ name }: { name: string }) {
         </Button>
       </DashboardGreeting>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Messages sent"
-          icon={Send}
-          value={m ? m.totalSent.toLocaleString() : null}
-          trend={sentTrend}
-          footnote={sentTrend === null ? "Last 30 days" : "Last 30 days · trend is week over week"}
-        />
-        <KpiCard
-          label="Delivery rate"
-          icon={CheckCheck}
-          value={deliveryRate === null ? (m ? "0%" : null) : `${deliveryRate}%`}
-          footnote={m ? `${m.totalFailed.toLocaleString()} failed in the last 30 days` : "Last 30 days"}
-        />
-        <KpiCard
-          label="Read rate"
-          icon={Eye}
-          value={readRate === null ? (m ? "0%" : null) : `${readRate}%`}
-          footnote={m ? `${m.totalRead.toLocaleString()} messages opened` : "Last 30 days"}
-        />
-        <KpiCard
-          label="Contacts"
-          icon={Contact}
-          value={contactsTotal === null ? null : contactsTotal.toLocaleString()}
-          footnote="People you can message"
-        />
-      </div>
+      <DeliveryBand
+        sent={m?.totalSent ?? 0}
+        delivered={m?.totalDelivered ?? 0}
+        read={m?.totalRead ?? 0}
+        failed={m?.totalFailed ?? 0}
+        trend={sentTrend}
+      />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
           <ActivityChart daily={daily} />
         </div>
-        <CurrentPlanCard />
+        <PlanPanel contacts={contactsTotal} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

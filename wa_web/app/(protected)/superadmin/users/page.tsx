@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { PageHero } from "@/components/page-hero";
+import { getUsersAction } from "@/features/users/actions/user-actions";
 import { UserTable } from "@/features/users/components/user-table";
 
 /**
@@ -13,15 +15,19 @@ export default async function UsersPage() {
     redirect("/unauthorized");
   }
 
+  const res = await getUsersAction({ page: 1, pageSize: 200 });
+  const list = res.success ? res.data.items : null;
+
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      {/* Header card — mirrors the Company Management screen style */}
-      <div className="page-header">
-        <h1>Users</h1>
-        <p>
-          Create and manage Company Admin and Agent users for tenant companies.
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
+      <PageHero
+        title="Users"
+        description="Everyone who can sign in to a company: its admins, and the agents who answer chats."
+        facts={[
+          { label: "Users", value: list ? list.length : null },
+          { label: "Active", value: list ? list.filter((u) => u.isActive).length : null, tone: "green" },
+        ]}
+      />
 
       <UserTable />
     </div>

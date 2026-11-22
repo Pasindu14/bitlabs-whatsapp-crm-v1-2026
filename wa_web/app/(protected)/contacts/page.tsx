@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { PageHero, totalOf } from "@/components/page-hero";
+import { getContactsAction } from "@/features/contacts/actions/contact-actions";
+import { getContactListsAction } from "@/features/contact-lists/actions/contact-list-actions";
 import { ContactTable } from "@/features/contacts/components/contact-table";
 
 /**
@@ -13,15 +16,21 @@ export default async function ContactsPage() {
     redirect("/unauthorized");
   }
 
+  const [contacts, lists] = await Promise.all([
+    getContactsAction({ page: 1, pageSize: 1 }).then(totalOf),
+    getContactListsAction({ page: 1, pageSize: 1 }).then(totalOf),
+  ]);
+
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      {/* Header card — mirrors the Team / WABA management screen style */}
-      <div className="page-header">
-        <h1>Contacts</h1>
-        <p>
-          Add and manage the people your company messages on WhatsApp.
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
+      <PageHero
+        title="Contacts"
+        description="The people your business messages on WhatsApp. Add them one by one, or import a spreadsheet."
+        facts={[
+          { label: "Contacts", value: contacts },
+          { label: "Contact lists", value: lists },
+        ]}
+      />
 
       <ContactTable />
     </div>

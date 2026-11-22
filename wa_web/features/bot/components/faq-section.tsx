@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +45,8 @@ export function FaqSection() {
   return (
     <SectionCard
       title="Prepared answers"
+      icon={MessageSquareText}
+      tone="teal"
       description={
         <>
           Questions you get all the time, answered the way you&apos;d answer them. The assistant

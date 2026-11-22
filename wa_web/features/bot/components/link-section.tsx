@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Trash2, X, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +46,8 @@ export function LinkSection() {
   return (
     <SectionCard
       title="Links to share"
+      icon={Link2}
+      tone="blue"
       description={
         <>
           Photos, price lists, maps — anything the assistant can send when a customer asks. It sends

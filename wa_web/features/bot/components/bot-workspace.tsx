@@ -1,5 +1,6 @@
 "use client";
 
+import { FileCode2, KeyRound, Plug, Sparkles, type LucideIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RuleTable } from "./rule-table";
 import { AiSettingsView } from "./ai-settings-view";
@@ -15,13 +16,13 @@ import { ClinicCrmSettingsView } from "@/features/clinic-crm/components/clinic-c
  */
 export function BotWorkspace() {
   return (
-    <Tabs defaultValue="assistant" className="gap-6">
-      <TabsList>
-        <TabsTrigger value="assistant">AI assistant</TabsTrigger>
-        <TabsTrigger value="prompt">AI prompt</TabsTrigger>
-        <TabsTrigger value="rules">Keyword rules</TabsTrigger>
+    <Tabs defaultValue="assistant" className="gap-5">
+      <TabsList variant="line" className="h-auto w-full justify-start gap-1 border-b pb-0">
+        <BotTab value="assistant" icon={Sparkles} label="AI assistant" />
+        <BotTab value="rules" icon={KeyRound} label="Keyword rules" />
         {/* Named for what it is to every business; the clinic CRM is the one integration so far. */}
-        <TabsTrigger value="integrations">Integrations</TabsTrigger>
+        <BotTab value="integrations" icon={Plug} label="Integrations" />
+        <BotTab value="prompt" icon={FileCode2} label="What the AI sees" />
       </TabsList>
 
       <TabsContent value="assistant">
@@ -40,5 +41,17 @@ export function BotWorkspace() {
         <ClinicCrmSettingsView />
       </TabsContent>
     </Tabs>
+  );
+}
+
+function BotTab({ value, icon: Icon, label }: { value: string; icon: LucideIcon; label: string }) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="-mb-px h-10 flex-none rounded-none border-0 border-b-2 border-transparent px-3 text-[13px] font-medium text-muted-foreground data-active:border-primary data-active:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground"
+    >
+      <Icon data-icon="inline-start" className="size-4" />
+      {label}
+    </TabsTrigger>
   );
 }

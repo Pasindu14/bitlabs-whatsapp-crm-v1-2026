@@ -48,13 +48,13 @@ export function PackagesReport() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Packages</p>
+          <p className="text-[13px] font-medium text-muted-foreground">Total packages</p>
           <p className="mt-2 text-3xl font-bold tabular-nums">
             {isLoading ? "—" : numFmt.format(data?.totalPackages ?? 0)}
           </p>
         </div>
         <div className="rounded-xl border bg-card p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Revenue</p>
+          <p className="text-[13px] font-medium text-muted-foreground">Total revenue</p>
           <p className="mt-2 text-3xl font-bold tabular-nums text-primary">
             {isLoading ? "—" : money(data?.totalRevenue ?? 0)}
           </p>

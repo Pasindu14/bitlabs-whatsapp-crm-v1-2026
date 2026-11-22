@@ -435,7 +435,7 @@ export function TemplateBuilderForm({ mode, defaultValues, onSave, isSaving, fie
         <div className="h-fit space-y-3 lg:sticky lg:top-6">
           <div className="flex items-center gap-2 px-1">
             <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Live Preview</p>
+            <p className="text-[13px] font-medium text-muted-foreground">Live preview</p>
           </div>
           <TemplatePreview values={values} />
         </div>

@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Hand } from "lucide-react";
 import { SectionCard } from "./section-card";
 import { useApprovedTemplates } from "@/features/templates/hooks/use-templates";
 import type { SaveBotProfileInput } from "@/features/bot/schema/bot-schema";
@@ -59,6 +60,8 @@ export function HandoffAlerts({
   return (
     <SectionCard
       title="When the assistant hands a chat to your team"
+      icon={Hand}
+      tone="pink"
       description={
         <>
           The assistant stops replying on that chat, so someone has to be told. Your team always

@@ -46,7 +46,7 @@ function StatusTick({ status }: { status: MessageStatus }) {
     case "Delivered":
       return <CheckCheck className="size-3.5" />;
     case "Read":
-      return <CheckCheck className="size-3.5 text-sky-400" />;
+      return <CheckCheck className="size-3.5 text-[#2fa8e6]" />;
     case "Failed":
       return <TriangleAlert className="size-3.5 text-destructive" />;
     default:
@@ -147,11 +147,13 @@ export function MessageBubble({
 
       <div
         className={cn(
-          "max-w-[78%] rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[70%]",
+          "max-w-[80%] rounded-2xl px-3.5 py-2 text-[14px] leading-relaxed shadow-[0_1px_0_rgb(16_60_36/0.08)] sm:max-w-[68%]",
+          // Lime out, white in: the same pairing as the sign-in page and WhatsApp itself, so the
+          // direction of every message reads at a glance.
           outbound
-            ? "rounded-br-sm bg-primary text-primary-foreground"
-            : "rounded-bl-sm border bg-card text-card-foreground",
-          failed && "ring-1 ring-destructive/40",
+            ? "rounded-br-md bg-[#dcf8c6] text-[#14201a] dark:bg-[#12432a] dark:text-[#e8efe9]"
+            : "rounded-bl-md bg-card text-card-foreground",
+          failed && "ring-1 ring-destructive/50",
         )}
       >
         {hasMedia && (
@@ -164,14 +166,17 @@ export function MessageBubble({
           <p className="whitespace-pre-wrap break-words">{renderWhatsAppText(message.body)}</p>
         )}
 
-        {failed && message.errorMessage && (
-          <p className="mt-1 text-[11px] text-primary-foreground/80">{message.errorMessage}</p>
+        {failed && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[12px] font-medium text-destructive">
+            <TriangleAlert className="size-3.5 shrink-0" />
+            Not delivered{message.errorMessage ? `: ${message.errorMessage}` : ""}
+          </p>
         )}
 
         <div
           className={cn(
-            "mt-1 flex items-center justify-end gap-1 text-[10px]",
-            outbound ? "text-primary-foreground/70" : "text-muted-foreground",
+            "mt-0.5 flex items-center justify-end gap-1 text-[10.5px] tabular-nums",
+            outbound ? "text-[#5c6d63] dark:text-[#9fb0a6]" : "text-muted-foreground",
           )}
         >
           <span>{formatMessageTime(message.createdAt)}</span>
