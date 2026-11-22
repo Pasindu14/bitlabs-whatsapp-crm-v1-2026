@@ -273,6 +273,559 @@ namespace wa_api.Migrations
                     b.ToTable("ProcessedStripeEvents");
                 });
 
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.AiReplyLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CacheReadTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CacheWriteTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("CostUsd")
+                        .HasPrecision(12, 6)
+                        .HasColumnType("numeric(12,6)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("InboundMessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Iterations")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("LatencyMs")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ToolCallsJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId");
+
+                    b.HasIndex("CompanyId", "CreatedAt");
+
+                    b.ToTable("AiReplyLogs");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.AutoReplyRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReplyBody")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<List<string>>("Terms")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "Priority");
+
+                    b.ToTable("AutoReplyRules");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.BotFaq", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "SortOrder");
+
+                    b.ToTable("BotFaqs");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.BotLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("WhenToShare")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "SortOrder");
+
+                    b.ToTable("BotLinks");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.BotProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BookingInstructions")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("BookingsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("BusinessDescription")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContactNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CurrencyLabel")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<int>("DailyReplyLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<List<string>>("HandoffAlertPhones")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.Property<Guid?>("HandoffAlertTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("HandoffResumeMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("IndustryRules")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int>("ResumeBotAfterIdleHours")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(24);
+
+                    b.Property<string>("ToneNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique();
+
+                    b.ToTable("BotProfiles");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Calendar.Entities.Appointment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AppointmentTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("BlockEndUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("BlockStartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EndUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ExternalBookingId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ExternalCustomerId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ExternalSyncError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ExternalSyncStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime?>("ExternalSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("HoldExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("ReminderSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("StartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentTypeId");
+
+                    b.HasIndex("ContactId");
+
+                    b.HasIndex("ConversationId");
+
+                    b.HasIndex("HoldExpiresAt")
+                        .HasFilter("\"HoldExpiresAt\" IS NOT NULL");
+
+                    b.HasIndex("CompanyId", "StartUtc");
+
+                    b.ToTable("Appointments");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Calendar.Entities.AppointmentType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BookingHorizonDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BufferAfterMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BufferBeforeMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ExternalTreatmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MinimumNoticeMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<decimal?>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("SlotIntervalMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "CompanyId", "Name" }, "UX_AppointmentTypes_Name")
+                        .IsUnique()
+                        .HasFilter("\"IsActive\" = TRUE");
+
+                    b.ToTable("AppointmentTypes");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Calendar.Entities.BusinessHours", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DayOfWeek")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<TimeOnly>("EndLocal")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<TimeOnly>("StartLocal")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "DayOfWeek");
+
+                    b.ToTable("BusinessHours");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Calendar.Entities.CalendarBlackout", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EndUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("StartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "StartUtc");
+
+                    b.ToTable("CalendarBlackouts");
+                });
+
             modelBuilder.Entity("wa_api.Features.Campaigns.Entities.Campaign", b =>
                 {
                     b.Property<Guid>("Id")
@@ -505,6 +1058,61 @@ namespace wa_api.Migrations
                     b.ToTable("CampaignRecipients");
                 });
 
+            modelBuilder.Entity("wa_api.Features.ClinicCrm.Entities.ClinicCrmConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BaseUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ClientSecret")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("LastErrorAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastSuccessAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "CompanyId" }, "UX_ClinicCrmConnections_Company")
+                        .IsUnique()
+                        .HasFilter("\"IsActive\" = TRUE");
+
+                    b.ToTable("ClinicCrmConnections");
+                });
+
             modelBuilder.Entity("wa_api.Features.Companies.Company", b =>
                 {
                     b.Property<Guid>("Id")
@@ -537,6 +1145,13 @@ namespace wa_api.Migrations
                     b.Property<string>("StripeCustomerId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasDefaultValue("UTC");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -696,6 +1311,32 @@ namespace wa_api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("BotAsksMade")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("BotConvertedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("BotFollowUpSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("BotFollowUpStepsSent")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("BotPausedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("BotPausedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("BotResumesAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("BotState")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
 
@@ -746,6 +1387,12 @@ namespace wa_api.Migrations
                     b.HasIndex("WabaConnectionId");
 
                     b.HasIndex("CompanyId", "LastMessageAt");
+
+                    b.HasIndex(new[] { "BotResumesAt" }, "IX_Conversations_BotResumesAt")
+                        .HasFilter("\"BotResumesAt\" IS NOT NULL");
+
+                    b.HasIndex(new[] { "BotState", "LastMessageAt" }, "IX_Conversations_PausedIdle")
+                        .HasFilter("\"BotState\" = 'Paused'");
 
                     b.HasIndex(new[] { "CompanyId", "ContactId", "WabaConnectionId" }, "UX_Conversations_OpenThread")
                         .IsUnique()
@@ -812,6 +1459,9 @@ namespace wa_api.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsAutoReply")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -829,6 +1479,10 @@ namespace wa_api.Migrations
                     b.Property<string>("MediaType")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("MetaCostUsd")
+                        .HasPrecision(10, 6)
+                        .HasColumnType("numeric(10,6)");
 
                     b.Property<string>("MetaMediaId")
                         .HasMaxLength(256)
@@ -1608,6 +2262,145 @@ namespace wa_api.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.AiReplyLog", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.AutoReplyRule", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.BotFaq", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.BotLink", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("wa_api.Features.Bot.Entities.BotProfile", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsMany("wa_api.Features.Bot.Entities.BotFollowUpStep", "FollowUpSteps", b1 =>
+                        {
+                            b1.Property<Guid>("BotProfileId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("DelayMinutes")
+                                .HasColumnType("integer");
+
+                            b1.Property<string>("Message")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<Guid?>("TemplateId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<List<string>>("VariableOverrides")
+                                .IsRequired()
+                                .HasColumnType("text[]");
+
+                            b1.HasKey("BotProfileId", "Id");
+
+                            b1.ToTable("BotProfiles");
+
+                            b1.ToJson("FollowUpSteps");
+
+                            b1.WithOwner()
+                                .HasForeignKey("BotProfileId");
+                        });
+
+                    b.Navigation("FollowUpSteps");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Calendar.Entities.Appointment", b =>
+                {
+                    b.HasOne("wa_api.Features.Calendar.Entities.AppointmentType", "AppointmentType")
+                        .WithMany()
+                        .HasForeignKey("AppointmentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("wa_api.Features.Contacts.Entities.Contact", "Contact")
+                        .WithMany()
+                        .HasForeignKey("ContactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("wa_api.Features.Conversations.Entities.Conversation", "Conversation")
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AppointmentType");
+
+                    b.Navigation("Contact");
+
+                    b.Navigation("Conversation");
+                });
+
+            modelBuilder.Entity("wa_api.Features.Calendar.Entities.AppointmentType", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("wa_api.Features.Calendar.Entities.BusinessHours", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("wa_api.Features.Calendar.Entities.CalendarBlackout", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("wa_api.Features.Campaigns.Entities.Campaign", b =>
                 {
                     b.HasOne("wa_api.Features.Companies.Company", null)
@@ -1712,6 +2505,15 @@ namespace wa_api.Migrations
                     b.Navigation("Contact");
 
                     b.Navigation("Message");
+                });
+
+            modelBuilder.Entity("wa_api.Features.ClinicCrm.Entities.ClinicCrmConnection", b =>
+                {
+                    b.HasOne("wa_api.Features.Companies.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("wa_api.Features.ContactLists.Entities.ContactList", b =>

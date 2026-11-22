@@ -6,7 +6,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { queryKeys } from "@/lib/hooks/query-keys";
 import { useConversationStore } from "@/features/conversations/store/conversation-store";
-import type { ChatEvent, MessageDeletedEvent } from "@/features/conversations/types";
+import type {
+  BotStateChangedEvent,
+  BotTypingEvent,
+  ChatEvent,
+  ConversationMessage,
+  MessageDeletedEvent,
+  MessageStatusEvent,
+} from "@/features/conversations/types";
 
 /**
  * Subscribes to the company's real-time chat channel. On every "message" event (inbound from a customer
@@ -43,7 +50,26 @@ export function useChatHub(apiUrl: string) {
         qc.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) });
         // Keep the open thread's header + 24h-window state fresh (inbound resets the window).
         useConversationStore.getState().patchSelected(event.conversation);
+        // A delivered message ends the composing state, whatever the server did or did not send —
+        // the reply arriving IS the end of it.
+        useConversationStore.getState().setBotTyping(conversationId, false);
       }
+    });
+
+    // The assistant is working on a reply. Several seconds pass between the customer's message and
+    // the answer (model call, tool round-trips, the deliberate read delay), which otherwise looks
+    // like nothing is happening.
+    connection.on("botTyping", (event: BotTypingEvent) => {
+      if (event?.conversationId) {
+        useConversationStore.getState().setBotTyping(event.conversationId, !!event.isTyping);
+      }
+    });
+
+    // Another agent took the thread over, or handed it back — flip the banner without a refresh so
+    // two agents do not start typing over each other.
+    connection.on("botStateChanged", (event: BotStateChangedEvent) => {
+      qc.invalidateQueries({ queryKey: queryKeys.conversations.lists() });
+      if (event?.conversation) useConversationStore.getState().patchSelected(event.conversation);
     });
 
     // Another agent deleted a message ("delete for me") — drop it from any open thread + refresh the list.
@@ -56,12 +82,37 @@ export function useChatHub(apiUrl: string) {
       }
     });
 
+    // Meta reported a delivery status (sent/delivered/read/failed) — move the ticks on an open thread.
+    // Patch the cached bubble so it flips instantly, then refetch to reconcile with the server.
+    connection.on("messageStatus", (event: MessageStatusEvent) => {
+      const conversationId = event?.conversationId;
+      if (!conversationId) return;
+      const key = queryKeys.conversations.messages(conversationId);
+      qc.setQueryData<ConversationMessage[]>(key, (old) =>
+        old?.map((m) =>
+          m.id === event.messageId
+            ? { ...m, status: event.status, statusAt: event.statusAt, errorMessage: event.errorMessage }
+            : m,
+        ),
+      );
+      qc.invalidateQueries({ queryKey: key });
+    });
+
+    // The server does not replay events, so anything sent while we were disconnected — the inbox
+    // page was closed, or the socket dropped — is gone. Once (re)connected, refetch everything and
+    // drop typing flags whose "done" event we may have missed.
+    const resync = () => {
+      useConversationStore.getState().clearBotTyping();
+      qc.invalidateQueries({ queryKey: queryKeys.conversations.all });
+    };
+    connection.onreconnected(resync);
+
     // Realtime is an enhancement — the inbox still works via normal fetches — so a failed connect is a
     // warning, not an error (and won't trip Next's error overlay). Crucially we NEVER call stop() while
     // start() is still negotiating: under React Strict Mode's dev mount→unmount→remount that throws
     // "The connection was stopped during negotiation". Instead the cleanup waits for start() to settle,
     // then stops — so the first (torn-down) connection ends cleanly and the remount connects normally.
-    const startPromise = connection.start().catch((err: unknown) => {
+    const startPromise = connection.start().then(resync, (err: unknown) => {
       console.warn("ChatHub realtime unavailable:", err instanceof Error ? err.message : err);
     });
 

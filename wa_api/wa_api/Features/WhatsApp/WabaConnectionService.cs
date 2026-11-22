@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Errors;
 using wa_api.Features.WhatsApp.Dtos;
@@ -107,10 +108,20 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
 
     public async Task<WabaConnectionResponse> UpdateAsync(Guid id, UpdateWabaConnectionRequest request, CancellationToken ct = default)
     {
-        var conn = await db.WabaConnections
-            .Include(w => w.Company)
-            .FirstOrDefaultAsync(w => w.Id == id, ct)
-            ?? throw new NotFoundException("WabaConnection", id);
+        WabaConnection conn;
+        try
+        {
+            conn = await db.WabaConnections
+                .Include(w => w.Company)
+                .FirstOrDefaultAsync(w => w.Id == id, ct)
+                ?? throw new NotFoundException("WabaConnection", id);
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException)
+        {
+            // The stored secrets were encrypted under a different Encryption:Key, so the row can't even be
+            // loaded. Re-entering them is the only way out, and that must work without reading the old values.
+            return await ReplaceUndecryptableSecretsAsync(id, request, ct);
+        }
 
         var company = conn.CompanyId == request.CompanyId
             ? conn.Company
@@ -149,6 +160,59 @@ public class WabaConnectionService(AppDbContext db, IMetaCredentialValidator met
         await db.SaveChangesAsync(ct);
 
         return Map(conn, company.Name);
+    }
+
+    /// <summary>
+    /// Recovery path for <see cref="UpdateAsync"/> when the row's secrets can't be decrypted. Reads only the
+    /// non-secret columns (a projection never runs the secret converter) and overwrites everything with a
+    /// set-based update, so the unreadable ciphertext is replaced without ever being decrypted. Both secrets
+    /// are required: keeping either "current" value would keep an undecryptable one.
+    /// </summary>
+    private async Task<WabaConnectionResponse> ReplaceUndecryptableSecretsAsync(
+        Guid id, UpdateWabaConnectionRequest request, CancellationToken ct)
+    {
+        var newToken = Normalize(request.AccessToken);
+        var newSecret = Normalize(request.AppSecret);
+        if (newToken is null || newSecret is null)
+            throw new BusinessRuleException("WABA_SECRETS_UNREADABLE",
+                "This connection's stored Access Token / App Secret can't be decrypted with the current " +
+                "encryption key. Enter both a new Access Token and App Secret to replace them.");
+
+        var existing = await db.WabaConnections
+            .Where(w => w.Id == id)
+            .Select(w => new { w.CompanyId, w.Status })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException("WabaConnection", id);
+
+        var company = await db.Companies.FirstOrDefaultAsync(c => c.Id == request.CompanyId, ct)
+            ?? throw new NotFoundException("Company", request.CompanyId);
+
+        var phoneNumberId = request.PhoneNumberId.Trim();
+        if (await db.WabaConnections.AnyAsync(w => w.Id != id && w.PhoneNumberId == phoneNumberId, ct))
+            throw new ConflictException("WABA_PHONE_NUMBER_DUPLICATE",
+                "A connection with this phone number id already exists.");
+
+        var wabaId = request.WabaId.Trim();
+        await metaValidator.ValidateAsync(phoneNumberId, wabaId, newToken, ct);
+
+        var displayPhoneNumber = Normalize(request.DisplayPhoneNumber) ?? string.Empty;
+        var status = request.Status ?? existing.Status;
+
+        // ExecuteUpdate runs the secret converter on the NEW values (encrypting them under the current key)
+        // but bypasses the change tracker, so UpdatedAt is stamped here rather than by the interceptor.
+        await db.WabaConnections
+            .Where(w => w.Id == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(w => w.CompanyId, company.Id)
+                .SetProperty(w => w.PhoneNumberId, phoneNumberId)
+                .SetProperty(w => w.WabaId, wabaId)
+                .SetProperty(w => w.DisplayPhoneNumber, displayPhoneNumber)
+                .SetProperty(w => w.Status, status)
+                .SetProperty(w => w.EncryptedAccessToken, newToken)
+                .SetProperty(w => w.AppSecret, newSecret)
+                .SetProperty(w => w.UpdatedAt, DateTime.UtcNow), ct);
+
+        return await GetByIdAsync(id, ct);
     }
 
     public Task<WabaConnectionResponse> ActivateAsync(Guid id, CancellationToken ct = default)

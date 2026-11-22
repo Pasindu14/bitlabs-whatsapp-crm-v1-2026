@@ -14,6 +14,9 @@ export const PERMISSIONS = [
   { key: "contact_list", label: "Contact List" },
   { key: "manage_user", label: "Manage User" },
   { key: "analytics", label: "Analytics" },
+  // On a PLAN these two are what switch the chatbot / calendar on for a company (the API enforces them).
+  { key: "manage_bot", label: "Manage Chatbot" },
+  { key: "manage_calendar", label: "Manage Calendar" },
 ] as const;
 
 export const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key) as [

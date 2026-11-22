@@ -34,6 +34,7 @@ public sealed class WebhookProcessingJob(IServiceScopeFactory scopeFactory, ILog
         await using var scope = scopeFactory.CreateAsyncScope();
         var inbox = scope.ServiceProvider.GetRequiredService<IWebhookInboxService>();
         var dispatcher = scope.ServiceProvider.GetRequiredService<IWebhookDispatcher>();
+        var postCommit = scope.ServiceProvider.GetRequiredService<WebhookPostCommitActions>();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var row = await inbox.GetForProcessingAsync(eventId, ct);
@@ -73,6 +74,7 @@ public sealed class WebhookProcessingJob(IServiceScopeFactory scopeFactory, ILog
             await strategy.ExecuteAsync(async () =>
             {
                 db.ChangeTracker.Clear();
+                postCommit.Clear(); // a retried attempt re-runs the handlers, which queue their pushes again
                 var fresh = await inbox.GetForProcessingAsync(eventId, ct)
                     ?? throw new InvalidOperationException(
                         $"Webhook {eventId} disappeared between claim and processing.");
@@ -94,5 +96,10 @@ public sealed class WebhookProcessingJob(IServiceScopeFactory scopeFactory, ILog
                 logger.LogWarning(ex, "Webhook {Id} attempt {Attempts} failed — Hangfire will retry.", row.Id, row.Attempts);
             throw; // rethrow so Hangfire records the failure and schedules the backoff retry
         }
+
+        // Realtime pushes go out only now that the batch is committed. Sent from inside the transaction, the
+        // inbox would refetch on the event, read the pre-commit state and keep it. Outside the try/catch: the
+        // batch is done, so nothing here may mark it Failed (RunAsync swallows per-action failures).
+        await postCommit.RunAsync(ct);
     }
 }

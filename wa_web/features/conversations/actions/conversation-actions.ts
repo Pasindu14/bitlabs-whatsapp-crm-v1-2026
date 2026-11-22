@@ -55,3 +55,9 @@ export const startConversationAction = createAction(
     return ConversationService.start(input);
   },
 );
+
+export const setConversationBotStateAction = createAction(
+  { name: "setConversationBotStateAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async (conversationId: string, paused: boolean, resumeAfterMinutes?: number) =>
+    ConversationService.setBotState(conversationId, paused, resumeAfterMinutes),
+);

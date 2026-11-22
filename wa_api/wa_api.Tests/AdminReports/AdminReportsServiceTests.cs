@@ -271,4 +271,85 @@ public class AdminReportsServiceTests
         Assert.Equal(3, result.TotalSent);
         Assert.Equal(2, result.TotalBillable);
     }
+
+    private static wa_api.Features.Bot.Entities.AiReplyLog AiLog(
+        Guid companyId, DateTime createdAt, wa_api.Features.Bot.Entities.AiCallKind kind, decimal? cost,
+        int cacheRead = 0, int cacheWrite = 0) => new()
+    {
+        Id = Guid.NewGuid(),
+        CompanyId = companyId,
+        Kind = kind,
+        Model = "claude-haiku-4-5",
+        InputTokens = 100,
+        OutputTokens = 10,
+        CacheReadTokens = cacheRead,
+        CacheWriteTokens = cacheWrite,
+        CostUsd = cost,
+        CreatedAt = createdAt,
+        UpdatedAt = createdAt,
+        IsActive = true,
+    };
+
+    [Fact]
+    public async Task Usage_AddsAiAndMetaCost_AndComparesItToThePlan()
+    {
+        await using var db = NewDb();
+        var co = Company("Marist");
+        var plan = Plan("Growth", 5000, 1199m);
+        plan.Currency = "AED";
+        var inRange = new DateTime(2026, 10, 10, 0, 0, 0, DateTimeKind.Utc);
+        db.AddRange(co, plan, Sub(co.Id, plan.Id, inRange));
+
+        var sent = Msg(co.Id, inRange, MessageStatus.Delivered, billable: true);
+        sent.MetaCostUsd = 0.0157m;
+        var free = Msg(co.Id, inRange, MessageStatus.Delivered, billable: false);
+        free.MetaCostUsd = 0m;
+        var notPricedYet = Msg(co.Id, inRange, MessageStatus.Sent, billable: true);
+        db.AddRange(sent, free, notPricedYet);
+
+        db.AddRange(
+            AiLog(co.Id, inRange, wa_api.Features.Bot.Entities.AiCallKind.Reply, 0.012m, cacheWrite: 8700),
+            AiLog(co.Id, inRange, wa_api.Features.Bot.Entities.AiCallKind.Reply, 0.003m, cacheRead: 8700),
+            AiLog(co.Id, inRange, wa_api.Features.Bot.Entities.AiCallKind.Preview, 0.004m),
+            AiLog(co.Id, inRange, wa_api.Features.Bot.Entities.AiCallKind.FollowUp, null));   // unpriced model
+        await db.SaveChangesAsync();
+
+        var result = await new AdminReportsService(db).GetUsageAsync(
+            new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 10, 31, 0, 0, 0, DateTimeKind.Utc));
+
+        var cost = Assert.Single(result.Companies).Cost!;
+        Assert.Equal(0.019m, cost.AiCostUsd);           // previews are real spend and are included
+        Assert.Equal(1, cost.UnpricedAiCalls);
+        Assert.Equal(0.0157m, cost.MetaCostUsd);
+        Assert.Equal(1, cost.UnpricedMetaMessages);
+        Assert.Equal(0.0347m, cost.TotalCostUsd);
+        Assert.Equal(0.13m, cost.TotalCostAed);         // 0.0347 × 3.6725, 2 dp
+        Assert.Equal(0.5, cost.CacheHitRate);
+        Assert.Equal("Growth", cost.PlanName);
+        Assert.Equal(1199m, cost.PlanPriceForRangeAed); // a 30-day range is one month
+        Assert.Equal(1199m - 0.13m, cost.MarginAed);
+        Assert.Equal(3, cost.AiByKind.Count);
+        Assert.Equal(0.0347m, result.TotalAiCostUsd + result.TotalMetaCostUsd);
+    }
+
+    [Fact]
+    public async Task Usage_IncludesACompanyThatOnlySpentOnAi()
+    {
+        await using var db = NewDb();
+        var co = Company("Quiet clinic");
+        var inRange = new DateTime(2026, 10, 10, 0, 0, 0, DateTimeKind.Utc);
+        db.AddRange(co, AiLog(co.Id, inRange, wa_api.Features.Bot.Entities.AiCallKind.Preview, 0.004m));
+        await db.SaveChangesAsync();
+
+        var result = await new AdminReportsService(db).GetUsageAsync(
+            new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 10, 31, 0, 0, 0, DateTimeKind.Utc));
+
+        var row = Assert.Single(result.Companies);
+        Assert.Equal(0, row.Sent);
+        Assert.Equal(0.004m, row.Cost!.TotalCostUsd);
+        Assert.Null(row.Cost.CostPerMessageAed);
+        Assert.Null(row.Cost.PlanName);
+    }
 }

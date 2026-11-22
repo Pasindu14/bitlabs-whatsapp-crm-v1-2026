@@ -26,4 +26,19 @@ public interface ITemplateService
 
     /// <summary>Soft-deletes a template (IsActive = false). Step 3 also removes it from Meta when submitted.</summary>
     Task<TemplateResponse> DeleteAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// Approved templates only, ordered by name — what a chatbot follow-up step or handoff alert picks from.
+    /// With <paramref name="bodyOnly"/> (the default) media-header, carousel and dynamic-URL templates are
+    /// left out, because the bot can only fill body variables (see <see cref="TemplateSendability"/>).
+    /// </summary>
+    Task<IReadOnlyList<TemplateResponse>> GetApprovedAsync(bool bodyOnly = true, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates the starter follow-up library as drafts for this company. Idempotent — a name that
+    /// already exists is left alone — and nothing is sent to Meta: each client submits under their own
+    /// number and credentials.
+    /// </summary>
+    Task<IReadOnlyList<TemplateResponse>> CreateStarterPackAsync(
+        Guid? wabaConnectionId = null, CancellationToken ct = default);
 }

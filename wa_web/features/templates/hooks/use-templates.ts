@@ -8,6 +8,8 @@ import { handleErrorToast } from "@/lib/hooks/use-error-toast";
 import type { ActionFailure } from "@/lib/types/actions";
 import {
   getTemplatesAction,
+  getApprovedTemplatesAction,
+  createStarterPackAction,
   getTemplateByIdAction,
   createTemplateAction,
   updateTemplateAction,
@@ -157,6 +159,40 @@ export function useRefreshTemplateStatus() {
       toast.success(`Status: ${t.status}`);
     },
     onError: (error: ActionFailure) => handleErrorToast(error, "Template", "refresh"),
+  });
+}
+
+/** Approved, text-only templates — what a chatbot follow-up step or handoff alert is allowed to use. */
+export function useApprovedTemplates() {
+  return useQuery({
+    queryKey: queryKeys.templates.approved(),
+    queryFn: async () => {
+      const res = await getApprovedTemplatesAction();
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+  });
+}
+
+/** Adds the chatbot's starter library as drafts. Each company still submits them under its own number. */
+export function useCreateStarterPack() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await createStarterPackAction();
+      if (!res.success) throw res;
+      return res.data;
+    },
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: queryKeys.templates.all });
+      toast.success(
+        created.length === 0
+          ? "You already have the starter templates"
+          : `Added ${created.length} draft templates`
+      );
+    },
+    onError: (error: ActionFailure) => handleErrorToast(error, "Starter templates", "create"),
   });
 }
 

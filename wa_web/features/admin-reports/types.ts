@@ -60,6 +60,24 @@ export interface CompanyUsageRow {
   read: number;
   failed: number;
   billable: number;
+  cost: UsageCost | null;
+}
+
+/** What one company cost us over the range (plan 013). USD as stored; AED for comparing to plans. */
+export interface UsageCost {
+  aiCostUsd: number;
+  aiByKind: { kind: "Reply" | "FollowUp" | "TemplateVariables" | "Preview" | "BookingSummary"; calls: number; costUsd: number }[];
+  unpricedAiCalls: number;
+  cacheHitRate: number | null;
+  metaCostUsd: number;
+  unpricedMetaMessages: number;
+  totalCostUsd: number;
+  totalCostAed: number;
+  costPerMessageAed: number | null;
+  planName: string | null;
+  planPriceForRangeAed: number | null;
+  marginAed: number | null;
+  costShareOfPlan: number | null;
 }
 
 export interface UsageReport {
@@ -68,4 +86,8 @@ export interface UsageReport {
   totalSent: number;
   totalBillable: number;
   companies: CompanyUsageRow[];
+  totalAiCostUsd: number;
+  totalMetaCostUsd: number;
+  totalCostAed: number;
+  usdToAed: number;
 }

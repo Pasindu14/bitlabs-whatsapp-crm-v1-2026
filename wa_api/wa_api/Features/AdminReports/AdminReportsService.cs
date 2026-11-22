@@ -14,10 +14,16 @@ namespace wa_api.Features.AdminReports;
 /// tenant's data is visible. Call sites are restricted to SuperAdmin-only endpoints.
 /// Read-only: never calls SaveChanges.
 /// </summary>
-public class AdminReportsService(AppDbContext db)
+public class AdminReportsService(AppDbContext db, IConfiguration? configuration = null)
 {
     /// <summary>Remaining quota below this fraction of the plan quota flags a low balance.</summary>
     private const double LowBalanceThreshold = 0.10;
+
+    /// <summary>The AED peg. Costs are stored in USD; plan prices are AED.</summary>
+    private const decimal DefaultUsdToAed = 3.6725m;
+
+    private readonly decimal _usdToAed =
+        configuration?.GetValue<decimal?>("Billing:UsdToAed") is decimal rate and > 0 ? rate : DefaultUsdToAed;
 
     // ── Packages purchased ────────────────────────────────────────────────────
 
@@ -215,33 +221,115 @@ public class AdminReportsService(AppDbContext db)
                 Read = g.Count(m => m.Status == MessageStatus.Read),
                 Failed = g.Count(m => m.Status == MessageStatus.Failed),
                 Billable = g.Count(m => m.Billable == true),
+                MetaCostUsd = g.Sum(m => m.MetaCostUsd ?? 0m),
+                UnpricedMeta = g.Count(m => m.Billable == true && m.MetaCostUsd == null),
             })
             .ToListAsync(ct);
+
+        // Every Anthropic call, grouped by company and kind (plan 013).
+        var ai = await db.AiReplyLogs
+            .IgnoreQueryFilters()
+            .Where(l => l.CreatedAt >= rangeFrom && l.CreatedAt <= rangeTo)
+            .GroupBy(l => new { l.CompanyId, l.Kind })
+            .Select(g => new
+            {
+                g.Key.CompanyId,
+                g.Key.Kind,
+                Calls = g.Count(),
+                CostUsd = g.Sum(l => l.CostUsd ?? 0m),
+                Unpriced = g.Count(l => l.CostUsd == null && (l.InputTokens > 0 || l.OutputTokens > 0)),
+                CacheRead = g.Sum(l => (long)l.CacheReadTokens),
+                CacheWrite = g.Sum(l => (long)l.CacheWriteTokens),
+            })
+            .ToListAsync(ct);
+
+        // The plan each company is on now, for the margin columns.
+        var plans = await db.Subscriptions
+            .IgnoreQueryFilters()
+            .Where(s => s.Status == SubscriptionStatus.Active)
+            .Select(s => new { s.CompanyId, s.Plan.Name, s.Plan.Price, s.Plan.Currency, s.CurrentPeriodEnd })
+            .ToListAsync(ct);
+        var planByCompany = plans
+            .GroupBy(p => p.CompanyId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.CurrentPeriodEnd).First());
 
         var companyNames = await db.Companies
             .Select(c => new { c.Id, c.Name })
             .ToListAsync(ct);
         var nameById = companyNames.ToDictionary(c => c.Id, c => c.Name);
 
-        var rows = stats
-            .Select(s => new CompanyUsageRow(
-                s.CompanyId,
-                nameById.TryGetValue(s.CompanyId, out var n) ? n : "(unknown)",
-                s.Sent,
-                s.Delivered,
-                s.Read,
-                s.Failed,
-                s.Billable
-            ))
+        var statsByCompany = stats.ToDictionary(s => s.CompanyId);
+        var aiByCompany = ai.GroupBy(a => a.CompanyId).ToDictionary(g => g.Key, g => g.ToList());
+        var rangeDays = Math.Max(1m, (decimal)(rangeTo - rangeFrom).TotalDays);
+
+        // A company that only spent on AI (previews, silent follow-ups) still belongs in a cost report.
+        var rows = statsByCompany.Keys.Union(aiByCompany.Keys)
+            .Select(companyId =>
+            {
+                statsByCompany.TryGetValue(companyId, out var s);
+                var aiRows = aiByCompany.GetValueOrDefault(companyId) ?? [];
+
+                var aiCost = aiRows.Sum(a => a.CostUsd);
+                var metaCost = s?.MetaCostUsd ?? 0m;
+                var totalUsd = aiCost + metaCost;
+                var totalAed = Math.Round(totalUsd * _usdToAed, 2);
+                var sent = s?.Sent ?? 0;
+
+                var cacheRead = aiRows.Sum(a => a.CacheRead);
+                var cacheWrite = aiRows.Sum(a => a.CacheWrite);
+
+                planByCompany.TryGetValue(companyId, out var plan);
+                decimal? planForRange = plan is null ? null
+                    : string.Equals(plan.Currency, "AED", StringComparison.OrdinalIgnoreCase)
+                        ? Math.Round(plan.Price * rangeDays / 30m, 2)
+                    : string.Equals(plan.Currency, "USD", StringComparison.OrdinalIgnoreCase)
+                        ? Math.Round(plan.Price * _usdToAed * rangeDays / 30m, 2)
+                    : null;
+
+                var cost = new UsageCost(
+                    AiCostUsd: Math.Round(aiCost, 6),
+                    AiByKind: [.. aiRows
+                        .OrderBy(a => a.Kind)
+                        .Select(a => new AiCostByKind(a.Kind.ToString(), a.Calls, Math.Round(a.CostUsd, 6)))],
+                    UnpricedAiCalls: aiRows.Sum(a => a.Unpriced),
+                    CacheHitRate: cacheRead + cacheWrite == 0 ? null : (double)cacheRead / (cacheRead + cacheWrite),
+                    MetaCostUsd: Math.Round(metaCost, 6),
+                    UnpricedMetaMessages: s?.UnpricedMeta ?? 0,
+                    TotalCostUsd: Math.Round(totalUsd, 6),
+                    TotalCostAed: totalAed,
+                    CostPerMessageAed: sent == 0 ? null : Math.Round(totalUsd * _usdToAed / sent, 4),
+                    PlanName: plan?.Name,
+                    PlanPriceForRangeAed: planForRange,
+                    MarginAed: planForRange is { } p ? p - totalAed : null,
+                    CostShareOfPlan: planForRange is > 0 ? (double)(totalAed / planForRange.Value) : null);
+
+                return new CompanyUsageRow(
+                    companyId,
+                    nameById.TryGetValue(companyId, out var n) ? n : "(unknown)",
+                    sent,
+                    s?.Delivered ?? 0,
+                    s?.Read ?? 0,
+                    s?.Failed ?? 0,
+                    s?.Billable ?? 0,
+                    cost);
+            })
             .OrderByDescending(r => r.Sent)
+            .ThenByDescending(r => r.Cost?.TotalCostUsd ?? 0)
             .ToList();
+
+        var totalAi = rows.Sum(r => r.Cost?.AiCostUsd ?? 0m);
+        var totalMeta = rows.Sum(r => r.Cost?.MetaCostUsd ?? 0m);
 
         return new UsageReportResponse(
             rangeFrom,
             rangeTo,
             rows.Sum(r => r.Sent),
             rows.Sum(r => r.Billable),
-            rows
+            rows,
+            totalAi,
+            totalMeta,
+            Math.Round((totalAi + totalMeta) * _usdToAed, 2),
+            _usdToAed
         );
     }
 

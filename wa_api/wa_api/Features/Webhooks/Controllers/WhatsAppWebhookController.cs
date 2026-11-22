@@ -8,6 +8,7 @@ using wa_api.Features.Webhooks.Ingestion;
 using wa_api.Features.Webhooks.Processing;
 using wa_api.Features.Webhooks.Signature;
 using wa_api.Features.WhatsApp;
+using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Features.Webhooks.Controllers;
 
@@ -61,7 +62,10 @@ public sealed class WhatsAppWebhookController(
         bool verified;
         if (phoneNumberId is not null)
         {
-            var conn = await connections.GetConnectionByPhoneNumberIdAsync(phoneNumberId, ct);
+            var (conn, undecryptable) = await TryLookupAsync(
+                () => connections.GetConnectionByPhoneNumberIdAsync(phoneNumberId, ct), "phone_number_id", phoneNumberId);
+            if (undecryptable)
+                return Ok();   // same reasoning as the unroutable case below — never 5xx the shared URL
             if (conn is null || string.IsNullOrWhiteSpace(conn.AppSecret))
             {
                 // Unroutable but plausibly legitimate: a number onboarded on Meta's side but not yet (or no
@@ -78,12 +82,16 @@ public sealed class WhatsAppWebhookController(
         }
         else
         {
-            // No phone_number_id — this is a template-status update (or similar), which carries only the WABA
-            // id in entry[].id. Route verification to the owning connection's App Secret (M14): a tenant whose
-            // Meta app secret differs from the global one would otherwise have all its template webhooks
-            // rejected. Fall back to the global secret only when the WABA can't be resolved (single-app setups).
+            // No phone_number_id — a WABA-level event, which carries only the WABA id in entry[].id.
+            // Route verification to the owning connection's App Secret (M14): a tenant whose Meta app
+            // secret differs from the global one would otherwise have all such webhooks rejected.
+            // Fall back to the global secret only when the WABA can't be resolved (single-app setups).
             var wabaId = TryExtractWabaId(rawBody);
-            var conn = wabaId is not null ? await connections.GetConnectionByWabaIdAsync(wabaId, ct) : null;
+            var (conn, undecryptable) = wabaId is not null
+                ? await TryLookupAsync(() => connections.GetConnectionByWabaIdAsync(wabaId, ct), "waba_id", wabaId)
+                : (null, false);
+            if (undecryptable)
+                return Ok();
 
             verified = conn is not null && !string.IsNullOrWhiteSpace(conn.AppSecret)
                 ? verifier.Verify(rawBody, signature, conn.AppSecret)
@@ -137,7 +145,7 @@ public sealed class WhatsAppWebhookController(
     }
 
     /// <summary>Best-effort first <c>entry[].id</c> — the WABA id on events without a phone_number_id
-    /// (e.g. template-status updates), used to pick the owning connection's App Secret for verification.</summary>
+    /// (WABA-level events), used to pick the owning connection's App Secret for verification.</summary>
     private static string? TryExtractWabaId(string rawBody)
     {
         try
@@ -151,6 +159,29 @@ public sealed class WhatsAppWebhookController(
         }
         catch (JsonException) { /* malformed — verification will fail closed below */ }
         return null;
+    }
+
+    /// <summary>
+    /// Loads a connection, turning a secret-decryption failure into a logged "undecryptable" result instead of
+    /// an exception. The EF value converter decrypts AppSecret/AccessToken while materializing the row, so a
+    /// row written under a different <c>Encryption:Key</c> throws here. Left unhandled that was a 500 on the ONE
+    /// shared webhook URL, and sustained non-2xx gets Meta to disable the subscription for every tenant.
+    /// </summary>
+    private async Task<(WabaConnection? Conn, bool Undecryptable)> TryLookupAsync(
+        Func<Task<WabaConnection?>> lookup, string keyName, string keyValue)
+    {
+        try
+        {
+            return (await lookup(), false);
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException)
+        {
+            logger.LogError(ex,
+                "Dropping webhook for {KeyName} {KeyValue}: the connection's stored secrets can't be decrypted " +
+                "with the configured Encryption:Key (written under a different key?). Re-enter the Access Token " +
+                "and App Secret on the WABA connection — acking 200.", keyName, keyValue);
+            return (null, true);
+        }
     }
 
     private static bool FixedTimeEquals(string? a, string b)

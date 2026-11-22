@@ -60,7 +60,11 @@ try
 
     // Per-request tenant identity (resolved from JWT claims). Scoped so it can be
     // injected into AppDbContext for the global query filter + CompanyId auto-stamp.
-    builder.Services.AddScoped<wa_api.Common.Tenancy.ITenantContext, wa_api.Common.Tenancy.HttpTenantContext>();
+    // Registered as itself as well as the interface: a background job resolves the concrete type to
+    // call EnterCompany, while everything else takes the interface and cannot reassign the tenant.
+    builder.Services.AddScoped<wa_api.Common.Tenancy.ScopedTenantContext>();
+    builder.Services.AddScoped<wa_api.Common.Tenancy.ITenantContext>(
+        sp => sp.GetRequiredService<wa_api.Common.Tenancy.ScopedTenantContext>());
 
     // ── At-rest secret encryption (H3) ─────────────────────────────────────
     // Encrypts WABA access tokens + per-connection app secrets at the DB boundary (AppDbContext value
@@ -145,10 +149,21 @@ try
     builder.Services.AddTransient<wa_api.Features.Webhooks.Processing.WebhookRetentionJob>();
 
     // Named HttpClient for Meta Graph API calls (base address set here; auth header per-request).
+    // ConnectCallback: try IPv4 before IPv6. graph.facebook.com publishes an AAAA record that some
+    // networks blackhole, and .NET 8 has no Happy Eyeballs fallback — so every send hung for the full
+    // 15s and failed, taking the WABA health check (and therefore the connection's Status) with it.
+    // See DualStackConnect for the measurements.
     builder.Services.AddHttpClient("MetaGraph", c =>
     {
         c.BaseAddress = new Uri("https://graph.facebook.com/");
         c.Timeout = TimeSpan.FromSeconds(15);
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        ConnectCallback = wa_api.Infrastructure.Http.DualStackConnect.ConnectAsync,
+        // The factory rotates handlers every 2 minutes by default; keep pooled connections inside that
+        // window so a rotated handler does not strand them.
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
     });
 
     // Separate client for downloading inbound media bytes — a longer timeout than the 15s API client since a
@@ -157,6 +172,11 @@ try
     {
         c.BaseAddress = new Uri("https://graph.facebook.com/");
         c.Timeout = TimeSpan.FromSeconds(60);
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        ConnectCallback = wa_api.Infrastructure.Http.DualStackConnect.ConnectAsync,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
     });
 
     // ── Authentication & Authorization (JWT bearer) ───────────────────────
@@ -238,6 +258,85 @@ try
     builder.Services.AddScoped<wa_api.Features.Notifications.INotificationService, wa_api.Features.Notifications.NotificationService>();
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>();
     builder.Services.AddScoped<wa_api.Features.Analytics.AnalyticsService>();
+    // ── Chatbot gate (plan 005): platform switch + plan entitlement + "has the company set anything up" ──
+    // Bot:Enabled ships false, so merging the chatbot in changes nothing until it is switched on.
+    builder.Services.Configure<wa_api.Features.Bot.BotOptions>(
+        builder.Configuration.GetSection(wa_api.Features.Bot.BotOptions.SectionName));
+    builder.Services.AddScoped<wa_api.Common.Subscriptions.IPlanFeatureGate, wa_api.Common.Subscriptions.PlanFeatureGate>();
+    builder.Services.AddScoped<wa_api.Features.Bot.IBotGate, wa_api.Features.Bot.BotGate>();
+
+    // ── Chatbot: rule CRUD, the (pure) matcher, and the post-commit reply job ──
+    builder.Services.AddScoped<wa_api.Features.Bot.IAutoReplyRuleService, wa_api.Features.Bot.AutoReplyRuleService>();
+    builder.Services.AddScoped<wa_api.Features.Bot.IBotProfileService, wa_api.Features.Bot.BotProfileService>();
+    builder.Services.AddScoped<wa_api.Features.Bot.IBotPreviewService, wa_api.Features.Bot.BotPreviewService>();
+    builder.Services.AddScoped<wa_api.Features.Bot.StaffAlerts.IStaffAlertService, wa_api.Features.Bot.StaffAlerts.StaffAlertService>();
+    builder.Services.AddSingleton<wa_api.Features.Bot.IAutoReplyEngine, wa_api.Features.Bot.AutoReplyEngine>();
+    builder.Services.AddTransient<wa_api.Features.Bot.Jobs.AutoReplyJob>();
+
+    // ── Chatbot: the AI sales engine ──────────────────────────────────────
+    // The key belongs in user-secrets or an environment variable. appsettings.Development.json is
+    // COMMITTED in this repo, so a key placed there would be published the moment it was written.
+    // An absent key is a supported state: the AI path skips itself and the keyword rules keep replying.
+    builder.Services.Configure<wa_api.Features.Bot.Ai.AnthropicOptions>(
+        builder.Configuration.GetSection(wa_api.Features.Bot.Ai.AnthropicOptions.SectionName));
+
+    var anthropicTimeout = builder.Configuration.GetValue<int?>("Anthropic:TimeoutSeconds") ?? 20;
+    builder.Services.AddHttpClient(wa_api.Features.Bot.Ai.AnthropicOptions.HttpClientName, c =>
+    {
+        // The customer is waiting on the other end of a WhatsApp thread, and Hangfire's retry is the
+        // backstop for a slow upstream — so failing fast beats holding one of only four workers.
+        c.Timeout = TimeSpan.FromSeconds(anthropicTimeout);
+    });
+
+    // Singleton: it builds one AnthropicClient and holds no per-request state. The tool executor, which
+    // does hold per-conversation state, is constructed by the job instead of registered.
+    builder.Services.AddSingleton<wa_api.Features.Bot.Ai.IAiReplyPlanner, wa_api.Features.Bot.Ai.AiReplyPlanner>();
+    builder.Services.AddTransient<wa_api.Features.Bot.Jobs.AiReplyJob>();
+    builder.Services.AddTransient<wa_api.Features.Bot.Jobs.BotAutoResumeJob>();
+    builder.Services.AddTransient<wa_api.Features.Bot.Jobs.BotFollowUpJob>();
+    // Fills a template's variables from the business details before a follow-up goes out as one.
+    builder.Services.AddScoped<wa_api.Features.Bot.Ai.TemplateVariableResolver>();
+
+    // ── Cost tracking (plan 013): every Anthropic call and every billed Meta message gets a USD cost,
+    // priced from config at write time. Calculators are stateless; the logger writes through the scoped DbContext.
+    builder.Services.AddSingleton<wa_api.Features.Bot.Ai.IAiCostCalculator, wa_api.Features.Bot.Ai.AiCostCalculator>();
+    builder.Services.AddScoped<wa_api.Features.Bot.Ai.IAiUsageLogger, wa_api.Features.Bot.Ai.AiUsageLogger>();
+    builder.Services.Configure<wa_api.Features.Messages.MetaPricingOptions>(
+        builder.Configuration.GetSection(wa_api.Features.Messages.MetaPricingOptions.SectionName));
+    builder.Services.AddSingleton<wa_api.Features.Messages.IMetaCostCalculator, wa_api.Features.Messages.MetaCostCalculator>();
+
+    // ── Calendar: configuration, the (pure) slot calculator, and bookings ──
+    // The calculator is stateless and does no I/O, so it is a singleton exactly like the auto-reply matcher.
+    builder.Services.AddSingleton<wa_api.Features.Calendar.Availability.IAvailabilityCalculator,
+                                  wa_api.Features.Calendar.Availability.AvailabilityCalculator>();
+    builder.Services.AddScoped<wa_api.Features.Calendar.ICalendarSettingsService, wa_api.Features.Calendar.CalendarSettingsService>();
+    builder.Services.AddScoped<wa_api.Features.Calendar.IAppointmentTypeService, wa_api.Features.Calendar.AppointmentTypeService>();
+    builder.Services.AddScoped<wa_api.Features.Calendar.IAvailabilityService, wa_api.Features.Calendar.AvailabilityService>();
+    builder.Services.AddScoped<wa_api.Features.Calendar.IAppointmentService, wa_api.Features.Calendar.AppointmentService>();
+
+    // ── Clinic CRM (plan 014): a connected company's bookings go to its clinic's CRM first ──
+    // The token cache is a singleton so every request and job shares one token per connection — the CRM
+    // allows only 10 token requests a minute.
+    builder.Services.Configure<wa_api.Features.ClinicCrm.ClinicCrmOptions>(
+        builder.Configuration.GetSection(wa_api.Features.ClinicCrm.ClinicCrmOptions.SectionName));
+    builder.Services.AddSingleton<wa_api.Features.ClinicCrm.Client.ClinicCrmTokenCache>();
+    builder.Services.AddHttpClient<wa_api.Features.ClinicCrm.Client.IClinicCrmClient,
+                                   wa_api.Features.ClinicCrm.Client.ClinicCrmClient>((sp, c) =>
+    {
+        var crmOptions = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<wa_api.Features.ClinicCrm.ClinicCrmOptions>>();
+        c.Timeout = TimeSpan.FromSeconds(Math.Max(1, crmOptions.Value.TimeoutSeconds));
+    })
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        ConnectCallback = wa_api.Infrastructure.Http.DualStackConnect.ConnectAsync,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+    });
+    builder.Services.AddScoped<wa_api.Features.ClinicCrm.IClinicCrmChatSummarizer, wa_api.Features.ClinicCrm.ClinicCrmChatSummarizer>();
+    builder.Services.AddScoped<wa_api.Features.ClinicCrm.IClinicCrmBookingService, wa_api.Features.ClinicCrm.ClinicCrmBookingService>();
+    builder.Services.AddScoped<wa_api.Features.ClinicCrm.IClinicCrmSettingsService, wa_api.Features.ClinicCrm.ClinicCrmSettingsService>();
+    builder.Services.AddTransient<wa_api.Features.ClinicCrm.Jobs.ClinicCrmSyncJob>();
+    builder.Services.AddTransient<wa_api.Features.ClinicCrm.Jobs.ClinicCrmLeadJob>();
+
     builder.Services.AddScoped<wa_api.Features.Monitoring.MonitoringService>();
     builder.Services.AddScoped<wa_api.Features.AdminReports.AdminReportsService>();
 
@@ -269,6 +368,8 @@ try
     builder.Services.AddScoped<wa_api.Features.Webhooks.Signature.IMetaSignatureVerifier, wa_api.Features.Webhooks.Signature.MetaSignatureVerifier>();
     builder.Services.AddScoped<wa_api.Features.Webhooks.Ingestion.IWebhookInboxService, wa_api.Features.Webhooks.Ingestion.WebhookInboxService>();
     builder.Services.AddScoped<wa_api.Features.Webhooks.Processing.IWebhookDispatcher, wa_api.Features.Webhooks.Processing.WebhookDispatcher>();
+    // Handlers queue their realtime pushes here; WebhookProcessingJob runs them after the batch commits.
+    builder.Services.AddScoped<wa_api.Features.Webhooks.Processing.WebhookPostCommitActions>();
     // All handlers share one interface so the dispatcher receives them via IEnumerable<IWebhookEventHandler>.
     builder.Services.AddScoped<wa_api.Features.Webhooks.Handlers.IWebhookEventHandler, wa_api.Features.Webhooks.Handlers.TemplateStatusWebhookHandler>();
     builder.Services.AddScoped<wa_api.Features.Webhooks.Handlers.IWebhookEventHandler, wa_api.Features.Webhooks.Handlers.MessageStatusWebhookHandler>();
@@ -399,6 +500,10 @@ try
     // so there is no monthly usage reset. RemoveIfExists cleans up any schedule left in Hangfire.
     RecurringJob.RemoveIfExists("subscription-period-reset");
     RecurringJob.AddOrUpdate<TemplateStatusSyncJob>("template-status-sync", j => j.RunAsync(), Cron.MinuteInterval(15));
+    // Hands paused threads back to the bot when their takeover window expires, so an agent who replied
+    // once and moved on does not silently orphan the conversation.
+    RecurringJob.AddOrUpdate<wa_api.Features.Bot.Jobs.BotAutoResumeJob>(
+        "bot-auto-resume", j => j.RunAsync(CancellationToken.None), Cron.MinuteInterval(5));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>("webhook-sweeper", j => j.RunAsync(), Cron.MinuteInterval(5));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookHealthCheckJob>("webhook-health-check", j => j.RunAsync(), Cron.MinuteInterval(5));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookRetentionJob>("webhook-retention", j => j.RunAsync(CancellationToken.None), "30 3 * * *");

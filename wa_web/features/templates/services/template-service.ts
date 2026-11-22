@@ -9,6 +9,25 @@ import type { Template, TemplateListParams, TemplatePayload } from "@/features/t
  * go through the /api/templates/media-handle route handler, not this service — they are multipart.)
  */
 export const TemplateService = {
+  /**
+   * Approved templates the chatbot can send: text-only ones. The API leaves out media-header, carousel
+   * and dynamic-link templates, because the bot can only fill body variables.
+   */
+  async getApproved(): Promise<Template[]> {
+    return executeService({ context: "TemplateService", method: "getApproved" }, async () => {
+      const res = await client.get<ApiSuccessBody<Template[]>>("/api/v1/templates/approved");
+      return res.data.data ?? [];
+    });
+  },
+
+  /** Adds the chatbot's reusable follow-up library as drafts. Idempotent, and nothing is sent to Meta. */
+  async createStarterPack(): Promise<Template[]> {
+    return executeService({ context: "TemplateService", method: "createStarterPack" }, async () => {
+      const res = await client.post<ApiSuccessBody<Template[]>>("/api/v1/templates/starter-pack", {});
+      return res.data.data ?? [];
+    });
+  },
+
   async getPaginated(params: TemplateListParams): Promise<PaginatedResponse<Template>> {
     return executeService(
       { context: "TemplateService", method: "getPaginated" },

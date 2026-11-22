@@ -23,8 +23,12 @@ public static class Permission
     public const string ManageTemplate = "manage_template";
     public const string ScheduleCampaign = "schedule_campaign";
     public const string ContactList = "contact_list";
+    public const string ManageBot = "manage_bot";
     public const string ManageUser = "manage_user";
     public const string Analytics = "analytics";
+
+    /// <summary>Configure appointment types, opening hours and blackouts, and manage bookings.</summary>
+    public const string ManageCalendar = "manage_calendar";
 
     /// <summary>Every known permission key — used to validate incoming grants.</summary>
     public static readonly FrozenSet<string> All = new[]
@@ -34,8 +38,10 @@ public static class Permission
         ManageTemplate,
         ScheduleCampaign,
         ContactList,
+        ManageBot,
         ManageUser,
         Analytics,
+        ManageCalendar,
     }.ToFrozenSet(StringComparer.Ordinal);
 
     /// <summary>True when every key in <paramref name="keys"/> is part of the catalog.</summary>

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Tenancy;
 using wa_api.Features.Contacts.Entities;
@@ -79,6 +80,18 @@ public class FreeWindowBillingTests
         public Task MessageDeletedAsync(
             Guid companyId, Guid conversationId, Guid messageId, ConversationResponse conversation,
             CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task BotStateChangedAsync(
+            Guid companyId, ConversationResponse conversation, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task BotTypingAsync(
+            Guid companyId, Guid conversationId, bool isTyping, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task MessageStatusAsync(
+            Guid companyId, Guid conversationId, Guid messageId, MessageStatus status, DateTime? statusAt,
+            string? errorMessage, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 
     private static AppDbContext NewDb(Guid companyId) =>
@@ -141,7 +154,7 @@ public class FreeWindowBillingTests
         await db.SaveChangesAsync();
 
         var sender = new SpySender(db);
-        var svc = new ConversationService(db, sender, new NoopNotifier());
+        var svc = new ConversationService(db, sender, new NoopNotifier(), new HttpContextAccessor());
 
         await svc.SendMessageAsync(conversation.Id, "first reply");
         await svc.SendMessageAsync(conversation.Id, "second reply");
@@ -163,7 +176,7 @@ public class FreeWindowBillingTests
         await db.SaveChangesAsync();
 
         var sender = new SpySender(db);
-        var svc = new ConversationService(db, sender, new NoopNotifier());
+        var svc = new ConversationService(db, sender, new NoopNotifier(), new HttpContextAccessor());
 
         await svc.SendMessageAsync(conversation.Id, "reply");
 
@@ -186,7 +199,7 @@ public class FreeWindowBillingTests
         await db.SaveChangesAsync();
 
         var sender = new SpySender(db);
-        var svc = new ConversationService(db, sender, new NoopNotifier());
+        var svc = new ConversationService(db, sender, new NoopNotifier(), new HttpContextAccessor());
 
         await svc.StartConversationAsync(contact.Id, waba.Id, "hello there");
 
@@ -205,7 +218,7 @@ public class FreeWindowBillingTests
         await db.SaveChangesAsync();
 
         var sender = new SpySender(db);
-        var svc = new ConversationService(db, sender, new NoopNotifier());
+        var svc = new ConversationService(db, sender, new NoopNotifier(), new HttpContextAccessor());
 
         await svc.StartConversationAsync(contact.Id, waba.Id, "following up");
 
@@ -224,7 +237,7 @@ public class FreeWindowBillingTests
         await db.SaveChangesAsync();
 
         var sender = new SpySender(db);
-        var svc = new ConversationService(db, sender, new NoopNotifier());
+        var svc = new ConversationService(db, sender, new NoopNotifier(), new HttpContextAccessor());
 
         var ex = await Assert.ThrowsAsync<wa_api.Common.Errors.BusinessRuleException>(
             () => svc.SendMessageAsync(conversation.Id, "too late"));
@@ -244,7 +257,7 @@ public class FreeWindowBillingTests
         db.AddRange(contact, waba, conversation);
         await db.SaveChangesAsync();
 
-        var svc = new ConversationService(db, new SpySender(db), new NoopNotifier());
+        var svc = new ConversationService(db, new SpySender(db), new NoopNotifier(), new HttpContextAccessor());
         await svc.SendMessageAsync(conversation.Id, "reply");
 
         var msg = await db.Messages.IgnoreQueryFilters().FirstAsync();

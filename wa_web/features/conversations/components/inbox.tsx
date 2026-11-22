@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
+import { matchQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/hooks/query-keys";
+import type { Conversation } from "@/features/conversations/types";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -16,6 +20,7 @@ import { MessageThread } from "./message-thread";
  */
 export function Inbox({ apiUrl }: { apiUrl: string }) {
   useChatHub(apiUrl);
+  useSyncSelectedFromList();
   const selected = useConversationStore((s) => s.selected);
 
   return (
@@ -36,4 +41,28 @@ export function Inbox({ apiUrl }: { apiUrl: string }) {
       <div className="h-full md:hidden">{selected ? <MessageThread /> : <ConversationList />}</div>
     </div>
   );
+}
+
+/**
+ * The open conversation is a snapshot taken when it was clicked, so its header and bot banner would
+ * otherwise only change on realtime events. Refresh it from every inbox-list fetch instead — the list
+ * is refetched on (re)connect and on each message, so the thread chrome is never older than the list.
+ */
+function useSyncSelectedFromList() {
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    const listKey = queryKeys.conversations.lists();
+
+    return qc.getQueryCache().subscribe((event) => {
+      if (event.type !== "updated" || event.action.type !== "success") return;
+      if (!matchQuery({ queryKey: listKey }, event.query)) return;
+
+      const selected = useConversationStore.getState().selected;
+      const fresh = (event.query.state.data as Conversation[] | undefined)?.find(
+        (c) => c.id === selected?.id,
+      );
+      if (fresh) useConversationStore.getState().patchSelected(fresh);
+    });
+  }, [qc]);
 }

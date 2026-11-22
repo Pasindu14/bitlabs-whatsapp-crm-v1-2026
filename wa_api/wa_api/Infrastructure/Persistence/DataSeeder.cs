@@ -71,6 +71,7 @@ public static class DataSeeder
                     Permission.LiveMessage, Permission.ContactList,
                     Permission.ManageTemplate, Permission.ScheduleCampaign,
                     Permission.TokenPurchase, Permission.Analytics,
+                    Permission.ManageBot, Permission.ManageCalendar,
                 ],
             });
 

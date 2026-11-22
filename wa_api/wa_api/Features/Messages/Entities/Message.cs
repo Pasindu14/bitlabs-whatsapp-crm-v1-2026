@@ -64,6 +64,13 @@ public class Message : BaseEntity, ITenantEntity
     public int? CampaignRunNumber { get; set; }
 
     /// <summary>
+    /// Estimated USD Meta charges for this message: the <c>Meta:Pricing</c> rate for the recipient's
+    /// country and <see cref="Category"/>, or 0 when Meta said it was not billable. Set once, when pricing
+    /// first arrives on a status webhook. Null until then, and for inbound messages.
+    /// </summary>
+    public decimal? MetaCostUsd { get; set; }
+
+    /// <summary>
     /// The subscription whose <c>MessagesUsedThisPeriod</c> this send incremented. Recorded at meter time so
     /// a later failure refunds the EXACT subscription that was charged — not merely "the current active one"
     /// (which may be a different row after a renewal / re-subscribe, causing a cross-period free-quota bug).
@@ -103,6 +110,13 @@ public class Message : BaseEntity, ITenantEntity
 
     /// <summary>UTC when the message was deleted from the inbox. Null unless <see cref="IsDeleted"/>.</summary>
     public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// True when this outbound message was produced by the auto-reply engine rather than a human
+    /// agent. Drives the bot loop-breaker and the per-conversation reply cooldown in
+    /// <c>AutoReplyJob</c>, and lets the inbox label a message as sent by the bot.
+    /// </summary>
+    public bool IsAutoReply { get; set; }
 
     public Contact Contact { get; set; } = null!;
     public WabaConnection WabaConnection { get; set; } = null!;

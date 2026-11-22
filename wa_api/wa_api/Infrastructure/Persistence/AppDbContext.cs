@@ -16,6 +16,9 @@ using wa_api.Features.Plans.Entities;
 using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.Templates.Entities;
 using wa_api.Features.Billing.Entities;
+using wa_api.Features.Bot.Entities;
+using wa_api.Features.Calendar.Entities;
+using wa_api.Features.ClinicCrm.Entities;
 using wa_api.Features.Notifications.Entities;
 using wa_api.Features.Webhooks.Entities;
 using wa_api.Features.WhatsApp.Entities;
@@ -32,6 +35,13 @@ public class AppDbContext(
     // Per-request tenant; falls back to the fail-closed null object for design-time
     // (EF CLI) and other non-HTTP scopes where no ITenantContext is injected.
     private readonly ITenantContext _tenant = tenant ?? NullTenantContext.Instance;
+
+    /// <summary>
+    /// The tenant this context is filtering by. Exposed so <c>AuditInterceptor</c> can stamp
+    /// <c>CompanyId</c> from the context's OWN scope rather than from <c>HttpContext</c> — the two are
+    /// the same instance during a request, but only this one exists inside a background job.
+    /// </summary>
+    internal ITenantContext Tenant => _tenant;
 
     // At-rest secret protector (H3); passthrough when unset (design-time / tests / no key). Registered as a
     // singleton, so capturing it in the cached model's value converter is safe.
@@ -71,6 +81,18 @@ public class AppDbContext(
     public DbSet<CampaignContact> CampaignContacts => Set<CampaignContact>();
     public DbSet<CampaignRecipient> CampaignRecipients => Set<CampaignRecipient>();
     public DbSet<Notification> Notifications => Set<Notification>();
+
+    // ── Chatbot, calendar and clinic CRM (plan 005) ────────────────────────
+    public DbSet<AutoReplyRule> AutoReplyRules => Set<AutoReplyRule>();
+    public DbSet<BotProfile> BotProfiles => Set<BotProfile>();
+    public DbSet<BotFaq> BotFaqs => Set<BotFaq>();
+    public DbSet<BotLink> BotLinks => Set<BotLink>();
+    public DbSet<AiReplyLog> AiReplyLogs => Set<AiReplyLog>();
+    public DbSet<AppointmentType> AppointmentTypes => Set<AppointmentType>();
+    public DbSet<BusinessHours> BusinessHours => Set<BusinessHours>();
+    public DbSet<CalendarBlackout> CalendarBlackouts => Set<CalendarBlackout>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<ClinicCrmConnection> ClinicCrmConnections => Set<ClinicCrmConnection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -151,6 +173,9 @@ public class AppDbContext(
             e.HasIndex(x => x.Slug).IsUnique();         // unique when set (nulls allowed)
             e.Property(x => x.Email).HasMaxLength(256);
             e.Property(x => x.Phone).HasMaxLength(32);
+            // IANA zone id ("Asia/Colombo"). Existing rows adopt UTC, which is always resolvable — the
+            // calendar settings screen is where a company picks the one it actually operates in.
+            e.Property(x => x.TimeZoneId).IsRequired().HasMaxLength(64).HasDefaultValue("UTC");
             // Stripe reverse-lookup: stripeCustomerId → Company. Indexed; null for manual-only companies.
             e.Property(x => x.StripeCustomerId).HasMaxLength(100);
             e.HasIndex(x => x.StripeCustomerId).IsUnique().HasFilter("\"StripeCustomerId\" IS NOT NULL");
@@ -261,6 +286,7 @@ public class AppDbContext(
             e.Property(x => x.ExternalMessageId).HasMaxLength(128);
             e.Property(x => x.ErrorCode).HasMaxLength(32);
             e.Property(x => x.Category).HasMaxLength(32);
+            e.Property(x => x.MetaCostUsd).HasPrecision(10, 6);
             // Inbound media metadata (bytes live in MessageMedia). All nullable — text messages leave them null.
             e.Property(x => x.MediaType).HasMaxLength(20);
             e.Property(x => x.MediaMimeType).HasMaxLength(128);
@@ -326,6 +352,18 @@ public class AppDbContext(
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             e.Property(x => x.LastMessageBody).HasMaxLength(512);
             e.Property(x => x.LastMessageDirection).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.BotState).HasConversion<string>().HasMaxLength(20).IsRequired();
+
+            // The auto-resume job scans for due threads across every tenant, so it filters on
+            // BotResumesAt alone — a partial index keeps it off the (much larger) set of active threads.
+            e.HasIndex(x => x.BotResumesAt, "IX_Conversations_BotResumesAt")
+                .HasFilter("\"BotResumesAt\" IS NOT NULL");
+
+            // The same job also sweeps pauses with NO resume time, judging them by how long the thread
+            // has been silent. Partial again: paused threads are a tiny slice of the table, so this stays
+            // small however many conversations pile up.
+            e.HasIndex(x => new { x.BotState, x.LastMessageAt }, "IX_Conversations_PausedIdle")
+                .HasFilter("\"BotState\" = 'Paused'");
 
             e.HasIndex(x => x.CompanyId);
             e.HasIndex(x => x.ContactId);
@@ -728,6 +766,241 @@ public class AppDbContext(
             e.Property(x => x.EventType).HasMaxLength(100);
             // No CompanyId / tenant filter: this is platform-plane billing plumbing written from the
             // webhook job (no HttpContext), mirroring how Stripe rows are handled with IgnoreQueryFilters.
+        });
+
+        modelBuilder.Entity<AutoReplyRule>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(120);
+            e.Property(x => x.Trigger).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.ReplyBody).IsRequired().HasMaxLength(4096);
+            e.Property(x => x.Terms)                      // trigger terms — Postgres text[]
+                .HasColumnType("text[]")
+                .IsRequired()
+                .HasDefaultValueSql("'{}'::text[]");
+
+            // Rule name is unique PER COMPANY, not globally.
+            e.HasIndex(x => new { x.CompanyId, x.Name }).IsUnique();
+            // The engine's fetch is (CompanyId, IsActive, IsEnabled) ordered by Priority — one index covers it.
+            e.HasIndex(x => new { x.CompanyId, x.Priority });
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<BotProfile>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.BusinessName).IsRequired().HasMaxLength(200);
+            e.Property(x => x.BusinessDescription).IsRequired().HasMaxLength(2000);
+            e.Property(x => x.ToneNotes).HasMaxLength(500);
+            e.Property(x => x.Location).HasMaxLength(500);
+            e.Property(x => x.ContactNote).HasMaxLength(500);
+            e.Property(x => x.BookingInstructions).HasMaxLength(1000);
+            e.Property(x => x.ResumeBotAfterIdleHours).HasDefaultValue(24);
+            e.Property(x => x.HandoffResumeMinutes).HasDefaultValue(0);
+            e.Property(x => x.HandoffAlertPhones)
+                .HasColumnType("text[]")
+                .IsRequired()
+                .HasDefaultValueSql("'{}'::text[]");
+            // A short ordered list read and written whole with the profile — a table of its own would
+            // add a join to every reply for no query that ever needs a single step.
+            e.OwnsMany(x => x.FollowUpSteps, s => s.ToJson());
+            e.Property(x => x.PreferredLanguage).HasMaxLength(60);
+            e.Property(x => x.CurrencyLabel).HasMaxLength(10);
+            e.Property(x => x.IndustryRules).HasMaxLength(2000);
+            // No HasDefaultValue(true): EF would then skip an explicit false on insert (false is the CLR
+            // default) and the database default would turn bookings back on. Existing rows get true from
+            // the migration's column default instead.
+
+            // Exactly one profile per company, enforced rather than assumed — the reply job reads it with
+            // SingleOrDefault and a second row would make the bot's persona depend on insertion order.
+            e.HasIndex(x => x.CompanyId).IsUnique();
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<BotFaq>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Question).IsRequired().HasMaxLength(500);
+            e.Property(x => x.Answer).IsRequired().HasMaxLength(2000);
+
+            // The prompt builder fetches a company's whole enabled set ordered by SortOrder.
+            e.HasIndex(x => new { x.CompanyId, x.SortOrder });
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<BotLink>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Title).IsRequired().HasMaxLength(100);
+            e.Property(x => x.Url).IsRequired().HasMaxLength(2000);
+            e.Property(x => x.WhenToShare).HasMaxLength(500);
+            e.Property(x => x.Message).HasMaxLength(300);
+
+            e.HasIndex(x => new { x.CompanyId, x.SortOrder });
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<AiReplyLog>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Model).IsRequired().HasMaxLength(60);
+            e.Property(x => x.Outcome).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.Error).HasMaxLength(2000);
+            e.Property(x => x.ToolCallsJson).HasColumnType("jsonb");
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.CostUsd).HasPrecision(12, 6);
+
+            // Two reads: the daily budget count (CompanyId + CreatedAt) and "what did the bot do on this
+            // thread" when a reply needs explaining. One composite index serves the first, which is the
+            // one on the hot path — it runs before every AI reply.
+            e.HasIndex(x => new { x.CompanyId, x.CreatedAt });
+            e.HasIndex(x => x.ConversationId);
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<AppointmentType>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).IsRequired().HasMaxLength(120);
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.Price).HasPrecision(18, 2);
+
+            // Name is unique PER COMPANY, and only among live rows — retiring a type must not reserve
+            // its name forever. Mirrors the partial-unique pattern used for open conversations.
+            e.HasIndex(x => new { x.CompanyId, x.Name }, "UX_AppointmentTypes_Name")
+                .IsUnique()
+                .HasFilter("\"IsActive\" = TRUE");
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<BusinessHours>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.DayOfWeek).HasConversion<string>().HasMaxLength(20).IsRequired();
+
+            // The availability calculator reads the whole weekly schedule for one company on every
+            // query, so a plain tenant index is exactly the access pattern.
+            e.HasIndex(x => new { x.CompanyId, x.DayOfWeek });
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<CalendarBlackout>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Reason).IsRequired().HasMaxLength(200);
+
+            // Every read is "blackouts overlapping this window for this company".
+            e.HasIndex(x => new { x.CompanyId, x.StartUtc });
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<Appointment>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.Notes).HasMaxLength(1000);
+            e.Property(x => x.CancellationReason).HasMaxLength(500);
+            e.Property(x => x.ExternalSyncStatus).HasConversion<string>().HasMaxLength(20).IsRequired();
+            e.Property(x => x.ExternalSyncError).HasMaxLength(500);
+
+            // The calendar grid's range scan, within a tenant.
+            e.HasIndex(x => new { x.CompanyId, x.StartUtc });
+            e.HasIndex(x => x.ContactId);
+            e.HasIndex(x => x.ConversationId);
+            // The hold sweeper's scan: expirable rows only, so the index stays tiny.
+            e.HasIndex(x => x.HoldExpiresAt).HasFilter("\"HoldExpiresAt\" IS NOT NULL");
+
+            e.HasOne(x => x.Contact)
+                .WithMany()
+                .HasForeignKey(x => x.ContactId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.AppointmentType)
+                .WithMany()
+                .HasForeignKey(x => x.AppointmentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Conversation)
+                .WithMany()
+                .HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // NOTE: the overlap guarantee is a Postgres EXCLUDE constraint that EF cannot express — it is
+            // created by raw SQL in the migration. See Appointment's docs for why a read-then-write check
+            // is not a substitute.
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
+        });
+
+        modelBuilder.Entity<ClinicCrmConnection>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.BaseUrl).IsRequired().HasMaxLength(500);
+            e.Property(x => x.ClientId).IsRequired().HasMaxLength(200);
+            e.Property(x => x.ClientSecret).IsRequired().HasMaxLength(2048).HasConversion(secretConverter);
+            e.Property(x => x.LastError).HasMaxLength(500);
+
+            // One live connection per company — the bot must never have to choose between two CRMs.
+            e.HasIndex(x => x.CompanyId, "UX_ClinicCrmConnections_Company")
+                .IsUnique()
+                .HasFilter("\"IsActive\" = TRUE");
+
+            e.HasOne<Company>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => _tenant.IsSuperAdmin || x.CompanyId == _tenant.CompanyId);
         });
     }
 }

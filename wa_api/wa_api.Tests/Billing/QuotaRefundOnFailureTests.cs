@@ -1,10 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using wa_api.Common.Tenancy;
+using wa_api.Features.Conversations.Dtos;
+using wa_api.Features.Conversations.Realtime;
+using wa_api.Features.Messages;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Subscriptions.Entities;
 using wa_api.Features.Webhooks.Handlers;
 using wa_api.Features.Webhooks.Payloads;
+using wa_api.Features.Webhooks.Processing;
 using wa_api.Infrastructure.Persistence;
 using Xunit;
 
@@ -90,8 +95,26 @@ public class QuotaRefundOnFailureTests
         },
     };
 
-    private static MessageStatusWebhookHandler NewHandler(AppDbContext db) =>
-        new(db, NullLogger<MessageStatusWebhookHandler>.Instance);
+    private sealed class NoopNotifier : IChatNotifier
+    {
+        public Task MessageAsync(Guid companyId, ConversationResponse conversation,
+            ConversationMessageResponse message, CancellationToken ct = default) => Task.CompletedTask;
+        public Task MessageDeletedAsync(Guid companyId, Guid conversationId, Guid messageId,
+            ConversationResponse conversation, CancellationToken ct = default) => Task.CompletedTask;
+        public Task BotStateChangedAsync(Guid companyId, ConversationResponse conversation,
+            CancellationToken ct = default) => Task.CompletedTask;
+        public Task BotTypingAsync(Guid companyId, Guid conversationId, bool isTyping,
+            CancellationToken ct = default) => Task.CompletedTask;
+        public Task MessageStatusAsync(Guid companyId, Guid conversationId, Guid messageId, MessageStatus status,
+            DateTime? statusAt, string? errorMessage, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private static MessageStatusWebhookHandler NewHandler(AppDbContext db) => new(
+        db,
+        new NoopNotifier(),
+        new WebhookPostCommitActions(NullLogger<WebhookPostCommitActions>.Instance),
+        new MetaCostCalculator(Options.Create(new MetaPricingOptions()), NullLogger<MetaCostCalculator>.Instance),
+        NullLogger<MessageStatusWebhookHandler>.Instance);
 
     [Fact]
     public async Task FailedStatus_CreditsOneMessageBack()

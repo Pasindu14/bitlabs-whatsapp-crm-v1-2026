@@ -42,6 +42,7 @@ function typeLabel(type: NotificationType): string {
     QuotaWarning2Days: "Quota",
     QuotaWarning1Day: "Quota",
     QuotaWarningToday: "Quota",
+    System: "Chatbot",
   };
   return map[type] ?? type;
 }

@@ -1,4 +1,6 @@
+using System.Globalization;
 using Hangfire;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.OptOut;
 using wa_api.Features.Contacts.Entities;
@@ -6,9 +8,13 @@ using wa_api.Features.Conversations.Dtos;
 using wa_api.Features.Conversations.Entities;
 using wa_api.Features.Conversations.Realtime;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Bot;
+using wa_api.Features.Bot.Jobs;
+using wa_api.Features.ClinicCrm.Jobs;
 using wa_api.Features.Messages.InboundMedia;
 using wa_api.Features.WhatsApp.Entities;
 using wa_api.Features.Webhooks.Payloads;
+using wa_api.Features.Webhooks.Processing;
 using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.Webhooks.Handlers;
@@ -30,11 +36,28 @@ namespace wa_api.Features.Webhooks.Handlers;
 public sealed class InboundMessageWebhookHandler(
     AppDbContext db,
     IChatNotifier notifier,
+    WebhookPostCommitActions postCommit,
     IBackgroundJobClient jobs,
-    ILogger<InboundMessageWebhookHandler> logger)
+    IMemoryCache cache,
+    ILogger<InboundMessageWebhookHandler> logger,
+    IBotGate? botGate = null)
     : IWebhookEventHandler
 {
     private const int PreviewLength = 200;
+
+    /// <summary>
+    /// How old an inbound message may be and still get a bot reply. Meta retries a failed webhook with a
+    /// growing backoff for days, so an outage delivers yesterday's "hi" this afternoon — and a bot answering
+    /// it as if it had just arrived reads as the business messaging out of nowhere. Past this age the
+    /// message is still stored for the inbox; it just doesn't wake the bot.
+    /// </summary>
+    public static readonly TimeSpan MaxBotReplyAge = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// A number is saved in the clinic's CRM at most once in this long — measured from the last save, not
+    /// the last message, so even a chat that never pauses re-saves a number the clinic deleted meanwhile.
+    /// </summary>
+    public static readonly TimeSpan ClinicSaveGap = TimeSpan.FromMinutes(10);
 
     public bool CanHandle(string field, WebhookChange change)
         => field == "messages" && change.Value?.Messages is { Count: > 0 };
@@ -53,6 +76,21 @@ public sealed class InboundMessageWebhookHandler(
         var wabaId = connection.Id;
         var value = ctx.Change.Value!;
         var profiles = value.Contacts;
+        var savedToClinic = new HashSet<string>();
+
+        // Asked once per batch (and cached by the gate): is the chatbot on for this company at all — the
+        // platform switch, the plan, and something configured? For a company with no bot this handler then
+        // enqueues nothing extra, so a campaign reply surge costs the same as it did before the chatbot
+        // existed. A null gate (unit tests) keeps the "always hand over, the job decides" behaviour.
+        var botLive = botGate is null || await botGate.IsLiveAsync(companyId, ct);
+        var clinicConnected = botGate is null || await botGate.HasClinicCrmAsync(companyId, ct);
+
+        // The team's own numbers receive the handoff alert, and a reply to it is a colleague talking, not a
+        // customer — the bot must never answer one. Loaded once per batch; the list is a handful of numbers.
+        List<string> teamPhones = botLive
+            ? (await db.BotProfiles.IgnoreQueryFilters().AsNoTracking()
+                .FirstOrDefaultAsync(p => p.CompanyId == companyId, ct))?.HandoffAlertPhones ?? []
+            : [];
 
         foreach (var m in value.Messages!)
         {
@@ -75,7 +113,25 @@ public sealed class InboundMessageWebhookHandler(
             var contact = await UpsertContactAsync(companyId, phone!, profileName, ct);
             var conversation = await FindOrCreateOpenAsync(companyId, wabaId, contact, ct);
 
+            // The contact is saved in the clinic's CRM as an interested customer when they write, at most once
+            // per ClinicSaveGap, so a number the clinic deleted there comes back within minutes — without a CRM
+            // call for every line of a chat. After commit, like the jobs below; the job skips a company with no
+            // CRM connection, and the CRM never duplicates a number. A restart forgets the timer, which only
+            // means one extra (harmless) save.
+            if (clinicConnected && !contact.IsOptedOut && !teamPhones.Contains(phone!) && savedToClinic.Add(phone!)
+                && !cache.TryGetValue(ClinicSaveKey(companyId, phone!), out _))
+            {
+                var name = contact.Name == contact.Phone ? null : contact.Name;
+                jobs.Enqueue<ClinicCrmLeadJob>(j => j.SaveAsync(companyId, phone!, name, CancellationToken.None));
+                cache.Set(ClinicSaveKey(companyId, phone!), true, ClinicSaveGap);
+            }
+
             var now = DateTime.UtcNow;
+
+            // When the customer actually sent it, per Meta — not when it reached us. A retried delivery can
+            // land hours late, and both the 24-hour window and the bot's decision to reply hang off this.
+            var sentAt = SentAt(m.Timestamp, now);
+            var isLateDelivery = now - sentAt > MaxBotReplyAge;
 
             // Media messages (image/video/audio/document/sticker) carry an opaque media id, not text. Detect
             // which node is present; its bytes are fetched asynchronously after commit (InboundMediaDownloadJob).
@@ -128,9 +184,17 @@ public sealed class InboundMessageWebhookHandler(
             conversation.LastMessageBody = Truncate(body);
             conversation.LastMessageDirection = MessageDirection.Inbound;
             conversation.UnreadCount += 1;
-            conversation.WindowExpiresAt = now.AddHours(24);
+            // Meta opens the window from when the customer sent the message, so a late delivery must not
+            // stretch it — and must never shorten a window a newer message already opened.
+            var windowFromThis = sentAt.AddHours(24);
+            if (conversation.WindowExpiresAt is null || conversation.WindowExpiresAt < windowFromThis)
+                conversation.WindowExpiresAt = windowFromThis;
+            // They wrote back, so this silence is over. Clearing it lets a later quiet patch earn its
+            // own nudge, while a single silence can still only ever earn one.
+            conversation.BotFollowUpSentAt = null;
+            conversation.BotFollowUpStepsSent = 0;
 
-            await NotifyAsync(companyId, conversation, contact, connection, message, now, ct);
+            QueueNotify(companyId, conversation, contact, connection, message, now);
 
             // Fetch the media bytes AFTER the batch commits — never inside the webhook transaction, which would
             // pin a pooled DB connection across two slow Meta HTTP calls. Hangfire's enqueue is not part of the
@@ -138,6 +202,34 @@ public sealed class InboundMessageWebhookHandler(
             // (the stale message id no-ops / dead-letters harmlessly).
             if (mediaType is not null && !string.IsNullOrWhiteSpace(mediaNode!.Id))
                 jobs.Enqueue<InboundMediaDownloadJob>(j => j.RunAsync(message.Id, CancellationToken.None));
+
+            // Hand the message to the chatbot AFTER the batch commits, for the same reason as the media
+            // download above: the reply job calls Meta (and now Anthropic) over HTTP, which must never
+            // happen inside the webhook transaction. The job re-checks opt-out, the 24h window, the bot
+            // pause state and a per-conversation cooldown itself, so nothing is decided here — an
+            // opted-out contact is still enqueued and the job declines. That keeps this handler's only
+            // job "persist what arrived".
+            //
+            // No chatbot for this company (or the platform switch is off): nothing to hand over.
+            if (!botLive) continue;
+
+            // The one exception is a late delivery: the moment to answer it has passed, and a reply now
+            // arrives with no visible prompt on the customer's side. A human can still pick it up.
+            if (isLateDelivery)
+            {
+                logger.LogInformation(
+                    "Inbound wamid {Wamid} was sent at {SentAt:o} but arrived {Delay} late — stored, no bot reply.",
+                    wamid, sentAt, now - sentAt);
+                continue;
+            }
+
+            if (teamPhones.Contains(phone!))
+            {
+                logger.LogInformation("Inbound message from team number {Phone} — stored, no bot reply.", phone);
+                continue;
+            }
+
+            jobs.Enqueue<AiReplyJob>(j => j.RunAsync(message.Id, CancellationToken.None));
         }
 
         // No SaveChanges — WebhookProcessingJob commits the batch once (atomic; discardable on retry).
@@ -188,6 +280,8 @@ public sealed class InboundMessageWebhookHandler(
         return contact;
     }
 
+    private static string ClinicSaveKey(Guid companyId, string phone) => $"clinic-crm-lead:{companyId}:{phone}";
+
     private async Task<Conversation> FindOrCreateOpenAsync(Guid companyId, Guid wabaId, Contact contact, CancellationToken ct)
     {
         var conversation = db.Conversations.Local.FirstOrDefault(c =>
@@ -213,39 +307,46 @@ public sealed class InboundMessageWebhookHandler(
         return conversation;
     }
 
-    private async Task NotifyAsync(
+    private void QueueNotify(
         Guid companyId, Conversation conversation, Contact contact, WabaConnection connection,
-        Message message, DateTime now, CancellationToken ct)
+        Message message, DateTime now)
     {
-        // Best-effort realtime hint, pushed BEFORE the batch commit (the pipeline commits once and exposes
-        // no post-commit hook). On the rare rollback + Hangfire retry the event simply re-fires; the client
-        // keys messages by id and reconciles on its next fetch. A SignalR hiccup must never fail webhook
-        // processing, so this is swallowed. Timestamps aren't stamped until commit, so we use `now`.
-        try
-        {
-            var conversationDto = new ConversationResponse(
-                conversation.Id, contact.Id, contact.Name, contact.Phone,
-                connection.Id, connection.DisplayPhoneNumber, conversation.Status,
-                conversation.LastMessageAt, conversation.LastMessageBody, conversation.LastMessageDirection,
-                conversation.UnreadCount, conversation.WindowExpiresAt,
-                conversation.CreatedAt == default ? now : conversation.CreatedAt);
+        // Realtime hint, sent only AFTER the batch commits: pushed from here, the inbox refetched on the event,
+        // read the not-yet-committed state and kept it until the agent switched chats. The DTOs are built now,
+        // from this attempt's tracked entities; a rolled-back attempt discards the queue. Best-effort — the
+        // runner swallows a SignalR failure. Timestamps aren't stamped until commit, so we use `now`.
+        var conversationDto = new ConversationResponse(
+            conversation.Id, contact.Id, contact.Name, contact.Phone,
+            connection.Id, connection.DisplayPhoneNumber, conversation.Status,
+            conversation.LastMessageAt, conversation.LastMessageBody, conversation.LastMessageDirection,
+            conversation.UnreadCount, conversation.WindowExpiresAt,
+            conversation.CreatedAt == default ? now : conversation.CreatedAt,
+            conversation.BotState, conversation.BotResumesAt, conversation.BotPausedByUserId != null);
 
-            var messageDto = new ConversationMessageResponse(
-                message.Id, conversation.Id, message.Body, message.Direction, message.Status,
-                message.ExternalMessageId, message.ErrorMessage, now, null,
-                // Media not yet downloaded → MediaReady:false. The download job re-pushes with it ready.
-                message.MediaType, message.MediaMimeType, MediaReady: false);
+        var messageDto = new ConversationMessageResponse(
+            message.Id, conversation.Id, message.Body, message.Direction, message.Status,
+            message.ExternalMessageId, message.ErrorMessage, now, null,
+            // Media not yet downloaded → MediaReady:false. The download job re-pushes with it ready.
+            message.MediaType, message.MediaMimeType, MediaReady: false);
 
-            await notifier.MessageAsync(companyId, conversationDto, messageDto, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Failed to push realtime inbound event for conversation {ConversationId} — non-fatal.", conversation.Id);
-        }
+        postCommit.Add(ct => notifier.MessageAsync(companyId, conversationDto, messageDto, ct));
     }
 
     private static string Truncate(string s) => s.Length <= PreviewLength ? s : s[..PreviewLength];
+
+    /// <summary>
+    /// Meta's send time (epoch seconds as a string). A missing or unparseable value counts as "just now" so
+    /// a malformed payload degrades to the old behaviour rather than silencing the bot; a timestamp ahead of
+    /// our clock (skew) is clamped to now so it can't push the window past 24 hours.
+    /// </summary>
+    private static DateTime SentAt(string? timestamp, DateTime now)
+    {
+        if (!long.TryParse(timestamp, NumberStyles.Integer, CultureInfo.InvariantCulture, out var epoch))
+            return now;
+
+        var sent = DateTimeOffset.FromUnixTimeSeconds(epoch).UtcDateTime;
+        return sent > now ? now : sent;
+    }
 
     /// <summary>The first non-blank candidate, or null when all are blank.</summary>
     private static string? FirstNonBlank(params string?[] candidates) =>

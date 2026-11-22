@@ -2,7 +2,8 @@
  *  service switches on these exact lowercase strings (Plan 004). */
 
 export type TemplateStatus = "Draft" | "Pending" | "Approved" | "Rejected" | "Paused" | "Disabled";
-export type TemplateCategory = "Marketing";
+// "Utility" templates come from the chatbot's starter pack (follow-ups, appointment notices, staff alerts).
+export type TemplateCategory = "Marketing" | "Utility";
 export type TemplateParameterFormat = "Positional";
 
 /** Header kinds the builder offers (Meta also supports "location"; not built in v1). */

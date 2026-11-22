@@ -49,9 +49,12 @@ public class AuditInterceptor(IHttpContextAccessor httpContextAccessor) : SaveCh
 
     private void StampEntities(DbContext context, DateTime now)
     {
-        // Resolved per-request from the same scope as the DbContext (null outside an HTTP
-        // request — migrations, seeding, jobs — in which case nothing is auto-stamped).
-        var tenant = _httpContextAccessor.HttpContext?.RequestServices.GetService<ITenantContext>();
+        // Taken from the context's OWN scope rather than from HttpContext. During a request the two
+        // are the same scoped instance, so nothing changes there — but a background job has no
+        // HttpContext, and reading it there meant a job that had legitimately entered a tenant
+        // (ScopedTenantContext.EnterCompany) still got no stamp and inserted CompanyId = Guid.Empty.
+        // Anything that is not our context stamps nothing, which is the same fail-closed default.
+        var tenant = (context as Infrastructure.Persistence.AppDbContext)?.Tenant;
 
         foreach (var entry in context.ChangeTracker.Entries<BaseEntity>())
         {
@@ -79,7 +82,7 @@ public class AuditInterceptor(IHttpContextAccessor httpContextAccessor) : SaveCh
         var httpContext = _httpContextAccessor.HttpContext;
         var correlationId = httpContext?.Items["CorrelationId"]?.ToString();
         var ipAddress = httpContext?.Connection.RemoteIpAddress?.ToString();
-        var changedBy = httpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        var changedBy = httpContext?.User?.FindFirstValue("sub");
 
         var entries = context.ChangeTracker.Entries()
             .Where(e => e.Entity is not AuditLog

@@ -4,9 +4,10 @@ using wa_api.Features.WhatsApp.Entities;
 
 namespace wa_api.Features.Templates.Entities;
 
-/// <summary>WhatsApp template category. Fixed to <see cref="Marketing"/> in v1 (Plan 004);
-/// kept as an enum so Utility/Authentication can be added later without a migration.</summary>
-public enum TemplateCategory { Marketing }
+/// <summary>WhatsApp template category. <see cref="Marketing"/> is what campaigns send; <see cref="Utility"/>
+/// is for the chatbot's follow-ups and staff alerts, which Meta rates cheaper. Stored as text, so adding a
+/// member needs no migration.</summary>
+public enum TemplateCategory { Marketing, Utility }
 
 /// <summary>
 /// Local lifecycle of a template. <c>Draft</c> is ours (not yet sent to Meta); the rest mirror

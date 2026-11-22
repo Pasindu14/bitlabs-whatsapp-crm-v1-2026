@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { queryKeys } from "@/lib/hooks/query-keys";
 import { handleErrorToast } from "@/lib/hooks/use-error-toast";
 import type { ActionFailure } from "@/lib/types/actions";
@@ -11,6 +12,7 @@ import {
   markConversationReadAction,
   startConversationAction,
   deleteConversationMessageAction,
+  setConversationBotStateAction,
 } from "@/features/conversations/actions/conversation-actions";
 import { useConversationStore } from "@/features/conversations/store/conversation-store";
 import type { StartConversationInput } from "@/features/conversations/schema/conversation-schema";
@@ -39,6 +41,8 @@ export function useConversationMessages(conversationId: string | null) {
       return [...res.data.items].reverse();
     },
     enabled: !!conversationId,
+    // Realtime only covers the time the inbox is open — coming back to it must always refetch.
+    staleTime: 0,
   });
 }
 
@@ -121,5 +125,39 @@ export function useStartConversation() {
       select(conversation); // open the freshly created thread
     },
     onError: (error: ActionFailure) => handleErrorToast(error, "Conversation", "start"),
+  });
+}
+
+/**
+ * Takes the thread off the bot, or hands it back.
+ *
+ * The API also pauses the bot automatically the moment an agent sends a message, so most takeovers
+ * never come through here — this is for claiming a thread before saying anything, and for giving it
+ * back once the conversation is done.
+ */
+export function useSetConversationBotState() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      conversationId,
+      paused,
+      resumeAfterMinutes,
+    }: {
+      conversationId: string;
+      paused: boolean;
+      resumeAfterMinutes?: number;
+    }) => {
+      const res = await setConversationBotStateAction(conversationId, paused, resumeAfterMinutes);
+      if (!res.success) throw res;
+      return res.data;
+    },
+    onSuccess: (conversation) => {
+      qc.invalidateQueries({ queryKey: queryKeys.conversations.lists() });
+      // Patch the open thread immediately so the banner flips without waiting for a refetch.
+      useConversationStore.getState().patchSelected(conversation);
+      toast.success(conversation.botState === "Paused" ? "You're handling this chat" : "Back to the bot");
+    },
+    onError: (error: ActionFailure) => handleErrorToast(error, "Chat", "update"),
   });
 }

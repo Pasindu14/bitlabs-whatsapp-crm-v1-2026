@@ -2,14 +2,18 @@ using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using wa_api.Common.Tenancy;
 using wa_api.Features.Conversations.Dtos;
 using wa_api.Features.Conversations.Realtime;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Bot.Jobs;
+using wa_api.Features.ClinicCrm.Jobs;
 using wa_api.Features.Messages.InboundMedia;
 using wa_api.Features.Webhooks.Handlers;
 using wa_api.Features.Webhooks.Payloads;
+using wa_api.Features.Webhooks.Processing;
 using wa_api.Features.WhatsApp.Entities;
 using wa_api.Infrastructure.Persistence;
 using Xunit;
@@ -50,13 +54,34 @@ public class InboundMediaWebhookHandlerTests
             Guid companyId, Guid conversationId, Guid messageId, ConversationResponse conversation,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task BotStateChangedAsync(
+            Guid companyId, ConversationResponse conversation, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task BotTypingAsync(
+            Guid companyId, Guid conversationId, bool isTyping, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task MessageStatusAsync(
+            Guid companyId, Guid conversationId, Guid messageId, MessageStatus status, DateTime? statusAt,
+            string? errorMessage, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 
     /// <summary>Fake job client — Hangfire's Enqueue&lt;T&gt; is an extension over Create(Job, IState).</summary>
     private sealed class RecordingJobClient : IBackgroundJobClient
     {
+        /// <summary>Every job but the clinic-CRM lead save, which is recorded in <see cref="Leads"/>.</summary>
         public List<Job> Created { get; } = [];
-        public string Create(Job job, IState state) { Created.Add(job); return Guid.NewGuid().ToString(); }
+        public List<Job> Leads { get; } = [];
+
+        public string Create(Job job, IState state)
+        {
+            (job.Type == typeof(ClinicCrmLeadJob) ? Leads : Created).Add(job);
+            return Guid.NewGuid().ToString();
+        }
+
         public bool ChangeState(string jobId, IState state, string expectedState) => true;
     }
 
@@ -94,7 +119,7 @@ public class InboundMediaWebhookHandlerTests
                     {
                         From = from,
                         Id = wamid,
-                        Timestamp = "1700000000",
+                        Timestamp = EpochSeconds(DateTime.UtcNow),
                         Type = "image",
                         Image = new WebhookMedia { Id = mediaId, MimeType = "image/jpeg", Caption = caption },
                     },
@@ -104,7 +129,11 @@ public class InboundMediaWebhookHandlerTests
         },
     };
 
-    private static WebhookContext TextMessage(WabaConnection conn, string wamid, string from, string body) => new()
+    private static string EpochSeconds(DateTime utc) =>
+        new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeSeconds().ToString();
+
+    private static WebhookContext TextMessage(
+        WabaConnection conn, string wamid, string from, string body, DateTime? sentAt = null) => new()
     {
         Field = "messages",
         Connection = conn,
@@ -119,7 +148,7 @@ public class InboundMediaWebhookHandlerTests
                     {
                         From = from,
                         Id = wamid,
-                        Timestamp = "1700000000",
+                        Timestamp = EpochSeconds(sentAt ?? DateTime.UtcNow),
                         Type = "text",
                         Text = new WebhookText { Body = body },
                     },
@@ -128,12 +157,21 @@ public class InboundMediaWebhookHandlerTests
         },
     };
 
-    private static (InboundMessageWebhookHandler Handler, RecordingNotifier Notifier, RecordingJobClient Jobs) NewHandler(AppDbContext db)
+    private static (InboundMessageWebhookHandler Handler, RecordingNotifier Notifier, RecordingJobClient Jobs, WebhookPostCommitActions PostCommit) NewHandler(
+        AppDbContext db, IMemoryCache? cache = null, wa_api.Features.Bot.IBotGate? gate = null)
     {
         var notifier = new RecordingNotifier();
         var jobs = new RecordingJobClient();
-        var handler = new InboundMessageWebhookHandler(db, notifier, jobs, NullLogger<InboundMessageWebhookHandler>.Instance);
-        return (handler, notifier, jobs);
+        var postCommit = new WebhookPostCommitActions(NullLogger<WebhookPostCommitActions>.Instance);
+        var handler = new InboundMessageWebhookHandler(db, notifier, postCommit, jobs,
+            cache ?? new MemoryCache(new MemoryCacheOptions()), NullLogger<InboundMessageWebhookHandler>.Instance,
+            gate);
+        return (handler, notifier, jobs, postCommit);
+    }
+
+    private sealed class TestClock : Microsoft.Extensions.Internal.ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.UtcNow;
     }
 
     [Fact]
@@ -145,9 +183,12 @@ public class InboundMediaWebhookHandlerTests
         db.WabaConnections.Add(conn);
         await db.SaveChangesAsync();
 
-        var (handler, notifier, jobs) = NewHandler(db);
+        var (handler, notifier, jobs, postCommit) = NewHandler(db);
         await handler.HandleAsync(ImageMessage(conn, "wamid-img-1", "15551234567", "media-abc", "look at this"));
+        // Nothing is pushed before the commit — the inbox would refetch and cache the pre-commit state.
+        Assert.Equal(0, notifier.Count);
         await db.SaveChangesAsync(); // mirrors the dispatcher's single atomic commit
+        await postCommit.RunAsync();  // ...after which the job sends the queued pushes
 
         var msg = await db.Messages.IgnoreQueryFilters().SingleAsync();
         Assert.Equal("image", msg.MediaType);
@@ -157,16 +198,72 @@ public class InboundMediaWebhookHandlerTests
         Assert.Null(msg.MediaDownloadedAt);           // bytes not fetched inline
         Assert.Equal(MessageDirection.Inbound, msg.Direction);
 
-        // A download job was enqueued for THIS message id (not run inline).
-        var job = Assert.Single(jobs.Created);
-        Assert.Equal(typeof(InboundMediaDownloadJob), job.Type);
-        Assert.Equal(nameof(InboundMediaDownloadJob.RunAsync), job.Method.Name);
-        Assert.Equal(msg.Id, Assert.IsType<Guid>(job.Args[0]));
+        // Two jobs are enqueued for THIS message id, neither run inline: the media download and the
+        // chatbot. Order matters only in that both must reference the same message.
+        Assert.Equal(2, jobs.Created.Count);
+
+        var download = Assert.Single(jobs.Created, j => j.Type == typeof(InboundMediaDownloadJob));
+        Assert.Equal(nameof(InboundMediaDownloadJob.RunAsync), download.Method.Name);
+        Assert.Equal(msg.Id, Assert.IsType<Guid>(download.Args[0]));
+
+        var autoReply = Assert.Single(jobs.Created, j => j.Type == typeof(AiReplyJob));
+        Assert.Equal(nameof(AiReplyJob.RunAsync), autoReply.Method.Name);
+        Assert.Equal(msg.Id, Assert.IsType<Guid>(autoReply.Args[0]));
 
         // The realtime push advertises media that isn't ready yet.
         Assert.Equal(1, notifier.Count);
         Assert.Equal("image", notifier.Last!.MediaType);
         Assert.False(notifier.Last!.MediaReady);
+    }
+
+    [Fact]
+    public async Task AContact_IsQueuedToBeSavedAtTheClinic_WithTheirProfileName_AtMostOncePerGap()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var clock = new TestClock();
+        var (handler, _, jobs, _) = NewHandler(db, new MemoryCache(new MemoryCacheOptions { Clock = clock }));
+        await handler.HandleAsync(ImageMessage(conn, "wamid-lead-1", "971501234567", "media-1", null));
+        await db.SaveChangesAsync();
+
+        var lead = Assert.Single(jobs.Leads);
+        Assert.Equal(nameof(ClinicCrmLeadJob.SaveAsync), lead.Method.Name);
+        Assert.Equal(companyId, lead.Args[0]);
+        Assert.Equal("971501234567", lead.Args[1]);
+        Assert.Equal("Mona", lead.Args[2]);
+
+        // Five minutes on, mid-chat: no second CRM call.
+        clock.UtcNow += TimeSpan.FromMinutes(5);
+        await handler.HandleAsync(TextMessage(conn, "wamid-lead-2", "971501234567", "hello again"));
+        await db.SaveChangesAsync();
+        Assert.Single(jobs.Leads);
+
+        // Still chatting, but the gap since the last SAVE has passed: saved again, in case the clinic deleted
+        // them meanwhile. (A gap measured from the last message would never re-save a chat that keeps going.)
+        clock.UtcNow += InboundMessageWebhookHandler.ClinicSaveGap - TimeSpan.FromMinutes(4);
+        await handler.HandleAsync(TextMessage(conn, "wamid-lead-3", "971501234567", "still here"));
+        await db.SaveChangesAsync();
+        Assert.Equal(2, jobs.Leads.Count);
+        Assert.All(jobs.Leads, l => Assert.Equal("971501234567", l.Args[1]));
+    }
+
+    [Fact]
+    public async Task ANewContact_WithoutAProfileName_IsQueuedWithNoName()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var (handler, _, jobs, _) = NewHandler(db);
+        await handler.HandleAsync(TextMessage(conn, "wamid-lead-3", "971509999999", "hi"));
+
+        Assert.Null(Assert.Single(jobs.Leads).Args[2]);
     }
 
     [Fact]
@@ -178,7 +275,7 @@ public class InboundMediaWebhookHandlerTests
         db.WabaConnections.Add(conn);
         await db.SaveChangesAsync();
 
-        var (handler, _, jobs) = NewHandler(db);
+        var (handler, _, jobs, _) = NewHandler(db);
         await handler.HandleAsync(ImageMessage(conn, "wamid-img-2", "15551234567", "media-xyz", caption: null));
         await db.SaveChangesAsync();
 
@@ -186,11 +283,11 @@ public class InboundMediaWebhookHandlerTests
         Assert.Equal("[image]", msg.Body);           // preview placeholder when no caption
         var convo = await db.Conversations.IgnoreQueryFilters().SingleAsync();
         Assert.Equal("[image]", convo.LastMessageBody);
-        Assert.Single(jobs.Created);
+        Assert.Equal(2, jobs.Created.Count);          // media download + auto-reply
     }
 
     [Fact]
-    public async Task InboundText_StoresNoMedia_AndEnqueuesNothing()
+    public async Task InboundText_StoresNoMedia_AndEnqueuesOnlyTheReplyJob()
     {
         var companyId = Guid.NewGuid();
         await using var db = NewDb();
@@ -198,7 +295,7 @@ public class InboundMediaWebhookHandlerTests
         db.WabaConnections.Add(conn);
         await db.SaveChangesAsync();
 
-        var (handler, _, jobs) = NewHandler(db);
+        var (handler, _, jobs, _) = NewHandler(db);
         await handler.HandleAsync(TextMessage(conn, "wamid-txt-1", "15551234567", "hello there"));
         await db.SaveChangesAsync();
 
@@ -206,6 +303,145 @@ public class InboundMediaWebhookHandlerTests
         Assert.Null(msg.MediaType);
         Assert.Null(msg.MetaMediaId);
         Assert.Equal("hello there", msg.Body);
-        Assert.Empty(jobs.Created);                   // no media → no download job
+        // No media → no download job. The chatbot is still handed the message: AiReplyJob decides
+        // for itself whether a rule matches, so the handler enqueues unconditionally.
+        var job = Assert.Single(jobs.Created);
+        Assert.Equal(typeof(AiReplyJob), job.Type);
+        Assert.Equal(msg.Id, Assert.IsType<Guid>(job.Args[0]));
+    }
+
+    /// <summary>
+    /// Staff get the handoff alert on WhatsApp, and a reply to it is a colleague talking. The bot answering a
+    /// team member, or the clinic CRM saving them as a lead, would be the system talking to itself.
+    /// </summary>
+    [Fact]
+    public async Task AMessageFromATeamNumber_IsStored_ButNeverWakesTheBot()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        db.BotProfiles.Add(new wa_api.Features.Bot.Entities.BotProfile
+        {
+            CompanyId = companyId, BusinessName = "Clinic", BusinessDescription = "A clinic.",
+            HandoffAlertPhones = ["15551234567"],
+        });
+        await db.SaveChangesAsync();
+
+        var (handler, _, jobs, _) = NewHandler(db);
+        await handler.HandleAsync(TextMessage(conn, "wamid-team-1", "15551234567", "on it"));
+        await db.SaveChangesAsync();
+
+        Assert.Equal("on it", (await db.Messages.IgnoreQueryFilters().SingleAsync()).Body);
+        Assert.Empty(jobs.Created);
+    }
+
+    /// <summary>
+    /// The production incident: the API was down overnight, Meta retried, and a "hi" sent at 9pm arrived
+    /// at 3pm the next day. The bot answered it as if it were new. It must be stored but not answered, and
+    /// the 24-hour window runs from when it was SENT, not when it arrived.
+    /// </summary>
+    [Fact]
+    public async Task LateDelivery_IsStored_ButDoesNotWakeTheBot_AndWindowRunsFromSendTime()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var sentAt = DateTime.UtcNow.AddHours(-18);
+
+        var (handler, notifier, jobs, postCommit) = NewHandler(db);
+        await handler.HandleAsync(TextMessage(conn, "wamid-late-1", "15551234567", "hi", sentAt));
+        await db.SaveChangesAsync();
+        await postCommit.RunAsync();
+
+        var msg = await db.Messages.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal("hi", msg.Body);                 // still in the inbox for a human
+        Assert.Equal(1, notifier.Count);              // and still pushed live
+        Assert.Empty(jobs.Created);                   // but no bot reply
+
+        var convo = await db.Conversations.IgnoreQueryFilters().SingleAsync();
+        Assert.NotNull(convo.WindowExpiresAt);
+        var expected = sentAt.AddHours(24);
+        Assert.InRange(convo.WindowExpiresAt!.Value, expected.AddSeconds(-1), expected.AddSeconds(1));
+    }
+
+    [Fact]
+    public async Task RecentMessage_JustInsideTheCutoff_StillGetsABotReply()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var (handler, _, jobs, _) = NewHandler(db);
+        await handler.HandleAsync(TextMessage(
+            conn, "wamid-recent-1", "15551234567", "hello",
+            DateTime.UtcNow - InboundMessageWebhookHandler.MaxBotReplyAge + TimeSpan.FromMinutes(1)));
+        await db.SaveChangesAsync();
+
+        Assert.Equal(typeof(AiReplyJob), Assert.Single(jobs.Created).Type);
+    }
+
+    /// <summary>A stale message arriving after a newer one must not shrink the window the newer one opened.</summary>
+    [Fact]
+    public async Task LateDelivery_AfterANewerMessage_DoesNotShortenTheWindow()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var (handler, _, _, _) = NewHandler(db);
+        await handler.HandleAsync(TextMessage(conn, "wamid-new", "15551234567", "fresh"));
+        await db.SaveChangesAsync();
+
+        var windowAfterFresh = (await db.Conversations.IgnoreQueryFilters().SingleAsync()).WindowExpiresAt;
+
+        await handler.HandleAsync(TextMessage(
+            conn, "wamid-old", "15551234567", "stale", DateTime.UtcNow.AddHours(-18)));
+        await db.SaveChangesAsync();
+
+        var convo = await db.Conversations.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal(windowAfterFresh, convo.WindowExpiresAt);
+    }
+
+    // ── CRM integration (plan 005): a company without the chatbot costs no extra jobs ──────────────
+
+    [Fact]
+    public async Task ChatbotNotLive_TheMessageIsStored_ButNoBotOrClinicJobIsEnqueued()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var (handler, _, jobs, _) = NewHandler(db, gate: new wa_api.Tests.Bot.TestBotGate(live: false, clinic: false));
+        await handler.HandleAsync(TextMessage(conn, "wamid-nobot-1", "15551234567", "hello"));
+        await db.SaveChangesAsync();
+
+        Assert.Single(await db.Messages.IgnoreQueryFilters().ToListAsync());   // still lands in the inbox
+        Assert.Empty(jobs.Created);
+    }
+
+    [Fact]
+    public async Task ChatbotLive_WithoutAClinicConnection_EnqueuesOnlyTheReplyJob()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var (handler, _, jobs, _) = NewHandler(db, gate: new wa_api.Tests.Bot.TestBotGate(live: true, clinic: false));
+        await handler.HandleAsync(TextMessage(conn, "wamid-bot-1", "15551234567", "hello"));
+        await db.SaveChangesAsync();
+
+        Assert.Equal(typeof(AiReplyJob), Assert.Single(jobs.Created).Type);
     }
 }

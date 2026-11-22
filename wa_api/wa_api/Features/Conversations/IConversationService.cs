@@ -43,4 +43,12 @@ public interface IConversationService
     /// message (and visible in the thread), not thrown.</summary>
     Task<ConversationResponse> StartConversationAsync(
         Guid contactId, Guid wabaConnectionId, string body, CancellationToken ct = default);
+
+    /// <summary>
+    /// Takes the thread away from the bot, or hands it back. Pausing with no duration means the agent
+    /// owns it until they say otherwise; a duration sets an auto-resume that <c>BotAutoResumeJob</c>
+    /// picks up. Note that replying by hand pauses the bot on its own — this is the explicit control.
+    /// </summary>
+    Task<ConversationResponse> SetBotStateAsync(
+        Guid conversationId, bool paused, int? resumeAfterMinutes, CancellationToken ct = default);
 }

@@ -132,6 +132,8 @@ export const queryKeys = {
     all: ['templates'] as const,
     lists: () => [...queryKeys.templates.all, 'list'] as const,
     list: (filters?: any) => [...queryKeys.templates.lists(), filters] as const,
+    // Approved, text-only templates — what a chatbot follow-up or handoff alert may use.
+    approved: () => [...queryKeys.templates.all, 'approved'] as const,
     details: () => [...queryKeys.templates.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.templates.details(), id] as const,
   },
@@ -205,5 +207,48 @@ export const queryKeys = {
     packages: (from?: string, to?: string) => [...queryKeys.adminReports.all, 'packages', { from, to }] as const,
     balances: () => [...queryKeys.adminReports.all, 'balances'] as const,
     usage: (from?: string, to?: string) => [...queryKeys.adminReports.all, 'usage', { from, to }] as const,
+  },
+
+  // ── Chatbot, calendar and clinic CRM (plan 005) ─────────────────────────
+
+  // Whether the caller's plan includes the chatbot / calendar, and whether the platform switch is on
+  botAccess: {
+    all: ['bot-access'] as const,
+  },
+
+  // Auto-reply rules (CompanyAdmin — the chatbot's rule set)
+  autoReplyRules: {
+    all: ['auto-reply-rules'] as const,
+    list: () => [...queryKeys.autoReplyRules.all, 'list'] as const,
+    details: () => [...queryKeys.autoReplyRules.all, 'detail'] as const,
+    detail: (id: string) => [...queryKeys.autoReplyRules.details(), id] as const,
+  },
+
+  // The AI assistant (CompanyAdmin — business profile + prepared answers)
+  botProfile: {
+    all: ['bot-profile'] as const,
+    profile: () => [...queryKeys.botProfile.all, 'profile'] as const,
+    faqs: () => [...queryKeys.botProfile.all, 'faqs'] as const,
+    links: () => [...queryKeys.botProfile.all, 'links'] as const,
+    prompt: () => [...queryKeys.botProfile.all, 'prompt'] as const,
+  },
+
+  // Clinic CRM connection (CompanyAdmin — the bot books into the clinic's CRM)
+  clinicCrm: {
+    all: ['clinic-crm'] as const,
+    settings: () => [...queryKeys.clinicCrm.all, 'settings'] as const,
+    treatments: () => [...queryKeys.clinicCrm.all, 'treatments'] as const,
+  },
+
+  // Calendar (CompanyAdmin — bookable services, opening hours, availability, bookings)
+  calendar: {
+    all: ['calendar'] as const,
+    settings: () => [...queryKeys.calendar.all, 'settings'] as const,
+    types: (enabledOnly?: boolean) => [...queryKeys.calendar.all, 'types', { enabledOnly }] as const,
+    blackouts: (from?: string, to?: string) => [...queryKeys.calendar.all, 'blackouts', { from, to }] as const,
+    availability: (typeId?: string, from?: string, to?: string) =>
+      [...queryKeys.calendar.all, 'availability', { typeId, from, to }] as const,
+    appointments: (from?: string, to?: string, includeCancelled?: boolean) =>
+      [...queryKeys.calendar.all, 'appointments', { from, to, includeCancelled }] as const,
   },
 } as const

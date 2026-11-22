@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { TemplateTable } from "@/features/templates/components/template-table";
+import { StarterPackButton } from "@/features/templates/components/starter-pack-button";
 
 /**
  * CompanyAdmin-only template management. Protected at four layers: proxy (auth), this server
@@ -20,6 +21,9 @@ export default async function TemplatesPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Build WhatsApp marketing templates, submit them to Meta, and track approval status.
         </p>
+        <div className="mt-4">
+          <StarterPackButton />
+        </div>
       </div>
 
       <TemplateTable />

@@ -28,4 +28,39 @@ public interface IWhatsAppMessageSender
     Task<Message> SendAsync(
         Contact contact, WabaConnection waba, string body, Guid? conversationId,
         bool chargeCredit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sends an approved message template — the only thing Meta accepts once the 24-hour window has
+    /// closed.
+    /// <para>
+    /// Always billed: a template is business-initiated by definition, so unlike an in-window reply it
+    /// reserves quota and takes a daily-tier permit. The row stored for the inbox carries the RENDERED
+    /// text, because a thread showing <c>{{1}}</c> is useless to the agent reading it.
+    /// </para>
+    /// <para>
+    /// Defaulted to a no-op so fakes that only care about plain sends do not have to implement it.
+    /// </para>
+    /// </summary>
+    /// <param name="templateName">Meta's template name, as approved.</param>
+    /// <param name="language">The template's language code.</param>
+    /// <param name="parameters">Body parameters in order, already validated as single-line.</param>
+    /// <param name="renderedBody">The same message with the parameters filled in, for the inbox.</param>
+    Task<Message> SendTemplateAsync(
+        Contact contact, WabaConnection waba, string templateName, string language,
+        IReadOnlyList<string> parameters, string renderedBody, Guid? conversationId,
+        CancellationToken ct = default)
+        => throw new NotSupportedException("This sender cannot send templates.");
+
+    /// <summary>
+    /// Shows "typing…" on the customer's phone and marks <paramref name="inboundWamid"/> as read (Meta
+    /// couples the two). It lasts until the next message we send or 25 seconds, whichever is first, and it
+    /// needs the id of a message the customer sent — so it only exists when replying to one.
+    /// <para>
+    /// Cosmetic and best-effort: it never throws, never writes a row, and takes no rate-limit slot or
+    /// credit. Only call it when a reply really is coming — that is Meta's rule, not ours.
+    /// </para>
+    /// Defaulted to a no-op so fakes that only care about sends don't have to implement it.
+    /// </summary>
+    Task ShowTypingAsync(WabaConnection waba, string? inboundWamid, CancellationToken ct = default)
+        => Task.CompletedTask;
 }

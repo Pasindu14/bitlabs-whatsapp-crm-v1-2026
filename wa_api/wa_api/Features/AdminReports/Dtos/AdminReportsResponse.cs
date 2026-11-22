@@ -67,7 +67,10 @@ public record DashboardResponse(
 
 // ── Usage analytics (per company, per date range) ─────────────────────────────
 
-/// <summary>Message volume for one company over the selected range.</summary>
+/// <summary>
+/// Message volume and what it cost us (plan 013) for one company over the selected range. Costs are USD
+/// as stored; the AED figures are converted with <c>Billing:UsdToAed</c> for display next to plan prices.
+/// </summary>
 public record CompanyUsageRow(
     Guid CompanyId,
     string CompanyName,
@@ -75,13 +78,45 @@ public record CompanyUsageRow(
     int Delivered,
     int Read,
     int Failed,
-    int Billable
+    int Billable,
+    UsageCost? Cost = null
 );
+
+/// <summary>What one company cost us over the range, and how that compares to what it pays.</summary>
+public record UsageCost(
+    /// <summary>All Anthropic spend, previews included — the bill is the bill.</summary>
+    decimal AiCostUsd,
+    IReadOnlyList<AiCostByKind> AiByKind,
+    /// <summary>Calls whose model had no configured price. Non-zero means AiCostUsd is understated.</summary>
+    int UnpricedAiCalls,
+    /// <summary>Cached-prefix reads ÷ (reads + writes). Low means the 5-minute cache keeps expiring.</summary>
+    double? CacheHitRate,
+    decimal MetaCostUsd,
+    /// <summary>Billable messages Meta has not reported a price for yet (or sent before pricing was tracked).</summary>
+    int UnpricedMetaMessages,
+    decimal TotalCostUsd,
+    decimal TotalCostAed,
+    /// <summary>Total cost ÷ sent messages. Null when nothing was sent.</summary>
+    decimal? CostPerMessageAed,
+    string? PlanName,
+    /// <summary>The active plan's monthly price, pro-rated to the range length (days ÷ 30). AED only.</summary>
+    decimal? PlanPriceForRangeAed,
+    /// <summary>PlanPriceForRangeAed − TotalCostAed.</summary>
+    decimal? MarginAed,
+    /// <summary>TotalCostAed ÷ PlanPriceForRangeAed. Above 0.5 is flagged in the UI.</summary>
+    double? CostShareOfPlan
+);
+
+public record AiCostByKind(string Kind, int Calls, decimal CostUsd);
 
 public record UsageReportResponse(
     DateTime From,
     DateTime To,
     int TotalSent,
     int TotalBillable,
-    IReadOnlyList<CompanyUsageRow> Companies
+    IReadOnlyList<CompanyUsageRow> Companies,
+    decimal TotalAiCostUsd = 0,
+    decimal TotalMetaCostUsd = 0,
+    decimal TotalCostAed = 0,
+    decimal UsdToAed = 0
 );

@@ -91,7 +91,8 @@ public sealed class InboundMediaDownloadJob(
                 conv.Id, conv.ContactId, conv.Contact.Name, conv.Contact.Phone,
                 conv.WabaConnectionId, conv.WabaConnection.DisplayPhoneNumber, conv.Status,
                 conv.LastMessageAt, conv.LastMessageBody, conv.LastMessageDirection,
-                conv.UnreadCount, conv.WindowExpiresAt, conv.CreatedAt);
+                conv.UnreadCount, conv.WindowExpiresAt, conv.CreatedAt, conv.BotState, conv.BotResumesAt,
+                conv.BotPausedByUserId != null);
 
             var messageDto = new ConversationMessageResponse(
                 message.Id, message.ConversationId, message.Body, message.Direction, message.Status,

@@ -17,6 +17,9 @@ public enum NotificationType
     CampaignThrottled,
     /// <summary>A campaign finished processing all its recipients (one per campaign, via the unique index).</summary>
     CampaignCompleted,
+    /// <summary>A general notice with no campaign or template behind it — the chatbot handing a customer to a
+    /// person, or a clinic CRM sync problem. Stored as text, so adding it needs no migration.</summary>
+    System,
 }
 
 /// <summary>

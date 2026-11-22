@@ -1,9 +1,11 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Features.Campaigns.Entities;
+using wa_api.Features.Conversations.Realtime;
 using wa_api.Features.Messages;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Webhooks.Payloads;
+using wa_api.Features.Webhooks.Processing;
 using wa_api.Infrastructure.Persistence;
 
 namespace wa_api.Features.Webhooks.Handlers;
@@ -12,8 +14,14 @@ namespace wa_api.Features.Webhooks.Handlers;
 /// PRD 6.4 — applies outbound delivery statuses (sent/delivered/read/failed) to the owning Message.
 /// Forward-only via <see cref="Rank"/>: a lower- or equal-rank status (out-of-order or duplicate callback)
 /// never regresses the row, and a Failed message is never resurrected. Captures error code + pricing.
+/// Each status that actually moves a message is pushed to the inbox once the batch commits.
 /// </summary>
-public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<MessageStatusWebhookHandler> logger)
+public sealed class MessageStatusWebhookHandler(
+    AppDbContext db,
+    IChatNotifier notifier,
+    WebhookPostCommitActions postCommit,
+    IMetaCostCalculator metaCosts,
+    ILogger<MessageStatusWebhookHandler> logger)
     : IWebhookEventHandler
 {
     // Accepted < Sent < Delivered < Read (PRD §5: forward-only StatusRank). Failed is terminal, handled
@@ -64,6 +72,12 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
             {
                 if (p.Billable is { } billable) message.Billable = billable;
                 if (!string.IsNullOrWhiteSpace(p.Category)) message.Category = p.Category;
+
+                // Priced once, the first time Meta tells us whether it billed. Later statuses (delivered,
+                // read) repeat the same pricing block and must not re-price at a rate that has since moved.
+                // recipient_id is the customer's WhatsApp number — the country Meta charges by.
+                if (message.MetaCostUsd is null)
+                    message.MetaCostUsd = metaCosts.CostUsd(s.RecipientId, message.Category, message.Billable);
             }
 
             var statusAt = ParseTimestamp(s.Timestamp);
@@ -88,6 +102,7 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
                 message.ErrorCode = err?.Code?.ToString(CultureInfo.InvariantCulture);
                 message.ErrorMessage = err?.Message ?? err?.Title ?? message.ErrorMessage;
                 message.StatusAt = statusAt;
+                QueueStatusPush(message);
 
                 // Undeliverable recipient (131026): the number isn't on WhatsApp. Stamp the contact invalid
                 // so future sends skip it. This is the only registration signal the Cloud API gives us, and
@@ -129,6 +144,7 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
             message.StatusAt = statusAt;
             if (message.CampaignId.HasValue)
                 campaignMessageUpdates[message.Id] = (incoming, null);
+            QueueStatusPush(message);
         }
 
         // Mirror delivery status advances onto CampaignRecipient rows (PRD §8.5 delivery tracking).
@@ -250,6 +266,20 @@ public sealed class MessageStatusWebhookHandler(AppDbContext db, ILogger<Message
         // delivery status advances past it.
         _ => 0
     };
+    /// <summary>
+    /// Queues the realtime tick update, sent after the batch commits so the inbox's refetch sees it. Values
+    /// are captured now — a later status in the same batch queues its own push. Campaign sends outside a
+    /// conversation have no thread to update, so they are skipped.
+    /// </summary>
+    private void QueueStatusPush(Message message)
+    {
+        if (message.ConversationId is not { } conversationId)
+            return;
+
+        var (companyId, messageId, status, statusAt, error) =
+            (message.CompanyId, message.Id, message.Status, message.StatusAt, message.ErrorMessage);
+        postCommit.Add(ct => notifier.MessageStatusAsync(companyId, conversationId, messageId, status, statusAt, error, ct));
+    }
 
     private static bool TryMap(string? metaStatus, out MessageStatus status)
     {

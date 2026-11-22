@@ -36,6 +36,26 @@ public class TemplatesController(
     }
 
     /// <summary>GET /api/v1/templates/{id} — single template with its full component tree.</summary>
+    [HttpGet("approved")]
+    public async Task<IActionResult> GetApproved(CancellationToken ct, [FromQuery] bool bodyOnly = true)
+    {
+        var result = await service.GetApprovedAsync(bodyOnly, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>
+    /// POST /api/v1/templates/starter-pack — adds the chatbot's reusable follow-up library as drafts.
+    /// <para>Nothing reaches Meta: submitting stays per-client, under their own credentials.</para>
+    /// </summary>
+    [HttpPost("starter-pack")]
+    public async Task<IActionResult> CreateStarterPack(
+        CancellationToken ct, [FromQuery] Guid? wabaConnectionId = null)
+    {
+        var result = await service.CreateStarterPackAsync(wabaConnectionId, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>GET /api/v1/templates/{id} — one template.</summary>
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {

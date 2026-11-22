@@ -60,6 +60,71 @@ public partial class TemplateService(AppDbContext db, IMetaTemplateClient meta, 
         return Map(template, template.WabaConnection?.DisplayPhoneNumber);
     }
 
+    /// <summary>Language the starter library is written in.</summary>
+    private const string StarterLanguage = "en";
+
+    public async Task<IReadOnlyList<TemplateResponse>> GetApprovedAsync(
+        bool bodyOnly = true, CancellationToken ct = default)
+    {
+        // Components is a jsonb value-converted property, so the body-only test runs in memory. The set is
+        // one company's approved templates — small.
+        var rows = await db.Templates.AsNoTracking()
+            .Include(t => t.WabaConnection)
+            .Where(t => t.IsActive && t.Status == TemplateStatus.Approved)
+            .OrderBy(t => t.Name)
+            .ToListAsync(ct);
+
+        return [.. rows
+            .Where(t => !bodyOnly || TemplateSendability.IsBodyOnly(t))
+            .Select(t => Map(t, t.WabaConnection?.DisplayPhoneNumber))];
+    }
+
+    public async Task<IReadOnlyList<TemplateResponse>> CreateStarterPackAsync(
+        Guid? wabaConnectionId = null, CancellationToken ct = default)
+    {
+        var connection = wabaConnectionId is { } id
+            ? await db.WabaConnections.AsNoTracking().FirstOrDefaultAsync(w => w.Id == id && w.IsActive, ct)
+              ?? throw new NotFoundException("WabaConnection", id)
+            : await db.WabaConnections.AsNoTracking().FirstOrDefaultAsync(w => w.IsActive, ct)
+              ?? throw new BusinessRuleException(
+                  "WABA_REQUIRED", "Connect a WhatsApp number before adding templates.");
+
+        // One query rather than one per template: the library is small but this runs on a button press.
+        var existing = await db.Templates
+            .Where(t => t.IsActive)
+            .Select(t => new { t.Name, t.Language })
+            .ToListAsync(ct);
+
+        var created = new List<Template>();
+
+        foreach (var starter in StarterTemplates.All)
+        {
+            if (existing.Any(e => e.Name == starter.Name && e.Language == StarterLanguage)) continue;
+
+            var template = new Template
+            {
+                WabaConnectionId = connection.Id,
+                WabaId = connection.WabaId,
+                Name = starter.Name,
+                Language = StarterLanguage,
+                Category = starter.Category,
+                ParameterFormat = TemplateParameterFormat.Positional,
+                Components = StarterTemplates.CopyComponents(starter.Components),
+                Status = TemplateStatus.Draft,
+                // CompanyId is auto-stamped from tenant context by AuditInterceptor on insert.
+            };
+
+            db.Templates.Add(template);
+            created.Add(template);
+        }
+
+        if (created.Count == 0) return [];
+
+        await db.SaveChangesAsync(ct);
+
+        return [.. created.Select(t => Map(t, connection.DisplayPhoneNumber))];
+    }
+
     public async Task<TemplateResponse> CreateAsync(CreateTemplateRequest request, CancellationToken ct = default)
     {
         var name = request.Name.Trim().ToLowerInvariant();

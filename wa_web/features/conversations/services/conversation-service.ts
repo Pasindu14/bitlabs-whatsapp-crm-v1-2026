@@ -98,6 +98,25 @@ export const ConversationService = {
 
   // "Delete for me": hides the message from our inbox only — it stays on the customer's phone (WhatsApp's
   // Cloud API can't unsend a delivered message).
+  // Takes the thread off the bot, or hands it back. Replying by hand already pauses it — this is
+  // for taking over BEFORE saying anything, and for handing it back afterwards.
+  async setBotState(
+    conversationId: string,
+    paused: boolean,
+    resumeAfterMinutes?: number,
+  ): Promise<Conversation> {
+    return executeService(
+      { context: "ConversationService", method: "setBotState" },
+      async () => {
+        const res = await client.post<ApiSuccessBody<Conversation>>(
+          `/api/v1/conversations/${conversationId}/bot/${paused ? "pause" : "resume"}`,
+          paused ? { resumeAfterMinutes: resumeAfterMinutes ?? null } : {},
+        );
+        return res.data.data;
+      },
+    );
+  },
+
   async deleteMessage(conversationId: string, messageId: string): Promise<void> {
     return executeService(
       { context: "ConversationService", method: "deleteMessage" },

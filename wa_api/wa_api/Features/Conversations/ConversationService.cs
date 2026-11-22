@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Errors;
+using wa_api.Features.Bot;
 using wa_api.Features.Contacts.Entities;
 using wa_api.Features.Conversations.Dtos;
 using wa_api.Features.Conversations.Entities;
@@ -21,10 +23,18 @@ namespace wa_api.Features.Conversations;
 public class ConversationService(
     AppDbContext db,
     IWhatsAppMessageSender sender,
-    IChatNotifier notifier) : IConversationService
+    IChatNotifier notifier,
+    IHttpContextAccessor httpContextAccessor,
+    IBotGate? botGate = null) : IConversationService
 {
     /// <summary>Max preview length stored on the conversation snapshot.</summary>
     private const int PreviewLength = 200;
+
+    /// <summary>
+    /// How long the bot stays out of the way after an agent replies by hand. Long enough to finish a
+    /// conversation, short enough that a thread is not silently orphaned when the agent moves on.
+    /// </summary>
+    private static readonly TimeSpan TakeoverDuration = TimeSpan.FromMinutes(60);
 
     public async Task<(IReadOnlyList<ConversationResponse> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, CancellationToken ct = default)
@@ -52,7 +62,8 @@ public class ConversationService(
                 c.Id, c.ContactId, c.Contact.Name, c.Contact.Phone,
                 c.WabaConnectionId, c.WabaConnection.DisplayPhoneNumber,
                 c.Status, c.LastMessageAt, c.LastMessageBody, c.LastMessageDirection,
-                c.UnreadCount, c.WindowExpiresAt, c.CreatedAt))
+                c.UnreadCount, c.WindowExpiresAt, c.CreatedAt, c.BotState, c.BotResumesAt,
+                c.BotPausedByUserId != null))
             .ToListAsync(ct);
 
         return (items, total);
@@ -66,7 +77,8 @@ public class ConversationService(
                 c.Id, c.ContactId, c.Contact.Name, c.Contact.Phone,
                 c.WabaConnectionId, c.WabaConnection.DisplayPhoneNumber,
                 c.Status, c.LastMessageAt, c.LastMessageBody, c.LastMessageDirection,
-                c.UnreadCount, c.WindowExpiresAt, c.CreatedAt))
+                c.UnreadCount, c.WindowExpiresAt, c.CreatedAt, c.BotState, c.BotResumesAt,
+                c.BotPausedByUserId != null))
             .FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException("Conversation", id);
 
@@ -127,10 +139,80 @@ public class ConversationService(
                 "The 24-hour customer service window has closed. You can reply again after the customer "
                 + "messages you (or by sending an approved template).");
 
+        // An agent typing IS the takeover. Pausing here rather than rejecting the send (the stricter
+        // design in plan 005 D2) keeps the composer working exactly as it does today while closing the
+        // real hazard: an AI running a multi-turn conversation talking over the person who just stepped
+        // in. The bot comes back on its own after an hour, or the agent hands it back sooner.
+        //
+        // Only when there is a bot to pause: for a company without the chatbot this would stamp every
+        // thread an agent replies on as "paused", then have the auto-resume job undo it an hour later.
+        if (conversation.BotState == ConversationBotState.Active
+            && (botGate is null || await botGate.IsLiveAsync(conversation.CompanyId, ct)))
+        {
+            conversation.BotState = ConversationBotState.Paused;
+            conversation.BotPausedAt = DateTime.UtcNow;
+            conversation.BotPausedByUserId = CurrentUserId();
+            conversation.BotResumesAt = DateTime.UtcNow + TakeoverDuration;
+        }
+
         var message = await SendInThreadAsync(
             conversation, conversation.Contact, conversation.WabaConnection, body, ct);
 
         return MapMessage(message);
+    }
+
+    public async Task<ConversationResponse> SetBotStateAsync(
+        Guid conversationId, bool paused, int? resumeAfterMinutes, CancellationToken ct = default)
+    {
+        var conversation = await db.Conversations
+            .Include(c => c.Contact)
+            .Include(c => c.WabaConnection)
+            .FirstOrDefaultAsync(c => c.Id == conversationId, ct)
+            ?? throw new NotFoundException("Conversation", conversationId);
+
+        if (paused)
+        {
+            conversation.BotState = ConversationBotState.Paused;
+            conversation.BotPausedAt = DateTime.UtcNow;
+            conversation.BotPausedByUserId = CurrentUserId();
+            // No duration means the agent owns this thread until they say otherwise.
+            conversation.BotResumesAt = resumeAfterMinutes is > 0
+                ? DateTime.UtcNow.AddMinutes(resumeAfterMinutes.Value)
+                : null;
+        }
+        else
+        {
+            conversation.BotState = ConversationBotState.Active;
+            conversation.BotPausedAt = null;
+            conversation.BotPausedByUserId = null;
+            conversation.BotResumesAt = null;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var response = MapConversation(conversation, conversation.Contact, conversation.WabaConnection);
+
+        // Push it so a second agent's open inbox sees the handover rather than typing over the first.
+        try
+        {
+            await notifier.BotStateChangedAsync(conversation.CompanyId, response, ct);
+        }
+        catch (Exception)
+        {
+            // Realtime is a convenience; the state is already committed.
+        }
+
+        return response;
+    }
+
+    /// <summary>
+    /// The acting agent, for the audit trail on a takeover. Null outside a request (and harmless there —
+    /// the bot pausing itself has no user to record).
+    /// </summary>
+    private Guid? CurrentUserId()
+    {
+        var raw = httpContextAccessor.HttpContext?.User?.FindFirstValue("sub");
+        return Guid.TryParse(raw, out var id) ? id : null;
     }
 
     public async Task MarkReadAsync(Guid conversationId, CancellationToken ct = default)
@@ -318,7 +400,8 @@ public class ConversationService(
         c.Id, c.ContactId, contact.Name, contact.Phone,
         c.WabaConnectionId, waba.DisplayPhoneNumber,
         c.Status, c.LastMessageAt, c.LastMessageBody, c.LastMessageDirection,
-        c.UnreadCount, c.WindowExpiresAt, c.CreatedAt);
+        c.UnreadCount, c.WindowExpiresAt, c.CreatedAt, c.BotState, c.BotResumesAt,
+        c.BotPausedByUserId != null);
 
     private static ConversationMessageResponse MapMessage(Message m) => new(
         m.Id, m.ConversationId, m.Body, m.Direction, m.Status,

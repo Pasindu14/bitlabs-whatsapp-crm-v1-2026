@@ -6,7 +6,9 @@ export type NotificationType =
   | "CampaignFailed"
   | "TemplateApproved"
   | "CampaignThrottled"
-  | "CampaignCompleted";
+  | "CampaignCompleted"
+  // A chatbot handoff ("a customer needs a person") or a clinic CRM sync problem.
+  | "System";
 
 export interface Notification {
   id: string;

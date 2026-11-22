@@ -113,6 +113,29 @@ public class ConversationsController(IConversationService service, IIdempotencyS
     }
 
     /// <summary>
+    /// POST /api/v1/conversations/{id}/bot/pause — take the thread off the bot.
+    /// <para>
+    /// Replying by hand pauses it automatically, so this is for taking over BEFORE saying anything, or
+    /// for parking a thread indefinitely (omit <c>resumeAfterMinutes</c>).
+    /// </para>
+    /// </summary>
+    [HttpPost("{id:guid}/bot/pause")]
+    public async Task<IActionResult> PauseBot(
+        Guid id, [FromBody] PauseBotRequest? request, CancellationToken ct)
+    {
+        var result = await service.SetBotStateAsync(id, paused: true, request?.ResumeAfterMinutes, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>POST /api/v1/conversations/{id}/bot/resume — hand the thread back to the bot.</summary>
+    [HttpPost("{id:guid}/bot/resume")]
+    public async Task<IActionResult> ResumeBot(Guid id, CancellationToken ct)
+    {
+        var result = await service.SetBotStateAsync(id, paused: false, null, ct);
+        return Ok(ResponseHelper.Ok(result, CorrelationId));
+    }
+
+    /// <summary>
     /// DELETE /api/v1/conversations/{id}/messages/{messageId} — "delete for me": hides the message from
     /// this company's inbox + history. It does NOT unsend it on the customer's phone (WhatsApp's Cloud API
     /// has no revoke). Idempotent; 404 when the message isn't in the conversation.

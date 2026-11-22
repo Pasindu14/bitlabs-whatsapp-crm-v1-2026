@@ -20,5 +20,14 @@ public record ConversationResponse(
     MessageDirection LastMessageDirection,
     int UnreadCount,
     DateTime? WindowExpiresAt,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    /// <summary>Whether the bot is answering this thread, so the composer can say who has it.</summary>
+    ConversationBotState BotState,
+    /// <summary>When the bot takes the thread back on its own. Null means manual hand-back only.</summary>
+    DateTime? BotResumesAt,
+    /// <summary>
+    /// True when a person paused the bot here, false when the bot handed the thread over itself (or it is
+    /// not paused). Lets the inbox say "the bot passed this to the team" instead of "you're handling it".
+    /// </summary>
+    bool BotPausedByAgent = false
 );

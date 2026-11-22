@@ -14,6 +14,16 @@ export const getTemplatesAction = createAction(
   async (params: TemplateListParams) => TemplateService.getPaginated(params)
 );
 
+export const getApprovedTemplatesAction = createAction(
+  { name: "getApprovedTemplatesAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async () => TemplateService.getApproved()
+);
+
+export const createStarterPackAction = createAction(
+  { name: "createStarterPackAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
+  async () => TemplateService.createStarterPack()
+);
+
 export const getTemplateByIdAction = createAction(
   { name: "getTemplateByIdAction", requireAuth: true, requiredRole: COMPANY_ADMIN },
   async (id: string) => TemplateService.getById(id)

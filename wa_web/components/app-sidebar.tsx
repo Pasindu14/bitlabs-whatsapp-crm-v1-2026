@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { CompanyLogo } from "@/components/company-logo";
+import { useBotAccess } from "@/features/bot/hooks/use-bot-access";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +24,8 @@ type NavSubItem = {
   title: string;
   url: string;
   roles?: string[];
+  /** Only shown when the company's plan includes this feature (plan 005). */
+  feature?: "chatbot" | "calendar";
 };
 
 type NavGroup = {
@@ -75,6 +78,8 @@ const navConfig: NavGroup[] = [
     items: [
       { title: "Inbox", url: "/inbox" },
       { title: "Campaigns", url: "/campaigns" },
+      { title: "Chatbot", url: "/bot", roles: ["CompanyAdmin"], feature: "chatbot" },
+      { title: "Calendar", url: "/calendar", roles: ["CompanyAdmin"], feature: "calendar" },
       { title: "Templates", url: "/templates" },
       { title: "Contacts", url: "/contacts" },
       { title: "Contact Lists", url: "/contact-lists" },
@@ -107,6 +112,7 @@ const navConfig: NavGroup[] = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
   const userRole = session?.user?.role ?? "";
+  const botAccess = useBotAccess();
 
   const filteredNav = navConfig
     .filter((group) => !group.roles || group.roles.includes(userRole))
@@ -116,7 +122,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: group.icon,
       isActive: group.isActive,
       items: group.items.filter(
-        (item) => !item.roles || item.roles.includes(userRole),
+        (item) =>
+          (!item.roles || item.roles.includes(userRole)) &&
+          (!item.feature || botAccess[item.feature]),
       ),
     }));
 
