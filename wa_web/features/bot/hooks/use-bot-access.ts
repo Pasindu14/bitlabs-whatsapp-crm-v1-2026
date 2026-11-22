@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { queryKeys } from "@/lib/hooks/query-keys";
 import { getBotAccessAction } from "@/features/bot/actions/bot-access-actions";
-import { NO_BOT_ACCESS, type BotAccess } from "@/features/bot/services/bot-access-service";
+import { NO_BOT_ACCESS, type BotAccess } from "@/features/bot/access";
 
 /**
  * Whether this company's plan includes the chatbot and the calendar.
