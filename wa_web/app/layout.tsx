@@ -1,7 +1,7 @@
 import { Providers } from "@/providers";
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter, Manrope } from "next/font/google";
+import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import NextTopLoader from "nextjs-toploader";
 
@@ -10,9 +10,8 @@ export const metadata: Metadata = {
   description: "Growchat",
 };
 
-// Inter for the interface, Manrope for headings.
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
-const manrope = Manrope({ subsets: ['latin'], variable: '--font-heading', display: 'swap' });
+// Font comes from the shadcn preset (Inter for everything, headings included).
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 export default function RootLayout({
   children,
@@ -20,9 +19,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable, manrope.variable)}>
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
       <body className={`${inter.className} antialiased`}>
-        <NextTopLoader color="#0e7e4e" showSpinner={false} height={2} />
+        <NextTopLoader color="var(--primary)" showSpinner={false} height={2} />
         <Providers>{children}</Providers>
       </body>
     </html>

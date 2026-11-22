@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-heading);
+  --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,97 +39,82 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  /* One corner size for controls, cards and panels (8px), as in the reference dashboard. */
-  --radius-sm: calc(var(--radius) * 0.75);
-  --radius-md: var(--radius);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
-  --radius-2xl: calc(var(--radius) * 1.5);
-  --radius-3xl: calc(var(--radius) * 2);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-
-  /* Flat surfaces: separation comes from hairline borders, not drop shadows. Floating layers
-     (menus, dialogs, popovers) keep the larger shadows so they still read as lifted. */
-  /* The default "small" text step is 13px rather than Tailwind's 14px, so every component that uses
-     text-sm (labels, inputs, table cells, menus, dialogs) lands on the reference size at once. */
-  --text-sm: 0.8125rem;
-  --text-sm--line-height: 1.25rem;
-
-  --shadow-2xs: 0 0 #0000;
-  --shadow-xs: 0 0 #0000;
-  --shadow-sm: 0 0 #0000;
 }
 
 :root {
-  /* Light theme. Neutral, near-white canvas; pure-white raised surfaces; near-black text; borders are
-     black at low opacity so they stay hairline on any surface; one green for primary actions. */
-  --background: #fdfdfd;
-  --foreground: #030303;
-  --card: #ffffff;
-  --card-foreground: #030303;
-  --popover: #ffffff;
-  --popover-foreground: #030303;
-  --primary: #0e7e4e;
-  --primary-foreground: #fafcfb;
-  --secondary: #f4f4f4;
-  --secondary-foreground: #030303;
-  --muted: #f5f5f5;
-  --muted-foreground: #696969;
-  --accent: #f3f3f3;
-  --accent-foreground: #030303;
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.153 0.006 107.1);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.153 0.006 107.1);
+  --primary: oklch(0.527 0.154 150.069);
+  --primary-foreground: oklch(0.982 0.018 155.826);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.966 0.005 106.5);
+  --muted-foreground: oklch(0.58 0.031 107.3);
+  --accent: oklch(0.966 0.005 106.5);
+  --accent-foreground: oklch(0.228 0.013 107.4);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: rgb(0 0 0 / 0.08);
-  --input: rgb(0 0 0 / 0.15);
-  --ring: #9a9a9a;
-  --chart-1: #3ecf8e;
-  --chart-2: #0e7e4e;
-  --chart-3: #696969;
-  --chart-4: #a3a3a3;
-  --chart-5: #d4d4d4;
-  --radius: 0.5rem;
-  --sidebar: #fdfdfd;
-  --sidebar-foreground: #464646;
-  --sidebar-primary: #0e7e4e;
-  --sidebar-primary-foreground: #fafcfb;
-  --sidebar-accent: #f3f3f3;
-  --sidebar-accent-foreground: #030303;
-  --sidebar-border: rgb(0 0 0 / 0.08);
-  --sidebar-ring: #9a9a9a;
+  --border: oklch(0.93 0.007 106.5);
+  --input: oklch(0.93 0.007 106.5);
+  --ring: oklch(0.737 0.021 106.9);
+  --chart-1: oklch(0.88 0.011 106.6);
+  --chart-2: oklch(0.58 0.031 107.3);
+  --chart-3: oklch(0.466 0.025 107.3);
+  --chart-4: oklch(0.394 0.023 107.4);
+  --chart-5: oklch(0.286 0.016 107.4);
+  --radius: 0.45rem;
+  --sidebar: oklch(0.988 0.003 106.5);
+  --sidebar-foreground: oklch(0.153 0.006 107.1);
+  --sidebar-primary: oklch(0.627 0.194 149.214);
+  --sidebar-primary-foreground: oklch(0.982 0.018 155.826);
+  --sidebar-accent: oklch(0.966 0.005 106.5);
+  --sidebar-accent-foreground: oklch(0.228 0.013 107.4);
+  --sidebar-border: oklch(0.93 0.007 106.5);
+  --sidebar-ring: oklch(0.737 0.021 106.9);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.153 0.006 107.1);
 }
 
 .dark {
-  /* Dark theme, same system: charcoal canvas, slightly lighter surfaces, white-alpha hairlines. */
-  --background: #171717;
-  --foreground: #fafafa;
-  --card: #1f1f1f;
-  --card-foreground: #fafafa;
-  --popover: #1f1f1f;
-  --popover-foreground: #fafafa;
-  --primary: #006239;
-  --primary-foreground: #fafafa;
-  --secondary: #262626;
-  --secondary-foreground: #fafafa;
-  --muted: #242424;
-  --muted-foreground: #898989;
-  --accent: #2a2a2a;
-  --accent-foreground: #fafafa;
+  --background: oklch(0.153 0.006 107.1);
+  --foreground: oklch(0.988 0.003 106.5);
+  --card: oklch(0.228 0.013 107.4);
+  --card-foreground: oklch(0.988 0.003 106.5);
+  --popover: oklch(0.228 0.013 107.4);
+  --popover-foreground: oklch(0.988 0.003 106.5);
+  --primary: oklch(0.448 0.119 151.328);
+  --primary-foreground: oklch(0.982 0.018 155.826);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.286 0.016 107.4);
+  --muted-foreground: oklch(0.737 0.021 106.9);
+  --accent: oklch(0.286 0.016 107.4);
+  --accent-foreground: oklch(0.988 0.003 106.5);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: rgb(255 255 255 / 0.1);
-  --input: rgb(255 255 255 / 0.16);
-  --ring: #6b6b6b;
-  --chart-1: #3ecf8e;
-  --chart-2: #00a36a;
-  --chart-3: #b4b4b4;
-  --chart-4: #898989;
-  --chart-5: #4d4d4d;
-  --sidebar: #171717;
-  --sidebar-foreground: #b4b4b4;
-  --sidebar-primary: #3ecf8e;
-  --sidebar-primary-foreground: #0f0f0f;
-  --sidebar-accent: #262626;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: rgb(255 255 255 / 0.1);
-  --sidebar-ring: #6b6b6b;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.58 0.031 107.3);
+  --chart-1: oklch(0.88 0.011 106.6);
+  --chart-2: oklch(0.58 0.031 107.3);
+  --chart-3: oklch(0.466 0.025 107.3);
+  --chart-4: oklch(0.394 0.023 107.4);
+  --chart-5: oklch(0.286 0.016 107.4);
+  --sidebar: oklch(0.228 0.013 107.4);
+  --sidebar-foreground: oklch(0.988 0.003 106.5);
+  --sidebar-primary: oklch(0.723 0.219 149.579);
+  --sidebar-primary-foreground: oklch(0.982 0.018 155.826);
+  --sidebar-accent: oklch(0.286 0.016 107.4);
+  --sidebar-accent-foreground: oklch(0.988 0.003 106.5);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.58 0.031 107.3);
 }
 
 @layer base {
@@ -138,47 +123,21 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Inter at a slightly heavier-than-regular weight reads crisper at small UI sizes. */
-    font-weight: 450;
-    font-feature-settings: "cv11", "ss01";
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
   }
   html {
     @apply font-sans;
   }
-  /* Headings use the display face with tight tracking; body copy stays in Inter. */
-  h1,
-  h2,
-  h3 {
-    font-family: var(--font-heading), var(--font-sans), system-ui, sans-serif;
-    letter-spacing: -0.025em;
-  }
-  /* Section headings default to 18px semibold; any utility class on the element still wins. */
-  h2 {
-    font-size: 1.125rem;
-    line-height: 1.4;
-    font-weight: 600;
-  }
-  /* Numbers in tables and stats line up column to column. */
-  table,
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
-  }
-  ::selection {
-    background-color: color-mix(in oklab, var(--primary) 18%, transparent);
-  }
 }
 
 @layer components {
-  /* The title block at the top of every screen: a plain heading on the canvas with a hairline under it. */
+  /* The title block at the top of every screen, styled once here from the theme tokens. */
   .page-header {
-    @apply border-b pb-5;
+    @apply rounded-xl border bg-muted/40 px-6 py-6;
   }
   .page-header h1 {
-    @apply text-[22px] leading-7 font-semibold;
+    @apply text-2xl font-semibold tracking-tight;
   }
   .page-header p {
-    @apply mt-1 max-w-3xl text-[15px] leading-[1.5] text-muted-foreground;
+    @apply mt-1 text-sm text-muted-foreground;
   }
 }
