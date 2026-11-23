@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using wa_api.Features.Templates.Entities;
+using wa_api.Features.Templates;
 using Microsoft.EntityFrameworkCore;
 using wa_api.Common.Errors;
 using wa_api.Features.Bot;
@@ -304,7 +306,8 @@ public class ConversationService(
     }
 
     public async Task<ConversationResponse> StartConversationAsync(
-        Guid contactId, Guid wabaConnectionId, string body, CancellationToken ct = default)
+        Guid contactId, Guid wabaConnectionId, string? body,
+        Guid? templateId = null, IReadOnlyList<string>? templateVariables = null, CancellationToken ct = default)
     {
         var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == contactId, ct)
             ?? throw new NotFoundException("Contact", contactId);
@@ -316,12 +319,63 @@ public class ConversationService(
             throw new BusinessRuleException("WABA_INACTIVE",
                 "The selected WhatsApp connection is inactive.");
 
+        if (templateId is null && string.IsNullOrWhiteSpace(body))
+            throw new BusinessRuleException("MESSAGE_REQUIRED", "Write a message or choose a template to send.");
+
+        // Free text only reaches a customer inside their 24-hour window; outside it Meta refuses it (131047)
+        // after we have already opened a thread and spent a send. Refuse it here instead, with the fix.
+        if (templateId is null)
+        {
+            var existing = await db.Conversations.FirstOrDefaultAsync(
+                c => c.ContactId == contact.Id && c.WabaConnectionId == waba.Id && c.Status == ConversationStatus.Open, ct);
+            if (existing?.WindowExpiresAt is not { } until || until <= DateTime.UtcNow)
+                throw new BusinessRuleException("WINDOW_CLOSED",
+                    $"{(string.IsNullOrWhiteSpace(contact.Name) ? "This customer" : contact.Name)} hasn't messaged "
+                    + "this number in the last 24 hours, so WhatsApp only allows an approved template. "
+                    + "Choose a template to start the chat.");
+        }
+
+        // Validate the template before a thread is opened, so a bad pick leaves nothing behind.
+        Template? template = null;
+        TemplateFillResult? fill = null;
+        if (templateId is { } tid)
+        {
+            template = await db.Templates.FirstOrDefaultAsync(t => t.Id == tid, ct)
+                ?? throw new NotFoundException("Template", tid);
+
+            if (template.Status != TemplateStatus.Approved)
+                throw new BusinessRuleException("TEMPLATE_NOT_APPROVED",
+                    "Only templates Meta has approved can be sent. This one is " + template.Status.ToString().ToLowerInvariant() + ".");
+
+            if (template.WabaConnectionId != waba.Id)
+                throw new BusinessRuleException("TEMPLATE_WRONG_NUMBER",
+                    $"This template belongs to a different WhatsApp number. Choose one made for {waba.DisplayPhoneNumber}.");
+
+            if (!TemplateSendability.IsBodyOnly(template))
+                throw new BusinessRuleException("TEMPLATE_NEEDS_CAMPAIGN",
+                    "This template has an image, a header value or a button link to fill in. Send it from Campaigns instead.");
+
+            var values = templateVariables ?? [];
+            fill = TemplateFill.Build(template, values.ElementAtOrDefault(0), values.Skip(1).ToList());
+            if (!fill.CanSend)
+                throw new BusinessRuleException("TEMPLATE_VALUES_INVALID",
+                    $"Fill in every value in the template ({fill.Problem}). Each value must be under {TemplateFill.MaxParameterLength} characters.");
+        }
+
         var conversation = await FindOrCreateOpenAsync(contact, waba, ct);
 
-        // Don't throw on a Meta rejection (e.g. a closed 24h window for a cold contact): the thread should
-        // still open so the agent sees their failed message + the window state. The Message row records the
-        // failure; the snapshot + realtime push happen inside SendInThreadAsync regardless.
-        await SendInThreadAsync(conversation, contact, waba, body, ct, throwOnFailure: false);
+        if (template is not null && fill is not null)
+        {
+            // Same rule as the reply path: a rejection is recorded on the message and shown in the thread,
+            // not thrown, so the agent sees what happened where they are looking.
+            var sent = await sender.SendTemplateAsync(
+                contact, waba, template.Name, template.Language, fill.Parameters, fill.RenderedBody, conversation.Id, ct);
+            await RecordOutboundAsync(conversation, contact, waba, sent, fill.RenderedBody, ct);
+        }
+        else
+        {
+            await SendInThreadAsync(conversation, contact, waba, body!, ct, throwOnFailure: false);
+        }
 
         return MapConversation(conversation, contact, waba);
     }
@@ -343,19 +397,30 @@ public class ConversationService(
 
         var message = await sender.SendAsync(contact, waba, body, conversation.Id, chargeCredit, ct);
 
-        conversation.LastMessageAt = message.CreatedAt;
-        conversation.LastMessageBody = Truncate(body);
-        conversation.LastMessageDirection = MessageDirection.Outbound;
-        await db.SaveChangesAsync(ct);
-
-        await notifier.MessageAsync(
-            conversation.CompanyId, MapConversation(conversation, contact, waba), MapMessage(message), ct);
+        await RecordOutboundAsync(conversation, contact, waba, message, body, ct);
 
         if (throwOnFailure && message.Status == MessageStatus.Failed)
             throw new BusinessRuleException("WHATSAPP_SEND_FAILED",
                 message.ErrorMessage ?? "Failed to send message via WhatsApp.");
 
         return message;
+    }
+
+    /// <summary>
+    /// After any outbound send: refresh the thread snapshot (outbound never touches the window or the unread
+    /// count) and push the realtime event so every open inbox shows it.
+    /// </summary>
+    private async Task RecordOutboundAsync(
+        Conversation conversation, Contact contact, WabaConnection waba, Message message, string preview,
+        CancellationToken ct)
+    {
+        conversation.LastMessageAt = message.CreatedAt;
+        conversation.LastMessageBody = Truncate(preview);
+        conversation.LastMessageDirection = MessageDirection.Outbound;
+        await db.SaveChangesAsync(ct);
+
+        await notifier.MessageAsync(
+            conversation.CompanyId, MapConversation(conversation, contact, waba), MapMessage(message), ct);
     }
 
     /// <summary>

@@ -39,10 +39,13 @@ public interface IConversationService
         Guid contactId, Guid wabaConnectionId, string body, CancellationToken ct = default);
 
     /// <summary>Starts (or reuses) a contact's open conversation and sends the first message, returning the
-    /// conversation so the client can open the thread. A closed-window send failure is recorded on the
-    /// message (and visible in the thread), not thrown.</summary>
+    /// conversation so the client can open the thread. Sends <paramref name="templateId"/> (an approved,
+    /// body-only template filled with <paramref name="templateVariables"/>) when given, otherwise
+    /// <paramref name="body"/> as free text — which WhatsApp only accepts inside the 24-hour window, so free
+    /// text to a contact outside it is refused with <c>WINDOW_CLOSED</c> before anything is sent.</summary>
     Task<ConversationResponse> StartConversationAsync(
-        Guid contactId, Guid wabaConnectionId, string body, CancellationToken ct = default);
+        Guid contactId, Guid wabaConnectionId, string? body,
+        Guid? templateId = null, IReadOnlyList<string>? templateVariables = null, CancellationToken ct = default);
 
     /// <summary>
     /// Takes the thread away from the bot, or hands it back. Pausing with no duration means the agent

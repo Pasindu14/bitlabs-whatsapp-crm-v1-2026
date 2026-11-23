@@ -183,13 +183,10 @@ public class FreeWindowBillingTests
         Assert.Equal([false], sender.ChargeCredits);
     }
 
-    // Business-initiated: a cold contact has no window, so the send is presented to the meter as charged.
-    // In production Meta then rejects free-form text outside a window (131047) and WhatsAppMessageSender
-    // refunds the reservation — so the real-world cost is 0 and template campaigns are effectively the only
-    // thing that consumes credits. What's pinned here is the DECISION, which is what would silently flip if
-    // someone keyed the rule off the wrong field.
+    // Free text to a cold contact used to be sent and then refused by Meta (131047). It is now refused
+    // up front with the fix in the message, so no thread is opened and no credit is ever reserved.
     [Fact]
-    public async Task StartConversation_WithColdContact_IsPresentedAsCharged()
+    public async Task StartConversation_FreeTextToColdContact_IsRefusedBeforeAnySend()
     {
         var companyId = Guid.NewGuid();
         await using var db = NewDb(companyId);
@@ -201,9 +198,12 @@ public class FreeWindowBillingTests
         var sender = new SpySender(db);
         var svc = new ConversationService(db, sender, new NoopNotifier(), new HttpContextAccessor());
 
-        await svc.StartConversationAsync(contact.Id, waba.Id, "hello there");
+        var ex = await Assert.ThrowsAsync<wa_api.Common.Errors.BusinessRuleException>(
+            () => svc.StartConversationAsync(contact.Id, waba.Id, "hello there"));
 
-        Assert.Equal([true], sender.ChargeCredits);
+        Assert.Equal("WINDOW_CLOSED", ex.ErrorCode);
+        Assert.Empty(sender.ChargeCredits);
+        Assert.Empty(db.Conversations.IgnoreQueryFilters());
     }
 
     [Fact] // Reusing a thread whose window is live is a reply, not outreach — bill it as one.

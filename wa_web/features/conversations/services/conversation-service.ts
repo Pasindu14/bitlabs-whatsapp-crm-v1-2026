@@ -73,14 +73,22 @@ export const ConversationService = {
     );
   },
 
-  async start(input: { contactId: string; wabaConnectionId: string; body: string }): Promise<Conversation> {
+  async start(input: {
+    contactId: string;
+    wabaConnectionId: string;
+    body?: string;
+    templateId?: string;
+    templateVariables?: string[];
+  }): Promise<Conversation> {
     return executeService(
       { context: "ConversationService", method: "start" },
       async () => {
         const res = await client.post<ApiSuccessBody<Conversation>>("/api/v1/conversations", {
           contactId: input.contactId,
           wabaConnectionId: input.wabaConnectionId,
-          body: input.body,
+          body: input.templateId ? undefined : input.body,
+          templateId: input.templateId || undefined,
+          templateVariables: input.templateId ? (input.templateVariables ?? []) : undefined,
         });
         return res.data.data;
       },

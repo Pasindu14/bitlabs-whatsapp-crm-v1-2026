@@ -63,7 +63,8 @@ public class ConversationsController(IConversationService service, IIdempotencyS
     [RequireActiveSubscription(SkipQuotaCheck = true)]
     public async Task<IActionResult> Start(StartConversationRequest request, CancellationToken ct)
     {
-        var result = await service.StartConversationAsync(request.ContactId, request.WabaConnectionId, request.Body, ct);
+        var result = await service.StartConversationAsync(
+            request.ContactId, request.WabaConnectionId, request.Body, request.TemplateId, request.TemplateVariables, ct);
         return StatusCode(StatusCodes.Status201Created, ResponseHelper.Created(result, CorrelationId));
     }
 
