@@ -30,6 +30,12 @@ public class ClinicCrmConnection : BaseEntity, ITenantEntity
     /// <summary>Off = behave as if there were no connection, without losing the credentials.</summary>
     public bool IsEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Tell the CRM (POST /messages) each time a customer sends a real message, so the clinic's staff see the
+    /// chat is live. Off by default; only counts while <see cref="IsEnabled"/> is on.
+    /// </summary>
+    public bool NotifyOnMessages { get; set; }
+
     /// <summary>When a call to the CRM last succeeded. Shown on the settings screen.</summary>
     public DateTime? LastSuccessAt { get; set; }
 

@@ -14,6 +14,8 @@ export interface ClinicCrmSettings {
   clientId: string | null;
   hasSecret: boolean;
   isEnabled: boolean;
+  /** Tell the CRM (POST /messages) when a customer sends a real message. Only counts while isEnabled. */
+  notifyOnMessages: boolean;
   lastSuccessAt: string | null;
   lastError: string | null;
   lastErrorAt: string | null;

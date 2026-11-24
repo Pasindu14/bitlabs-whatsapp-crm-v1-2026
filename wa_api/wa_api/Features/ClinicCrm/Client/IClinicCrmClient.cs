@@ -39,6 +39,13 @@ public interface IClinicCrmClient
     Task<ClinicCrmResult<JsonElement>> CancelBookingAsync(
         ClinicCrmEndpoint endpoint, int bookingId, ClinicCrmCancelBookingRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// POST /messages — tells the CRM the customer on this number just sent a message. Read as raw JSON like
+    /// the cancel: only success matters.
+    /// </summary>
+    Task<ClinicCrmResult<JsonElement>> NotifyMessageAsync(
+        ClinicCrmEndpoint endpoint, ClinicCrmMessageRequest request, CancellationToken ct = default);
+
     /// <summary>PATCH /bookings/{id}. Moving a booking returns a NEW booking id.</summary>
     Task<ClinicCrmResult<ClinicCrmBookingChange>> UpdateBookingAsync(
         ClinicCrmEndpoint endpoint, int bookingId, ClinicCrmUpdateBookingRequest request, CancellationToken ct = default);

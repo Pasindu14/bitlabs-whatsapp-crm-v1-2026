@@ -52,6 +52,7 @@ public sealed class ClinicCrmSettingsService(
         connection.ClientId = clientId;
         if (!string.IsNullOrEmpty(secret)) connection.ClientSecret = secret;
         connection.IsEnabled = request.IsEnabled;
+        connection.NotifyOnMessages = request.NotifyOnMessages;
 
         // The old health says nothing about new credentials.
         if (credentialsChanged)
@@ -155,10 +156,10 @@ public sealed class ClinicCrmSettingsService(
             .ToListAsync(ct);
 
         return connection is null
-            ? new ClinicCrmSettingsResponse(false, null, null, false, false, null, null, null, services)
+            ? new ClinicCrmSettingsResponse(false, null, null, false, false, false, null, null, null, services)
             : new ClinicCrmSettingsResponse(
                 true, connection.BaseUrl, connection.ClientId, !string.IsNullOrEmpty(connection.ClientSecret),
-                connection.IsEnabled, connection.LastSuccessAt, connection.LastError, connection.LastErrorAt, services);
+                connection.IsEnabled, connection.NotifyOnMessages, connection.LastSuccessAt, connection.LastError, connection.LastErrorAt, services);
     }
 
     private async Task<ClinicCrmTestResponse> RecordAsync(

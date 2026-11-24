@@ -300,4 +300,20 @@ public class ClinicCrmClientTests
         Assert.Equal(new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc),
             ClinicCrmFormat.ToUtc("2026-10-05", "16:00", ClinicCrmTestKit.Dubai));
     }
+
+    [Fact]
+    public async Task NotifyMessage_PostsTheNumberToMessages()
+    {
+        var crm = new FakeCrm()
+            .On("/api/bot/token", HttpStatusCode.OK, TokenReply)
+            .On("/api/bot/messages", HttpStatusCode.OK, """{ "success": true, "data": null }""");
+
+        var result = await Client(crm).NotifyMessageAsync(Endpoint, new ClinicCrmMessageRequest("+971501234567"));
+
+        Assert.True(result.IsOk);
+        var request = Assert.Single(crm.Requests, r => r.Path == "/api/bot/messages");
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.Equal("Bearer tok-1", request.Auth);
+        Assert.Equal("+971501234567", JsonDocument.Parse(request.Body!).RootElement.GetProperty("whatsapp").GetString());
+    }
 }

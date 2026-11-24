@@ -22,5 +22,10 @@ internal sealed class TestBotGate(bool live = true, bool clinic = false) : IBotG
 
     public Task<bool> HasClinicCrmAsync(Guid companyId, CancellationToken ct = default) => Task.FromResult(Clinic);
 
+    public bool ClinicNotify { get; set; }
+
+    public Task<bool> NotifiesClinicCrmOfMessagesAsync(Guid companyId, CancellationToken ct = default) =>
+        Task.FromResult(Clinic && ClinicNotify);
+
     public void Forget(Guid companyId) { }
 }

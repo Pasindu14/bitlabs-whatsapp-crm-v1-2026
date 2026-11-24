@@ -336,6 +336,7 @@ try
     builder.Services.AddScoped<wa_api.Features.ClinicCrm.IClinicCrmSettingsService, wa_api.Features.ClinicCrm.ClinicCrmSettingsService>();
     builder.Services.AddTransient<wa_api.Features.ClinicCrm.Jobs.ClinicCrmSyncJob>();
     builder.Services.AddTransient<wa_api.Features.ClinicCrm.Jobs.ClinicCrmLeadJob>();
+    builder.Services.AddTransient<wa_api.Features.ClinicCrm.Jobs.ClinicCrmMessageJob>();
 
     builder.Services.AddScoped<wa_api.Features.Monitoring.MonitoringService>();
     builder.Services.AddScoped<wa_api.Features.AdminReports.AdminReportsService>();

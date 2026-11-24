@@ -1,3 +1,4 @@
+using System.Text.Json;
 using wa_api.Features.ClinicCrm.Client;
 
 namespace wa_api.Features.ClinicCrm;
@@ -40,6 +41,15 @@ public interface IClinicCrmBookingService
 
     /// <summary>The current company's enabled connection, or null — null means "book on our own calendar".</summary>
     Task<ClinicCrmEndpoint?> GetEndpointAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// The connection, only when it is enabled AND set to hear about inbound messages. Null = do not notify.
+    /// </summary>
+    Task<ClinicCrmEndpoint?> GetMessageNotifyEndpointAsync(CancellationToken ct = default);
+
+    /// <summary>POST /messages for this number. NotFound means the CRM has not saved the customer yet.</summary>
+    Task<ClinicCrmResult<JsonElement>> NotifyMessageAsync(
+        ClinicCrmEndpoint endpoint, string phone, CancellationToken ct = default);
 
     /// <summary>
     /// The handover note for a booking — concern, discussed, recommended — or null. Never throws: a booking

@@ -54,6 +54,10 @@ public sealed class ClinicCrmClient(
         ClinicCrmEndpoint endpoint, int bookingId, ClinicCrmCancelBookingRequest request, CancellationToken ct = default) =>
         SendAsync<JsonElement>(endpoint, HttpMethod.Post, $"bookings/{bookingId}/cancel", request, ct);
 
+    public Task<ClinicCrmResult<JsonElement>> NotifyMessageAsync(
+        ClinicCrmEndpoint endpoint, ClinicCrmMessageRequest request, CancellationToken ct = default) =>
+        SendAsync<JsonElement>(endpoint, HttpMethod.Post, "messages", request, ct);
+
     public Task<ClinicCrmResult<ClinicCrmBookingChange>> UpdateBookingAsync(
         ClinicCrmEndpoint endpoint, int bookingId, ClinicCrmUpdateBookingRequest request, CancellationToken ct = default) =>
         SendAsync<ClinicCrmBookingChange>(endpoint, HttpMethod.Patch, $"bookings/{bookingId}", request, ct);

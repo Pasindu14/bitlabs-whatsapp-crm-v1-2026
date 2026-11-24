@@ -1101,6 +1101,9 @@ namespace wa_api.Migrations
                     b.Property<DateTime?>("LastSuccessAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("NotifyOnMessages")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 

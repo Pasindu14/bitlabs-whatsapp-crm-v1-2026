@@ -84,6 +84,9 @@ public sealed record ClinicCrmBookRequest(
 /// </summary>
 public sealed record ClinicCrmCancelBookingRequest(string Whatsapp, string? Note);
 
+/// <summary>Body for POST /messages: the number (with <c>+</c>) that just wrote in.</summary>
+public sealed record ClinicCrmMessageRequest(string Whatsapp);
+
 /// <summary>PATCH body. Null fields are left out of the JSON, so only what changes is sent.</summary>
 public sealed record ClinicCrmUpdateBookingRequest(
     string Whatsapp, string? Date = null, string? StartTime = null,

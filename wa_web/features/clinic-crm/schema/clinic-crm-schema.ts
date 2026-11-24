@@ -22,6 +22,7 @@ export const saveClinicCrmConnectionSchema = z.object({
     .nullable()
     .optional(),
   isEnabled: z.boolean().default(true),
+  notifyOnMessages: z.boolean().default(false),
 });
 
 export type SaveClinicCrmConnectionInput = z.input<typeof saveClinicCrmConnectionSchema>;

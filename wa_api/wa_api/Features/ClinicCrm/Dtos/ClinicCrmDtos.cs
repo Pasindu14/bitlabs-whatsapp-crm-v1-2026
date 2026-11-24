@@ -11,6 +11,7 @@ public record ClinicCrmSettingsResponse(
     string? ClientId,
     bool HasSecret,
     bool IsEnabled,
+    bool NotifyOnMessages,
     DateTime? LastSuccessAt,
     string? LastError,
     DateTime? LastErrorAt,
@@ -33,7 +34,8 @@ public record SaveClinicCrmConnectionRequest(
     [Required][MaxLength(500)] string BaseUrl,
     [Required][MaxLength(200)] string ClientId,
     [MaxLength(2048)] string? ClientSecret,
-    bool IsEnabled = true
+    bool IsEnabled = true,
+    bool NotifyOnMessages = false
 );
 
 /// <summary>A treatment from the clinic's CRM.</summary>

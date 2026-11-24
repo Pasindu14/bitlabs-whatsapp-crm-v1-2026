@@ -31,6 +31,15 @@ public class ClinicCrmBookingServiceTests
         }
         public List<(int BookingId, ClinicCrmUpdateBookingRequest Request)> Updates { get; } = [];
 
+        public List<ClinicCrmMessageRequest> MessageNotifications { get; } = [];
+
+        public Task<ClinicCrmResult<JsonElement>> NotifyMessageAsync(
+            ClinicCrmEndpoint e, ClinicCrmMessageRequest request, CancellationToken ct = default)
+        {
+            MessageNotifications.Add(request);
+            return Task.FromResult(new ClinicCrmResult<JsonElement>(ClinicCrmOutcome.Ok));
+        }
+
         public Task<ClinicCrmResult<ClinicCrmToken>> GetTokenAsync(ClinicCrmEndpoint e, CancellationToken ct = default) =>
             throw new NotSupportedException();
 

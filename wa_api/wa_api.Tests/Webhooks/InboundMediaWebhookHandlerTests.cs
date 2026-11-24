@@ -75,10 +75,14 @@ public class InboundMediaWebhookHandlerTests
         /// <summary>Every job but the clinic-CRM lead save, which is recorded in <see cref="Leads"/>.</summary>
         public List<Job> Created { get; } = [];
         public List<Job> Leads { get; } = [];
+        /// <summary>The clinic-CRM "new message" notifications.</summary>
+        public List<Job> Notifies { get; } = [];
 
         public string Create(Job job, IState state)
         {
-            (job.Type == typeof(ClinicCrmLeadJob) ? Leads : Created).Add(job);
+            (job.Type == typeof(ClinicCrmLeadJob) ? Leads
+                : job.Type == typeof(ClinicCrmMessageJob) ? Notifies
+                : Created).Add(job);
             return Guid.NewGuid().ToString();
         }
 
@@ -443,5 +447,80 @@ public class InboundMediaWebhookHandlerTests
         await db.SaveChangesAsync();
 
         Assert.Equal(typeof(AiReplyJob), Assert.Single(jobs.Created).Type);
+    }
+
+    // ── Clinic CRM "new message" notification ────────────────────────────────────────────────────
+
+    private static wa_api.Tests.Bot.TestBotGate NotifyGate(bool notify = true) =>
+        new(live: true, clinic: true) { ClinicNotify = notify };
+
+    [Fact]
+    public async Task NotifyOn_AMeaningfulMessage_QueuesOneNotification_AtMostOncePerGap()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var clock = new TestClock();
+        var (handler, _, jobs, _) = NewHandler(db, new MemoryCache(new MemoryCacheOptions { Clock = clock }), NotifyGate());
+        await handler.HandleAsync(TextMessage(conn, "wamid-n-1", "971501234567", "Do you have a slot tomorrow?"));
+        await db.SaveChangesAsync();
+
+        var notify = Assert.Single(jobs.Notifies);
+        Assert.Equal(nameof(ClinicCrmMessageJob.NotifyAsync), notify.Method.Name);
+        Assert.Equal(companyId, notify.Args[0]);
+        Assert.Equal("971501234567", notify.Args[1]);
+
+        // Second line of the same question, a minute later: still one notification.
+        clock.UtcNow += TimeSpan.FromMinutes(1);
+        await handler.HandleAsync(TextMessage(conn, "wamid-n-2", "971501234567", "Around 4pm"));
+        await db.SaveChangesAsync();
+        Assert.Single(jobs.Notifies);
+
+        // Past the gap, a new message notifies again.
+        clock.UtcNow += InboundMessageWebhookHandler.ClinicNotifyGap;
+        await handler.HandleAsync(TextMessage(conn, "wamid-n-3", "971501234567", "Is that possible?"));
+        await db.SaveChangesAsync();
+        Assert.Equal(2, jobs.Notifies.Count);
+    }
+
+    [Theory]
+    [InlineData("STOP")]
+    [InlineData("ok 👍")]
+    [InlineData("Thanks!!")]
+    [InlineData("🙏🙏")]
+    public async Task NotifyOn_StopOrAnAcknowledgement_IsNotSentToTheClinic(string body)
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var (handler, _, jobs, _) = NewHandler(db, gate: NotifyGate());
+        await handler.HandleAsync(TextMessage(conn, "wamid-skip-1", "971501234567", body));
+        await db.SaveChangesAsync();
+
+        Assert.Single(await db.Messages.IgnoreQueryFilters().ToListAsync());   // still in the inbox
+        Assert.Empty(jobs.Notifies);
+    }
+
+    [Fact]
+    public async Task NotifyOff_NothingIsSentToTheClinic_EvenForARealQuestion()
+    {
+        var companyId = Guid.NewGuid();
+        await using var db = NewDb();
+        var conn = NewConnection(companyId);
+        db.WabaConnections.Add(conn);
+        await db.SaveChangesAsync();
+
+        var (handler, _, jobs, _) = NewHandler(db, gate: NotifyGate(notify: false));
+        await handler.HandleAsync(TextMessage(conn, "wamid-off-1", "971501234567", "How much is a PRP session?"));
+        await db.SaveChangesAsync();
+
+        Assert.Empty(jobs.Notifies);
+        Assert.Single(jobs.Leads);   // the lead save is unaffected by this switch
     }
 }

@@ -10,6 +10,7 @@ using wa_api.Features.Conversations.Realtime;
 using wa_api.Features.Messages.Entities;
 using wa_api.Features.Bot;
 using wa_api.Features.Bot.Jobs;
+using wa_api.Features.ClinicCrm;
 using wa_api.Features.ClinicCrm.Jobs;
 using wa_api.Features.Messages.InboundMedia;
 using wa_api.Features.WhatsApp.Entities;
@@ -59,6 +60,12 @@ public sealed class InboundMessageWebhookHandler(
     /// </summary>
     public static readonly TimeSpan ClinicSaveGap = TimeSpan.FromMinutes(10);
 
+    /// <summary>
+    /// A number triggers at most one "new message" notification to the clinic's CRM in this long. A customer
+    /// typing a question over three lines is one thing for the clinic to look at, not three.
+    /// </summary>
+    public static readonly TimeSpan ClinicNotifyGap = TimeSpan.FromMinutes(2);
+
     public bool CanHandle(string field, WebhookChange change)
         => field == "messages" && change.Value?.Messages is { Count: > 0 };
 
@@ -84,6 +91,9 @@ public sealed class InboundMessageWebhookHandler(
         // existed. A null gate (unit tests) keeps the "always hand over, the job decides" behaviour.
         var botLive = botGate is null || await botGate.IsLiveAsync(companyId, ct);
         var clinicConnected = botGate is null || await botGate.HasClinicCrmAsync(companyId, ct);
+        // Opt-in (off by default), so a null gate means off — unlike the two checks above.
+        var clinicWantsMessages = botGate is not null && clinicConnected
+            && await botGate.NotifiesClinicCrmOfMessagesAsync(companyId, ct);
 
         // The team's own numbers receive the handoff alert, and a reply to it is a colleague talking, not a
         // customer — the bot must never answer one. Loaded once per batch; the list is a handful of numbers.
@@ -196,6 +206,19 @@ public sealed class InboundMessageWebhookHandler(
 
             QueueNotify(companyId, conversation, contact, connection, message, now);
 
+            // Tell the clinic's CRM a customer wrote — only for real content (not STOP, a reaction, a sticker
+            // or a bare "ok"), never for someone who has opted out or for the team's own numbers, and at most
+            // once per ClinicNotifyGap per number. After commit, like the other jobs; the job re-checks the
+            // switch, so turning it off stops what is already queued.
+            if (clinicWantsMessages && !contact.IsOptedOut && !teamPhones.Contains(phone!)
+                && ClinicCrmMessageRelevance.IsMeaningful(m)
+                && !cache.TryGetValue(ClinicNotifyKey(companyId, phone!), out _))
+            {
+                var name = contact.Name == contact.Phone ? null : contact.Name;
+                jobs.Enqueue<ClinicCrmMessageJob>(j => j.NotifyAsync(companyId, phone!, name, CancellationToken.None));
+                cache.Set(ClinicNotifyKey(companyId, phone!), true, ClinicNotifyGap);
+            }
+
             // Fetch the media bytes AFTER the batch commits — never inside the webhook transaction, which would
             // pin a pooled DB connection across two slow Meta HTTP calls. Hangfire's enqueue is not part of the
             // EF transaction; the job tolerates the enqueue→commit race (retries) and a rolled-back batch
@@ -281,6 +304,8 @@ public sealed class InboundMessageWebhookHandler(
     }
 
     private static string ClinicSaveKey(Guid companyId, string phone) => $"clinic-crm-lead:{companyId}:{phone}";
+
+    private static string ClinicNotifyKey(Guid companyId, string phone) => $"clinic-crm-message:{companyId}:{phone}";
 
     private async Task<Conversation> FindOrCreateOpenAsync(Guid companyId, Guid wabaId, Contact contact, CancellationToken ct)
     {

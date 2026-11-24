@@ -59,6 +59,11 @@ public interface IBotGate
     /// <summary>The company has an active, enabled clinic CRM connection. Cached briefly per company.</summary>
     Task<bool> HasClinicCrmAsync(Guid companyId, CancellationToken ct = default);
 
+    /// <summary>
+    /// The company's enabled clinic CRM connection also wants to hear about inbound messages. Cached briefly.
+    /// </summary>
+    Task<bool> NotifiesClinicCrmOfMessagesAsync(Guid companyId, CancellationToken ct = default);
+
     /// <summary>Drops the cached answers for a company — called when its bot settings change.</summary>
     void Forget(Guid companyId);
 }
@@ -102,10 +107,16 @@ public sealed class BotGate(
             db.ClinicCrmConnections.IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(c => c.CompanyId == companyId && c.IsActive && c.IsEnabled, ct));
 
+    public Task<bool> NotifiesClinicCrmOfMessagesAsync(Guid companyId, CancellationToken ct = default) =>
+        CachedAsync(ClinicNotifyKey(companyId), () =>
+            db.ClinicCrmConnections.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(c => c.CompanyId == companyId && c.IsActive && c.IsEnabled && c.NotifyOnMessages, ct));
+
     public void Forget(Guid companyId)
     {
         cache.Remove(LiveKey(companyId));
         cache.Remove(ClinicKey(companyId));
+        cache.Remove(ClinicNotifyKey(companyId));
     }
 
     private async Task<bool> CachedAsync(string key, Func<Task<bool>> load)
@@ -119,4 +130,5 @@ public sealed class BotGate(
 
     private static string LiveKey(Guid companyId) => $"bot-gate:live:{companyId}";
     private static string ClinicKey(Guid companyId) => $"bot-gate:clinic:{companyId}";
+    private static string ClinicNotifyKey(Guid companyId) => $"bot-gate:clinic-notify:{companyId}";
 }

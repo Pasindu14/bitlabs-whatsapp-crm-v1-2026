@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -40,6 +41,24 @@ public sealed class ClinicCrmBookingService(
             ? null
             : new ClinicCrmEndpoint(connection.Id, connection.BaseUrl, connection.ClientId, connection.ClientSecret);
     }
+
+    public async Task<ClinicCrmEndpoint?> GetMessageNotifyEndpointAsync(CancellationToken ct = default)
+    {
+        var connection = await db.ClinicCrmConnections.AsNoTracking()
+            .Where(c => c.IsActive && c.IsEnabled && c.NotifyOnMessages)
+            .Select(c => new { c.Id, c.BaseUrl, c.ClientId, c.ClientSecret })
+            .FirstOrDefaultAsync(ct);
+
+        return connection is null || string.IsNullOrWhiteSpace(connection.ClientSecret)
+            ? null
+            : new ClinicCrmEndpoint(connection.Id, connection.BaseUrl, connection.ClientId, connection.ClientSecret);
+    }
+
+    public async Task<ClinicCrmResult<JsonElement>> NotifyMessageAsync(
+        ClinicCrmEndpoint endpoint, string phone, CancellationToken ct = default) =>
+        await TrackAsync(endpoint,
+            await client.NotifyMessageAsync(endpoint, new ClinicCrmMessageRequest(ClinicCrmFormat.WhatsApp(phone)), ct),
+            ct);
 
     public async Task<string?> SummarizeConversationAsync(
         Guid companyId, Guid conversationId, string serviceName, CancellationToken ct = default)

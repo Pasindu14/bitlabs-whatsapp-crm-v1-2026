@@ -193,6 +193,25 @@ internal sealed class FakeClinicCrmBookings : IClinicCrmBookingService
 
     public Task<ClinicCrmEndpoint?> GetEndpointAsync(CancellationToken ct = default) => Task.FromResult(Endpoint);
 
+    /// <summary>The endpoint the message notification sees; null = the switch is off.</summary>
+    public ClinicCrmEndpoint? NotifyEndpoint { get; set; }
+
+    /// <summary>Replies to POST /messages, in order; the last one repeats.</summary>
+    public Queue<ClinicCrmOutcome> NotifyReplies { get; } = new();
+    public List<string> MessageNotifications { get; } = [];
+
+    public Task<ClinicCrmEndpoint?> GetMessageNotifyEndpointAsync(CancellationToken ct = default) =>
+        Task.FromResult(NotifyEndpoint);
+
+    public Task<ClinicCrmResult<JsonElement>> NotifyMessageAsync(
+        ClinicCrmEndpoint endpoint, string phone, CancellationToken ct = default)
+    {
+        MessageNotifications.Add(phone);
+        var outcome = NotifyReplies.Count > 1 ? NotifyReplies.Dequeue()
+            : NotifyReplies.Count == 1 ? NotifyReplies.Peek() : ClinicCrmOutcome.Ok;
+        return Task.FromResult(new ClinicCrmResult<JsonElement>(outcome));
+    }
+
     public Task<string?> SummarizeConversationAsync(
         Guid companyId, Guid conversationId, string serviceName, CancellationToken ct = default) =>
         Task.FromResult(Summary);

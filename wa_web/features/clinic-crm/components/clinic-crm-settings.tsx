@@ -61,7 +61,7 @@ export function ClinicCrmSettingsView() {
 
   // Keyed on what was saved, so a save or a disconnect remounts each form with the new values
   // rather than syncing local state in an effect.
-  const connectionKey = [settings.configured, settings.baseUrl, settings.clientId, settings.hasSecret, settings.isEnabled].join("|");
+  const connectionKey = [settings.configured, settings.baseUrl, settings.clientId, settings.hasSecret, settings.isEnabled, settings.notifyOnMessages].join("|");
   const mappingKey = settings.services.map((s) => `${s.appointmentTypeId}:${s.externalTreatmentId ?? ""}`).join("|");
 
   return (
@@ -93,6 +93,7 @@ function ConnectionCard({ settings }: { settings: ClinicCrmSettings }) {
   const [clientId, setClientId] = useState(settings.clientId ?? "");
   const [clientSecret, setClientSecret] = useState("");
   const [isEnabled, setIsEnabled] = useState(settings.configured ? settings.isEnabled : true);
+  const [notifyOnMessages, setNotifyOnMessages] = useState(settings.configured ? settings.notifyOnMessages : false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   const needsSecret = !settings.hasSecret;
@@ -111,6 +112,7 @@ function ConnectionCard({ settings }: { settings: ClinicCrmSettings }) {
       clientId: clientId.trim(),
       clientSecret: clientSecret.trim() || null,
       isEnabled,
+      notifyOnMessages,
     });
   }
 
@@ -177,6 +179,24 @@ function ConnectionCard({ settings }: { settings: ClinicCrmSettings }) {
             </p>
           </div>
           <Switch id="crm-enabled" checked={isEnabled} onCheckedChange={setIsEnabled} />
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+          <div className="space-y-0.5">
+            <Label htmlFor="crm-notify-messages" className={isEnabled ? undefined : "text-muted-foreground"}>
+              Notify the CRM about new messages
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Tells the clinic&apos;s CRM when a customer writes in with a real message. STOP, reactions,
+              stickers and a plain &ldquo;ok&rdquo; or &ldquo;thanks&rdquo; are not sent.
+            </p>
+          </div>
+          <Switch
+            id="crm-notify-messages"
+            checked={isEnabled && notifyOnMessages}
+            disabled={!isEnabled}
+            onCheckedChange={setNotifyOnMessages}
+          />
         </div>
 
         {plainHttp ? (
