@@ -97,7 +97,8 @@ public sealed class InboundMediaDownloadJob(
             var messageDto = new ConversationMessageResponse(
                 message.Id, message.ConversationId, message.Body, message.Direction, message.Status,
                 message.ExternalMessageId, message.ErrorMessage, message.CreatedAt, message.StatusAt,
-                message.MediaType, message.MediaMimeType, MediaReady: true);
+                message.MediaType, message.MediaMimeType, MediaReady: true,
+                MediaFileName: message.MediaFileName);
 
             await notifier.MessageAsync(message.CompanyId, conversationDto, messageDto, ct);
         }

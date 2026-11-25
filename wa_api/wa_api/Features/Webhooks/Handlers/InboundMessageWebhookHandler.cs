@@ -352,7 +352,8 @@ public sealed class InboundMessageWebhookHandler(
             message.Id, conversation.Id, message.Body, message.Direction, message.Status,
             message.ExternalMessageId, message.ErrorMessage, now, null,
             // Media not yet downloaded → MediaReady:false. The download job re-pushes with it ready.
-            message.MediaType, message.MediaMimeType, MediaReady: false);
+            message.MediaType, message.MediaMimeType, MediaReady: false,
+            MediaFileName: message.MediaFileName);
 
         postCommit.Add(ct => notifier.MessageAsync(companyId, conversationDto, messageDto, ct));
     }

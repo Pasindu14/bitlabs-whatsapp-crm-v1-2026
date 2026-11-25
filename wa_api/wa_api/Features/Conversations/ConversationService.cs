@@ -114,7 +114,7 @@ public class ConversationService(
             .Select(m => new ConversationMessageResponse(
                 m.Id, m.ConversationId, m.Body, m.Direction, m.Status,
                 m.ExternalMessageId, m.ErrorMessage, m.CreatedAt, m.StatusAt,
-                m.MediaType, m.MediaMimeType, m.MediaDownloadedAt != null, m.MediaPurgedAt != null))
+                m.MediaType, m.MediaMimeType, m.MediaDownloadedAt != null, m.MediaPurgedAt != null, m.MediaFileName))
             .ToListAsync(ct);
 
         return (items, total);
@@ -567,7 +567,7 @@ public class ConversationService(
     private static ConversationMessageResponse MapMessage(Message m) => new(
         m.Id, m.ConversationId, m.Body, m.Direction, m.Status,
         m.ExternalMessageId, m.ErrorMessage, m.CreatedAt, m.StatusAt,
-        m.MediaType, m.MediaMimeType, m.MediaDownloadedAt != null, m.MediaPurgedAt != null);
+        m.MediaType, m.MediaMimeType, m.MediaDownloadedAt != null, m.MediaPurgedAt != null, m.MediaFileName);
 
     private static string Truncate(string s) => s.Length <= PreviewLength ? s : s[..PreviewLength];
 }

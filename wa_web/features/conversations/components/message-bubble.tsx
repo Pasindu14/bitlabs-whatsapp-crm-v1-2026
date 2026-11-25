@@ -75,7 +75,9 @@ function MessageMedia({ message }: { message: ConversationMessage }) {
   if (!mediaType) return null;
 
   const url = `/api/media/${message.id}`;
-  const isImage = mediaType === "image" || mediaType === "sticker";
+  // A photo sent "as a document" arrives as type=document with an image MIME — still preview it.
+  const isImage =
+    mediaType === "image" || mediaType === "sticker" || (message.mediaMimeType?.startsWith("image/") ?? false);
 
   // The 90-day retention sweep removed the file; the message and caption stay.
   if (message.mediaExpired) {
@@ -129,7 +131,7 @@ function MessageMedia({ message }: { message: ConversationMessage }) {
       className="flex items-center gap-2 rounded-lg border bg-background/50 px-3 py-2 transition-colors hover:bg-background/80"
     >
       <Icon className="size-5 shrink-0" />
-      <span className="flex-1 truncate text-sm">{label}</span>
+      <span className="flex-1 truncate text-sm">{message.mediaFileName || label}</span>
       <Download className="size-4 shrink-0 opacity-60" />
     </a>
   );

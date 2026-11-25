@@ -48,6 +48,8 @@ export interface ConversationMessage {
   mediaReady?: boolean;
   /** True once the 90-day retention sweep removed the file — the message and caption stay. */
   mediaExpired?: boolean;
+  /** Original file name — documents only. */
+  mediaFileName?: string | null;
 }
 
 export interface ConversationListParams {

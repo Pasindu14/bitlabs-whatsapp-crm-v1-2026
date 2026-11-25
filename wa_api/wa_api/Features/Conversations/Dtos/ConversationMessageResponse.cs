@@ -25,5 +25,6 @@ public record ConversationMessageResponse(
     string? MediaType = null,
     string? MediaMimeType = null,
     bool MediaReady = false,
-    bool MediaExpired = false
+    bool MediaExpired = false,
+    string? MediaFileName = null
 );
