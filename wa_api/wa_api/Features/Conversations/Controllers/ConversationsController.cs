@@ -105,6 +105,27 @@ public class ConversationsController(IConversationService service, IIdempotencyS
         return StatusCode(StatusCodes.Status201Created, envelope);
     }
 
+    /// <summary>
+    /// POST /api/v1/conversations/{id}/messages/media — send an image, audio file, video or document
+    /// (multipart: <c>file</c> + optional <c>caption</c>). Same gate as a text reply: free inside the open
+    /// 24-hour window, so an exhausted quota must not block it. Type and size are validated in the service.
+    /// </summary>
+    [HttpPost("{id:guid}/messages/media")]
+    [RequireActiveSubscription(SkipQuotaCheck = true)]
+    [RequestSizeLimit(100L * 1024 * 1024)]
+    public async Task<IActionResult> SendMedia(
+        Guid id, IFormFile file, [FromForm] string? caption, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            throw new BusinessRuleException("MEDIA_EMPTY", "Choose a file to send.");
+
+        using var ms = new MemoryStream((int)Math.Min(file.Length, int.MaxValue));
+        await file.CopyToAsync(ms, ct);
+
+        var result = await service.SendMediaAsync(id, ms.ToArray(), file.FileName, file.ContentType, caption, ct);
+        return StatusCode(StatusCodes.Status201Created, ResponseHelper.Created(result, CorrelationId));
+    }
+
     /// <summary>POST /api/v1/conversations/{id}/read — clear the unread count (agent opened the thread).</summary>
     [HttpPost("{id:guid}/read")]
     public async Task<IActionResult> MarkRead(Guid id, CancellationToken ct)

@@ -227,6 +227,10 @@ try
     // Inbound media: the two-step Meta downloader + the async job that persists the bytes off the webhook tx.
     builder.Services.AddScoped<wa_api.Features.Messages.InboundMedia.IInboundMediaDownloader, wa_api.Features.Messages.InboundMedia.InboundMediaDownloader>();
     builder.Services.AddTransient<wa_api.Features.Messages.InboundMedia.InboundMediaDownloadJob>();
+    // Outbound media: files sent from the inbox live on the VPS disk and are purged after Media:RetentionDays.
+    builder.Services.AddSingleton<wa_api.Features.Messages.OutboundMedia.IMediaStorage, wa_api.Features.Messages.OutboundMedia.LocalMediaStorage>();
+    builder.Services.AddScoped<wa_api.Features.Messages.OutboundMedia.IWabaMediaUploader, wa_api.Features.Messages.OutboundMedia.WabaMediaUploader>();
+    builder.Services.AddTransient<wa_api.Features.Messages.OutboundMedia.MediaRetentionJob>();
     builder.Services.AddScoped<wa_api.Features.Conversations.IConversationService, wa_api.Features.Conversations.ConversationService>();
     builder.Services.AddScoped<wa_api.Features.Conversations.Realtime.IChatNotifier, wa_api.Features.Conversations.Realtime.ChatNotifier>();
 
@@ -508,6 +512,8 @@ try
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookSweeperJob>("webhook-sweeper", j => j.RunAsync(), Cron.MinuteInterval(5));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookHealthCheckJob>("webhook-health-check", j => j.RunAsync(), Cron.MinuteInterval(5));
     RecurringJob.AddOrUpdate<wa_api.Features.Webhooks.Processing.WebhookRetentionJob>("webhook-retention", j => j.RunAsync(CancellationToken.None), "30 3 * * *");
+    // Media files (sent and received) are deleted after Media:RetentionDays (default 90).
+    RecurringJob.AddOrUpdate<wa_api.Features.Messages.OutboundMedia.MediaRetentionJob>("media-retention", j => j.RunAsync(CancellationToken.None), "45 3 * * *");
     RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.CampaignSchedulerJob>("campaign-scheduler", j => j.RunAsync(), Cron.Minutely);
     RecurringJob.AddOrUpdate<wa_api.Features.Campaigns.Jobs.QuotaWarningCheckerJob>("quota-warning-checker", j => j.RunAsync(CancellationToken.None), "0 6 * * *");
 

@@ -63,6 +63,36 @@ export function useSendConversationMessage(conversationId: string) {
   });
 }
 
+/**
+ * Sends a file (image, audio, video or document) in the thread, with the typed text as its caption. Goes
+ * through the Next proxy because a server action can't carry a File cleanly. The new bubble arrives via the
+ * realtime event; invalidating covers a missed one.
+ */
+export function useSendConversationMedia(conversationId: string) {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ file, caption }: { file: File; caption: string }) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      if (caption.trim()) fd.append("caption", caption.trim());
+      const res = await fetch(`/api/conversations/${conversationId}/media`, { method: "POST", body: fd });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Could not send the file.");
+      return json?.message as ConversationMessage | null;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) });
+      qc.invalidateQueries({ queryKey: queryKeys.conversations.lists() });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+      // A refused send can still leave a "Not delivered" bubble behind.
+      qc.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) });
+    },
+  });
+}
+
 export function useMarkConversationRead() {
   const qc = useQueryClient();
 

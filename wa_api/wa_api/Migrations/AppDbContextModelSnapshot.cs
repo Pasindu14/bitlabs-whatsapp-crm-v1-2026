@@ -1479,6 +1479,9 @@ namespace wa_api.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<DateTime?>("MediaPurgedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("MediaType")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -1554,12 +1557,18 @@ namespace wa_api.Migrations
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("StoragePath")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("CreatedAt");
 
                     b.HasIndex("MessageId")
                         .IsUnique();

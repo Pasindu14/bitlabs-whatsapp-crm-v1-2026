@@ -29,9 +29,55 @@ public class WhatsAppMessageSender(
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly RateLimitOptions _rateOptions = rateOptions.Value;
 
-    public async Task<Message> SendAsync(
+    public Task<Message> SendAsync(
         Contact contact, WabaConnection waba, string body, Guid? conversationId,
         bool chargeCredit, CancellationToken ct = default)
+        => SendCoreAsync(
+            contact, waba, body, conversationId, chargeCredit,
+            () => CallMetaApiAsync(waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, body, ct),
+            shape: null, ct);
+
+    public Task<Message> SendMediaAsync(
+        Contact contact, WabaConnection waba, string mediaType, string metaMediaId, string mimeType,
+        string? fileName, string? caption, Guid? conversationId, bool chargeCredit, CancellationToken ct = default)
+    {
+        // Audio has no caption on WhatsApp. The placeholder body mirrors what inbound media stores, which the
+        // inbox already knows to hide under the media.
+        var cap = mediaType == "audio" || string.IsNullOrWhiteSpace(caption) ? null : caption.Trim();
+        var body = cap ?? $"[{mediaType}]";
+
+        var inner = new Dictionary<string, object?> { ["id"] = metaMediaId };
+        if (cap is not null) inner["caption"] = cap;
+        if (mediaType == "document" && !string.IsNullOrWhiteSpace(fileName)) inner["filename"] = fileName;
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["messaging_product"] = "whatsapp",
+            ["to"] = contact.Phone,
+            ["type"] = mediaType,
+            [mediaType] = inner,
+        };
+
+        return SendCoreAsync(
+            contact, waba, body, conversationId, chargeCredit,
+            () => PostToMetaAsync(waba.PhoneNumberId, waba.EncryptedAccessToken, payload, ct),
+            shape: m =>
+            {
+                m.MediaType = mediaType;
+                m.MediaMimeType = mimeType;
+                m.MediaFileName = fileName;
+                m.MetaMediaId = metaMediaId;
+            },
+            ct);
+    }
+
+    /// <summary>
+    /// The shared send pipeline: pace → reserve quota → call Meta → persist → refund on failure. Text and
+    /// media differ only in the Meta call and in what they stamp on the row.
+    /// </summary>
+    private async Task<Message> SendCoreAsync(
+        Contact contact, WabaConnection waba, string body, Guid? conversationId, bool chargeCredit,
+        Func<Task<(string? ExternalId, string? Error)>> callMeta, Action<Message>? shape, CancellationToken ct)
     {
         // Session/service reply (within the 24h window): per-second pacing only, no tier consumption.
         await rateLimiter.AcquireOrThrowAsync(
@@ -51,8 +97,7 @@ public class WhatsAppMessageSender(
                 throw new BusinessRuleException("QUOTA_EXCEEDED", "Your message quota has been reached.");
         }
 
-        var (externalId, errorMessage) = await CallMetaApiAsync(
-            waba.PhoneNumberId, waba.EncryptedAccessToken, contact.Phone, body, ct);
+        var (externalId, errorMessage) = await callMeta();
 
         var message = new Message
         {
@@ -70,6 +115,7 @@ public class WhatsAppMessageSender(
             MeteredSubscriptionId = reservedSubId,
             // CompanyId is auto-stamped by AuditInterceptor from the JWT tenant context (HTTP path).
         };
+        shape?.Invoke(message);
         db.Messages.Add(message);
         await db.SaveChangesAsync(ct);
 

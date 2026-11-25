@@ -77,6 +77,17 @@ function MessageMedia({ message }: { message: ConversationMessage }) {
   const url = `/api/media/${message.id}`;
   const isImage = mediaType === "image" || mediaType === "sticker";
 
+  // The 90-day retention sweep removed the file; the message and caption stay.
+  if (message.mediaExpired) {
+    const { Icon, label } = isImage ? { Icon: ImageIcon, label: "Photo" } : mediaMeta(mediaType);
+    return (
+      <div className="flex items-center gap-2 rounded-lg bg-background/40 px-3 py-3 text-muted-foreground">
+        <Icon className="size-5 shrink-0" />
+        <span className="text-xs">{label} no longer available — files are kept for 90 days.</span>
+      </div>
+    );
+  }
+
   // Bytes not yet downloaded from Meta → placeholder until the realtime "media ready" event arrives.
   if (!message.mediaReady) {
     const { Icon, label } = isImage ? { Icon: ImageIcon, label: "Photo" } : mediaMeta(mediaType);
@@ -101,6 +112,11 @@ function MessageMedia({ message }: { message: ConversationMessage }) {
         />
       </a>
     );
+  }
+
+  // Audio plays in place (the API serves byte ranges, so it can seek without downloading it all first).
+  if (mediaType === "audio") {
+    return <audio controls preload="none" src={url} className="h-10 w-60 max-w-full" />;
   }
 
   // Non-image media, or an image that failed to load → a downloadable attachment chip.

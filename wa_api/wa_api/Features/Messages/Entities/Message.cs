@@ -98,6 +98,12 @@ public class Message : BaseEntity, ITenantEntity
     /// <summary>UTC when the media bytes were fetched from Meta and persisted to <see cref="Media"/>. Null = pending/failed.</summary>
     public DateTime? MediaDownloadedAt { get; set; }
 
+    /// <summary>
+    /// UTC when the media file was removed by the 90-day retention sweep (or could not be stored). The message
+    /// and caption stay; the inbox shows "file expired". Null while the file is still available.
+    /// </summary>
+    public DateTime? MediaPurgedAt { get; set; }
+
     // ── "Delete for me" (CRM-side soft delete) ─────────────────────────────────
     // WhatsApp's Cloud (Business) API exposes NO way to revoke/unsend a delivered message, so this only
     // hides the row from the tenant's own inbox + history — it never touches the customer's phone. It's a

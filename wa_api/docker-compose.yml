@@ -38,6 +38,10 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:8080"
       REDIS_CONNECTION: "redis:6379,abortConnect=false"
+      # Files sent from the inbox; purged after Media__RetentionDays (default 90) by the media-retention job.
+      Media__StoragePath: /data/media
+    volumes:
+      - media-data:/data/media
     depends_on:
       redis:
         condition: service_healthy
@@ -112,6 +116,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
 volumes:
+  media-data:
   redis-data:
   caddy-data:
   caddy-config:

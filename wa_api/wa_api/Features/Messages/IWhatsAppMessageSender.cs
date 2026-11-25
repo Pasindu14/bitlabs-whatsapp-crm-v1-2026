@@ -52,6 +52,17 @@ public interface IWhatsAppMessageSender
         => throw new NotSupportedException("This sender cannot send templates.");
 
     /// <summary>
+    /// Sends a file Meta already holds (uploaded via <c>IWabaMediaUploader</c>) as an image, audio, video or
+    /// document. Same pipeline and billing rule as <see cref="SendAsync"/>; the stored message carries the
+    /// media metadata. <paramref name="caption"/> is ignored for audio. Defaulted to a throw so fakes that only
+    /// send text need not implement it.
+    /// </summary>
+    Task<Message> SendMediaAsync(
+        Contact contact, WabaConnection waba, string mediaType, string metaMediaId, string mimeType,
+        string? fileName, string? caption, Guid? conversationId, bool chargeCredit, CancellationToken ct = default)
+        => throw new NotSupportedException("This sender cannot send media.");
+
+    /// <summary>
     /// Shows "typing…" on the customer's phone and marks <paramref name="inboundWamid"/> as read (Meta
     /// couples the two). It lasts until the next message we send or 25 seconds, whichever is first, and it
     /// needs the id of a message the customer sent — so it only exists when replying to one.

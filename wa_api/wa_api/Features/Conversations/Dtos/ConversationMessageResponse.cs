@@ -24,5 +24,6 @@ public record ConversationMessageResponse(
     DateTime? StatusAt,
     string? MediaType = null,
     string? MediaMimeType = null,
-    bool MediaReady = false
+    bool MediaReady = false,
+    bool MediaExpired = false
 );

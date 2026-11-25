@@ -23,8 +23,14 @@ public class MessageMedia : BaseEntity, ITenantEntity
     /// <summary>MIME type of the stored bytes (e.g. <c>image/jpeg</c>) — echoed as the Content-Type on read.</summary>
     public string ContentType { get; set; } = "application/octet-stream";
 
-    /// <summary>The raw media bytes.</summary>
+    /// <summary>The raw media bytes. Empty for files sent from the inbox — those live on disk, see <see cref="StoragePath"/>.</summary>
     public byte[] Data { get; set; } = [];
+
+    /// <summary>
+    /// Path (relative to <c>Media:StoragePath</c>) of a file stored on the VPS disk. Set for media SENT from
+    /// the inbox; null for inbound media, whose bytes are in <see cref="Data"/>.
+    /// </summary>
+    public string? StoragePath { get; set; }
 
     public Message Message { get; set; } = null!;
 }

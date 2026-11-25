@@ -21,6 +21,16 @@ public interface IConversationService
     /// the shared pathway, updates the snapshot, and pushes a realtime event. Throws on send failure.</summary>
     Task<ConversationMessageResponse> SendMessageAsync(Guid conversationId, string body, CancellationToken ct = default);
 
+    /// <summary>
+    /// Sends an image, audio file, video or document inside the open 24-hour window. Validates type and size,
+    /// uploads to Meta, sends by media id, keeps a copy on disk for the thread, and pushes a realtime event.
+    /// Throws <c>MEDIA_*</c> / <c>WINDOW_CLOSED</c> before anything is sent, <c>WHATSAPP_SEND_FAILED</c> if Meta
+    /// refuses the message afterwards.
+    /// </summary>
+    Task<ConversationMessageResponse> SendMediaAsync(
+        Guid conversationId, byte[] data, string fileName, string contentType, string? caption,
+        CancellationToken ct = default);
+
     /// <summary>Resets a conversation's unread count to zero (agent opened the thread).</summary>
     Task MarkReadAsync(Guid conversationId, CancellationToken ct = default);
 

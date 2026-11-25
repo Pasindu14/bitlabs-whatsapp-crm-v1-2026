@@ -329,6 +329,9 @@ public class AppDbContext(
             e.HasKey(x => x.Id);
             e.Property(x => x.ContentType).IsRequired().HasMaxLength(128);
             e.Property(x => x.Data).IsRequired();
+            e.Property(x => x.StoragePath).HasMaxLength(512);
+            // Retention sweep scans by age.
+            e.HasIndex(x => x.CreatedAt);
             // 1:1 with Message — one media blob per media message.
             e.HasIndex(x => x.MessageId).IsUnique();
             e.HasIndex(x => x.CompanyId);

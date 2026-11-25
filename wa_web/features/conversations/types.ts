@@ -46,6 +46,8 @@ export interface ConversationMessage {
   mediaType?: string | null;
   mediaMimeType?: string | null;
   mediaReady?: boolean;
+  /** True once the 90-day retention sweep removed the file — the message and caption stay. */
+  mediaExpired?: boolean;
 }
 
 export interface ConversationListParams {

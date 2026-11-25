@@ -11,6 +11,7 @@ using wa_api.Features.Conversations.Realtime;
 using wa_api.Features.Messages;
 using wa_api.Features.Messages.Dtos;
 using wa_api.Features.Messages.Entities;
+using wa_api.Features.Messages.OutboundMedia;
 using wa_api.Features.WhatsApp.Entities;
 using wa_api.Infrastructure.Persistence;
 
@@ -27,7 +28,9 @@ public class ConversationService(
     IWhatsAppMessageSender sender,
     IChatNotifier notifier,
     IHttpContextAccessor httpContextAccessor,
-    IBotGate? botGate = null) : IConversationService
+    IBotGate? botGate = null,
+    IMediaStorage? mediaStorage = null,
+    IWabaMediaUploader? mediaUploader = null) : IConversationService
 {
     /// <summary>Max preview length stored on the conversation snapshot.</summary>
     private const int PreviewLength = 200;
@@ -111,7 +114,7 @@ public class ConversationService(
             .Select(m => new ConversationMessageResponse(
                 m.Id, m.ConversationId, m.Body, m.Direction, m.Status,
                 m.ExternalMessageId, m.ErrorMessage, m.CreatedAt, m.StatusAt,
-                m.MediaType, m.MediaMimeType, m.MediaDownloadedAt != null))
+                m.MediaType, m.MediaMimeType, m.MediaDownloadedAt != null, m.MediaPurgedAt != null))
             .ToListAsync(ct);
 
         return (items, total);
@@ -141,13 +144,26 @@ public class ConversationService(
                 "The 24-hour customer service window has closed. You can reply again after the customer "
                 + "messages you (or by sending an approved template).");
 
-        // An agent typing IS the takeover. Pausing here rather than rejecting the send (the stricter
-        // design in plan 005 D2) keeps the composer working exactly as it does today while closing the
-        // real hazard: an AI running a multi-turn conversation talking over the person who just stepped
-        // in. The bot comes back on its own after an hour, or the agent hands it back sooner.
-        //
-        // Only when there is a bot to pause: for a company without the chatbot this would stamp every
-        // thread an agent replies on as "paused", then have the auto-resume job undo it an hour later.
+        await PauseBotForTakeoverAsync(conversation, ct);
+
+        var message = await SendInThreadAsync(
+            conversation, conversation.Contact, conversation.WabaConnection, body, ct);
+
+        return MapMessage(message);
+    }
+
+    /// <summary>
+    /// An agent typing IS the takeover. Pausing here rather than rejecting the send (the stricter
+    /// design in plan 005 D2) keeps the composer working exactly as it does today while closing the
+    /// real hazard: an AI running a multi-turn conversation talking over the person who just stepped
+    /// in. The bot comes back on its own after an hour, or the agent hands it back sooner.
+    /// <para>
+    /// Only when there is a bot to pause: for a company without the chatbot this would stamp every
+    /// thread an agent replies on as "paused", then have the auto-resume job undo it an hour later.
+    /// </para>
+    /// </summary>
+    private async Task PauseBotForTakeoverAsync(Conversation conversation, CancellationToken ct)
+    {
         if (conversation.BotState == ConversationBotState.Active
             && (botGate is null || await botGate.IsLiveAsync(conversation.CompanyId, ct)))
         {
@@ -156,9 +172,89 @@ public class ConversationService(
             conversation.BotPausedByUserId = CurrentUserId();
             conversation.BotResumesAt = DateTime.UtcNow + TakeoverDuration;
         }
+    }
 
-        var message = await SendInThreadAsync(
-            conversation, conversation.Contact, conversation.WabaConnection, body, ct);
+    public async Task<ConversationMessageResponse> SendMediaAsync(
+        Guid conversationId, byte[] data, string fileName, string contentType, string? caption,
+        CancellationToken ct = default)
+    {
+        if (mediaStorage is null || mediaUploader is null)
+            throw new InvalidOperationException("Media sending is not configured.");
+
+        var conversation = await db.Conversations
+            .Include(c => c.Contact)
+            .Include(c => c.WabaConnection)
+            .FirstOrDefaultAsync(c => c.Id == conversationId, ct)
+            ?? throw new NotFoundException("Conversation", conversationId);
+
+        if (!conversation.WabaConnection.IsActive)
+            throw new BusinessRuleException("WABA_INACTIVE",
+                "The WhatsApp connection for this conversation is inactive.");
+
+        if (conversation.WindowExpiresAt is null || conversation.WindowExpiresAt <= DateTime.UtcNow)
+            throw new BusinessRuleException("WINDOW_CLOSED",
+                "The 24-hour customer service window has closed. You can reply again after the customer "
+                + "messages you (or by sending an approved template).");
+
+        // Validate before anything leaves the building: type, size, caption.
+        var kind = OutboundMediaRules.Classify(contentType)
+            ?? throw new BusinessRuleException("MEDIA_TYPE_NOT_ALLOWED",
+                "WhatsApp can't send this kind of file. Use a JPG or PNG photo, an MP3/AAC/OGG/AMR audio file, "
+                + "an MP4 video, or a PDF, Word, Excel, PowerPoint or text document.");
+        if (data.Length == 0)
+            throw new BusinessRuleException("MEDIA_EMPTY", "The file is empty.");
+        if (data.Length > kind.MaxBytes)
+            throw new BusinessRuleException("MEDIA_TOO_LARGE",
+                $"This {kind.MediaType} is too large. WhatsApp allows up to {kind.MaxBytes / (1024 * 1024)} MB.");
+
+        var cleanCaption = string.IsNullOrWhiteSpace(caption) || !OutboundMediaRules.SupportsCaption(kind.MediaType)
+            ? null
+            : caption.Trim();
+        if (cleanCaption is { Length: > OutboundMediaRules.MaxCaptionLength })
+            throw new BusinessRuleException("CAPTION_TOO_LONG",
+                $"A caption can be up to {OutboundMediaRules.MaxCaptionLength} characters.");
+
+        var mime = OutboundMediaRules.NormalizeMime(contentType);
+        var safeName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(safeName)) safeName = "file" + kind.Extension;
+
+        await PauseBotForTakeoverAsync(conversation, ct);
+
+        // Upload first: a refusal here leaves no message row, no quota spent and nothing to clean up.
+        var metaMediaId = await mediaUploader.UploadAsync(conversation.WabaConnection, data, mime, safeName, ct);
+
+        var chargeCredit = conversation.WindowExpiresAt is null || conversation.WindowExpiresAt <= DateTime.UtcNow;
+        var message = await sender.SendMediaAsync(
+            conversation.Contact, conversation.WabaConnection, kind.MediaType, metaMediaId, mime,
+            safeName, cleanCaption, conversation.Id, chargeCredit, ct);
+
+        // Keep our own copy so the thread can show it (Meta's id expires, and its URL needs the token). A
+        // disk failure must not turn a delivered message into an error: mark the file unavailable instead.
+        try
+        {
+            var path = await mediaStorage.SaveAsync(conversation.CompanyId, message.Id, kind.Extension, data, ct);
+            db.MessageMedia.Add(new MessageMedia
+            {
+                CompanyId = conversation.CompanyId,
+                MessageId = message.Id,
+                ContentType = mime,
+                StoragePath = path,
+            });
+            message.MediaDownloadedAt = DateTime.UtcNow;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            message.MediaPurgedAt = DateTime.UtcNow;
+        }
+        await db.SaveChangesAsync(ct);
+
+        await RecordOutboundAsync(
+            conversation, conversation.Contact, conversation.WabaConnection, message,
+            cleanCaption ?? OutboundMediaRules.PreviewLabel(kind.MediaType), ct);
+
+        if (message.Status == MessageStatus.Failed)
+            throw new BusinessRuleException("WHATSAPP_SEND_FAILED",
+                message.ErrorMessage ?? "Failed to send message via WhatsApp.");
 
         return MapMessage(message);
     }
@@ -470,7 +566,8 @@ public class ConversationService(
 
     private static ConversationMessageResponse MapMessage(Message m) => new(
         m.Id, m.ConversationId, m.Body, m.Direction, m.Status,
-        m.ExternalMessageId, m.ErrorMessage, m.CreatedAt, m.StatusAt);
+        m.ExternalMessageId, m.ErrorMessage, m.CreatedAt, m.StatusAt,
+        m.MediaType, m.MediaMimeType, m.MediaDownloadedAt != null, m.MediaPurgedAt != null);
 
     private static string Truncate(string s) => s.Length <= PreviewLength ? s : s[..PreviewLength];
 }
