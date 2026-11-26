@@ -9,7 +9,7 @@ const ACTIONS = [
   { href: "/inbox?action=new", title: "New chat", hint: "Message one customer", icon: MessageSquarePlus, tone: "bg-[#dcebfa] text-[#1b5e9e]" },
   { href: "/templates/new", title: "New template", hint: "Get it approved by Meta", icon: FilePlus2, tone: "bg-[#ece4fb] text-[#5b3aa8]" },
   { href: "/contacts?action=new", title: "Add contact", hint: "Save one number", icon: UserPlus, tone: "bg-[#fbe7d3] text-[#9a4f0f]" },
-  { href: "/contacts?action=import", title: "Import contacts", hint: "Upload a file", icon: Upload, tone: "bg-[#fbe0e6] text-[#a32648]" },
+  { href: "/contacts?action=import", title: "Import contacts", hint: "Paste many numbers", icon: Upload, tone: "bg-[#fbe0e6] text-[#a32648]" },
   { href: "/contact-lists?action=new", title: "New contact list", hint: "Group your audience", icon: ListPlus, tone: "bg-[#d8f0f0] text-[#126b6b]" },
 ];
 
