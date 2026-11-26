@@ -78,7 +78,7 @@ function Empty({ text, cta = false }: { text: string; cta?: boolean }) {
       <p className="max-w-[18rem] text-[13px]">{text}</p>
       {cta && (
         <Button asChild size="sm" variant="outline" className="rounded-full">
-          <Link href="/campaigns">Create a campaign</Link>
+          <Link href="/campaigns?action=new">Create a campaign</Link>
         </Button>
       )}
     </div>

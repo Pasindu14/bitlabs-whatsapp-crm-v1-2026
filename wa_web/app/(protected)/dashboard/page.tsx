@@ -7,7 +7,6 @@ import {
   Layers,
   ListChecks,
   Megaphone,
-  Plus,
   Smartphone,
   Users,
 } from "lucide-react";
@@ -27,6 +26,7 @@ import { RecentCampaigns } from "@/features/dashboard/components/recent-campaign
 import { QuickLinkCard } from "@/features/dashboard/components/quick-link-card";
 import { DeliveryBand } from "@/features/dashboard/components/delivery-band";
 import { PlanPanel } from "@/features/dashboard/components/plan-panel";
+import { QuickActions } from "@/features/dashboard/components/quick-actions";
 import { change } from "@/features/dashboard/format";
 
 const isoDay = (d: Date) => d.toISOString().slice(0, 10);
@@ -82,18 +82,9 @@ async function CompanyAdminContent({ name }: { name: string }) {
 
   return (
     <>
-      <DashboardGreeting name={name} subtitle="Here's how your WhatsApp messaging is doing.">
-        <Button asChild variant="outline" size="lg">
-          <Link href="/inbox">
-            <Inbox data-icon="inline-start" /> Inbox
-          </Link>
-        </Button>
-        <Button asChild size="lg">
-          <Link href="/campaigns">
-            <Plus data-icon="inline-start" /> New campaign
-          </Link>
-        </Button>
-      </DashboardGreeting>
+      <DashboardGreeting name={name} subtitle="Here's how your WhatsApp messaging is doing." />
+
+      <QuickActions />
 
       <DeliveryBand
         sent={m?.totalSent ?? 0}

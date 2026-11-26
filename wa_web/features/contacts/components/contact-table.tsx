@@ -17,10 +17,13 @@ import { getContactColumns } from "./columns";
 import { ContactDialogs } from "./contact-dialogs";
 import { ContactImportDialog } from "./contact-import-dialog";
 import { SendMessageDialog } from "@/features/messages/components/send-message-dialog";
+import { useOpenFromQuery } from "@/lib/hooks/use-open-from-query";
 
 export function ContactTable() {
   const openCreate = useContactDialogStore((s) => s.openCreate);
   const openImport = useContactDialogStore((s) => s.openImport);
+  useOpenFromQuery("new", openCreate);
+  useOpenFromQuery("import", openImport);
   const { open: openEdit } = useEditContactDialog();
   const { open: openActivate } = useActivateContactDialog();
   const { open: openDeactivate } = useDeactivateContactDialog();

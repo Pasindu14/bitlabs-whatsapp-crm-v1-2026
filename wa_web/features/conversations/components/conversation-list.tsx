@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Search, Plus, Inbox as InboxIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ import { useBotAccess } from "@/features/bot/hooks/use-bot-access";
 import type { Conversation } from "@/features/conversations/types";
 import { ConversationListItem } from "./conversation-list-item";
 import { NewConversationDialog } from "./new-conversation-dialog";
+import { useOpenFromQuery } from "@/lib/hooks/use-open-from-query";
 
 type Filter = "all" | "unread" | "needs-you";
 
@@ -27,6 +28,7 @@ export function ConversationList() {
   const { data: conversations, isLoading, isError } = useConversations(debounced);
   const selected = useConversationStore((s) => s.selected);
   const [composeOpen, setComposeOpen] = useState(false);
+  useOpenFromQuery("new", useCallback(() => setComposeOpen(true), []));
   const [filter, setFilter] = useState<Filter>("all");
   const botAccess = useBotAccess();
   const botOn = botAccess.chatbot && botAccess.platformEnabled;

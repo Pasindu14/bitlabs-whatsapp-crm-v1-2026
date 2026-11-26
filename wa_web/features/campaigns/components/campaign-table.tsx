@@ -17,10 +17,12 @@ import {
 } from "@/features/campaigns/store/campaign-store";
 import { getCampaignColumns } from "./columns";
 import { CampaignDialogs } from "./campaign-dialogs";
+import { useOpenFromQuery } from "@/lib/hooks/use-open-from-query";
 
 export function CampaignTable() {
   const router = useRouter();
   const openCreate = useCampaignDialogStore((s) => s.openCreate);
+  useOpenFromQuery("new", openCreate);
   const { open: openEdit } = useEditCampaignDialog();
   const { open: openDelete } = useDeleteCampaignDialog();
   const { open: openCancel } = useCancelCampaignDialog();

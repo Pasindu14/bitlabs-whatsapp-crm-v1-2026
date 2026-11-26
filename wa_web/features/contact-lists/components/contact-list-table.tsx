@@ -16,9 +16,11 @@ import {
 } from "@/features/contact-lists/store/contact-list-store";
 import { getContactListColumns } from "./columns";
 import { ContactListDialogs } from "./contact-list-dialogs";
+import { useOpenFromQuery } from "@/lib/hooks/use-open-from-query";
 
 export function ContactListTable() {
   const openCreate = useContactListDialogStore((s) => s.openCreate);
+  useOpenFromQuery("new", openCreate);
   const { open: openEdit } = useEditContactListDialog();
   const { open: openManage } = useManageContactsDialog();
   const { open: openImport } = useImportContactsDialog();
