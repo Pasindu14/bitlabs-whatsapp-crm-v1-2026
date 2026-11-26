@@ -84,8 +84,6 @@ async function CompanyAdminContent({ name }: { name: string }) {
     <>
       <DashboardGreeting name={name} subtitle="Here's how your WhatsApp messaging is doing." />
 
-      <QuickActions />
-
       <DeliveryBand
         sent={m?.totalSent ?? 0}
         delivered={m?.totalDelivered ?? 0}
@@ -93,6 +91,8 @@ async function CompanyAdminContent({ name }: { name: string }) {
         failed={m?.totalFailed ?? 0}
         trend={sentTrend}
       />
+
+      <QuickActions />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2">
