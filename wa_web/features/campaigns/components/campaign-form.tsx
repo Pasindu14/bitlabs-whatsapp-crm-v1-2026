@@ -83,7 +83,9 @@ export function CampaignForm({
         ? toLocalDatetimeInput(defaultValues.scheduledAt)
         : null,
       recurrenceCron: defaultValues?.recurrenceCron ?? null,
-      overrideConsentGate: defaultValues?.overrideConsentGate ?? true,
+      // Off by default: imported customers who already consented get opt-in recorded at import
+      // ("Mark all as opted-in"), so the consent gate passes without this override.
+      overrideConsentGate: defaultValues?.overrideConsentGate ?? false,
     },
   });
 
@@ -91,14 +93,24 @@ export function CampaignForm({
   const selectedListIds = watch("contactListIds") ?? [];
   const selectedContactIds = watch("contactIds") ?? [];
 
-  // Load approved templates for the picker
-  const { data: templatesData } = useQuery({
-    queryKey: queryKeys.templates.list({ page: 1, pageSize: 50, status: "Approved" }),
+  // Load approved templates for the picker. pageSize 100 = the API's cap, so approved templates
+  // past the 50th are not silently dropped. retry: 1 — the default 3 retries with backoff left the
+  // picker empty for ~7s on a transient failure with nothing on screen to explain why.
+  const {
+    data: templatesData,
+    isPending: templatesLoading,
+    isError: templatesFailed,
+    error: templatesError,
+    refetch: refetchTemplates,
+    isFetching: templatesFetching,
+  } = useQuery({
+    queryKey: queryKeys.templates.list({ page: 1, pageSize: 100, status: "Approved" }),
     queryFn: async () => {
-      const res = await getTemplatesAction({ page: 1, pageSize: 50, status: "Approved" });
+      const res = await getTemplatesAction({ page: 1, pageSize: 100, status: "Approved" });
       if (!res.success) throw new Error(res.error);
       return res.data.items;
     },
+    retry: 1,
   });
 
   // Load contact lists
@@ -175,10 +187,19 @@ export function CampaignForm({
           name="templateId"
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select an approved template" />
+              <SelectTrigger className="w-full" disabled={templatesLoading}>
+                <SelectValue
+                  placeholder={
+                    templatesLoading ? "Loading templates…" : "Select an approved template"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
+                {templatesData?.length === 0 && (
+                  <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                    No approved templates yet.
+                  </p>
+                )}
                 {templatesData?.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
                     {t.name} — {t.language}
@@ -188,6 +209,21 @@ export function CampaignForm({
             </Select>
           )}
         />
+        {templatesFailed && (
+          <div className="flex items-center gap-2 text-xs text-destructive">
+            <span>Couldn&apos;t load templates{templatesError?.message ? `: ${templatesError.message}` : "."}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs"
+              disabled={templatesFetching}
+              onClick={() => refetchTemplates()}
+            >
+              {templatesFetching ? <Spinner className="size-3" /> : "Retry"}
+            </Button>
+          </div>
+        )}
         {errors.templateId && (
           <p className="text-xs text-destructive">{errors.templateId.message}</p>
         )}

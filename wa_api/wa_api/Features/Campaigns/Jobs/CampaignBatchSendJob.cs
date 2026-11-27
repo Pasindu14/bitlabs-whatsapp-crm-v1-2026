@@ -33,6 +33,7 @@ public class CampaignBatchSendJob(
     IBackgroundJobClient jobClient,
     IHttpClientFactory httpClientFactory,
     IOptions<RateLimitOptions> rateOptions,
+    IOptions<SendWindowOptions> sendWindowOptions,
     ILogger<CampaignBatchSendJob> logger)
 {
     private const int BatchSize = 50;
@@ -109,8 +110,9 @@ public class CampaignBatchSendJob(
         // recipients stay Queued so the resumed run continues exactly where this one stopped (no
         // double-send). Same graceful shape as the throttle/daily-tier reschedule paths. This is the
         // guarantee that a long send started before 20:00 never spills past it: each batch re-checks.
+        // A company listed in SendWindowOptions (e.g. the Meta app-review tenant) skips this gate.
         var nowUtc = DateTime.UtcNow;
-        if (!SendWindow.IsOpen(nowUtc))
+        if (!sendWindowOptions.Value.IsExempt(campaign.CompanyId) && !SendWindow.IsOpen(nowUtc))
         {
             var resumeJobId = jobClient.Schedule<CampaignBatchSendJob>(
                 j => j.RunAsync(campaignId, CancellationToken.None), SendWindow.NextOpen(nowUtc) - nowUtc);

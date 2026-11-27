@@ -1,5 +1,7 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using wa_api.Common.Tenancy;
 using wa_api.Common.Errors;
 using wa_api.Common.Subscriptions;
 using wa_api.Features.Campaigns.Dtos;
@@ -15,9 +17,14 @@ public class CampaignService(
     IBackgroundJobClient jobClient,
     IRecurringJobManager recurringJobs,
     ISubscriptionGate subscriptionGate,
+    ITenantContext tenant,
+    IOptions<SendWindowOptions> sendWindowOptions,
     ILogger<CampaignService> logger)
     : ICampaignService
 {
+    /// <summary>True when the company must respect the UAE quiet-hours window (i.e. is not exempt).</summary>
+    private bool WindowApplies(Guid? companyId) => !sendWindowOptions.Value.IsExempt(companyId);
+
     public async Task<(IReadOnlyList<CampaignResponse> Items, int Total)> GetPagedAsync(
         int page, int pageSize, string? search, string? statusFilter, CancellationToken ct = default)
     {
@@ -69,7 +76,7 @@ public class CampaignService(
     public async Task<CampaignResponse> CreateAsync(CreateCampaignRequest request, CancellationToken ct = default)
     {
         await ValidateTargetsAsync(request.TemplateId, request.ContactListIds, request.ContactIds, ct);
-        ValidateSchedule(request.ScheduleType, request.ScheduledAt, request.RecurrenceCron);
+        ValidateSchedule(request.ScheduleType, request.ScheduledAt, request.RecurrenceCron, tenant.CompanyId);
 
         // No quota check on a Draft: nothing is sent yet. Launch requires ≥1 message of balance
         // ([RequireActiveSubscription]); a partial balance sends what fits and holds the rest as QUOTA_EXCEEDED.
@@ -104,7 +111,7 @@ public class CampaignService(
                 "Only Draft campaigns can be edited.");
 
         await ValidateTargetsAsync(request.TemplateId, request.ContactListIds, request.ContactIds, ct);
-        ValidateSchedule(request.ScheduleType, request.ScheduledAt, request.RecurrenceCron);
+        ValidateSchedule(request.ScheduleType, request.ScheduledAt, request.RecurrenceCron, campaign.CompanyId);
 
         campaign.Name = request.Name;
         campaign.TemplateId = request.TemplateId;
@@ -170,7 +177,7 @@ public class CampaignService(
         var sendsNow = campaign.ScheduleType == ScheduleType.Immediate
             || (campaign.ScheduleType == ScheduleType.OneTime
                 && campaign.ScheduledAt is { } at && at <= DateTime.UtcNow);
-        if (sendsNow && !SendWindow.IsOpen(DateTime.UtcNow))
+        if (sendsNow && WindowApplies(campaign.CompanyId) && !SendWindow.IsOpen(DateTime.UtcNow))
             throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",
                 $"Sends are only permitted between {SendWindow.WindowText}. Schedule this campaign for a time inside that window.");
 
@@ -290,7 +297,7 @@ public class CampaignService(
                 "This campaign has no recipients held back by the message quota.");
 
         // Sends happen immediately, so the UAE quiet-hours window must be open (same rule as launch).
-        if (!SendWindow.IsOpen(DateTime.UtcNow))
+        if (WindowApplies(campaign.CompanyId) && !SendWindow.IsOpen(DateTime.UtcNow))
             throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",
                 $"Sends are only permitted between {SendWindow.WindowText}. Try again inside that window.");
 
@@ -575,7 +582,7 @@ public class CampaignService(
             flags.Count, sendable, noConsent, optedOut, invalid, noConsentOverridden, ov, quotaRemaining);
     }
 
-    private static void ValidateSchedule(ScheduleType type, DateTime? scheduledAt, string? cron)
+    private void ValidateSchedule(ScheduleType type, DateTime? scheduledAt, string? cron, Guid? companyId)
     {
         if (type == ScheduleType.OneTime && scheduledAt is null)
             throw new BusinessRuleException("SCHEDULE_REQUIRED",
@@ -587,6 +594,8 @@ public class CampaignService(
 
         // UAE quiet-hours: the start time must fall inside 08:00–20:00 UAE. (Immediate has no
         // configured time — its window is checked at launch, against the actual send moment.)
+        if (!WindowApplies(companyId)) return;
+
         if (type == ScheduleType.OneTime && scheduledAt is { } at
             && !SendWindow.IsOpen(DateTime.SpecifyKind(at, DateTimeKind.Utc)))
             throw new BusinessRuleException("OUTSIDE_SEND_WINDOW",

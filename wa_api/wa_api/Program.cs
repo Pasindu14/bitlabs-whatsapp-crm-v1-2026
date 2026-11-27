@@ -254,6 +254,8 @@ try
     builder.Services.AddScoped<wa_api.Features.Templates.ITemplateMediaSampleStore, wa_api.Features.Templates.TemplateMediaSampleStore>();
     builder.Services.AddScoped<wa_api.Common.Subscriptions.ISubscriptionGate, wa_api.Common.Subscriptions.SubscriptionGate>();
     builder.Services.AddScoped<wa_api.Common.Subscriptions.ISubscriptionMeter, wa_api.Common.Subscriptions.SubscriptionMeter>();
+    builder.Services.Configure<wa_api.Features.Campaigns.SendWindowOptions>(
+        builder.Configuration.GetSection(wa_api.Features.Campaigns.SendWindowOptions.SectionName));
     builder.Services.AddScoped<wa_api.Features.Campaigns.ICampaignService, wa_api.Features.Campaigns.CampaignService>();
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignLaunchJob>();
     builder.Services.AddTransient<wa_api.Features.Campaigns.Jobs.CampaignBatchSendJob>();
